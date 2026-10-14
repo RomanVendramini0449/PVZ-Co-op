@@ -22,6 +22,8 @@
 #include "CoopLockstep.h"
 
 #include <cmath>
+#include <cstdarg>
+#include <cstdio>
 
 namespace Coop
 {
@@ -464,31 +466,78 @@ int RunLockstepSelfTest()
 namespace Coop
 {
 
+namespace
+{
+	// The net test has to be readable live -- the host needs to see its own
+	// IP address while it is still waiting -- AND end up in a file the player
+	// can send on. Redirecting the console to a file gives up the first, and
+	// batch files have no tee, so the program writes both itself.
+	FILE* gNetTestLog = nullptr;
+
+	void LogPrintf(const char* theFormat, ...)
+	{
+		va_list aArgs;
+
+		va_start(aArgs, theFormat);
+		vprintf(theFormat, aArgs);
+		va_end(aArgs);
+		fflush(stdout);  // unbuffered, so progress shows as it happens
+
+		if (gNetTestLog != nullptr)
+		{
+			va_start(aArgs, theFormat);
+			vfprintf(gNetTestLog, theFormat, aArgs);
+			va_end(aArgs);
+			fflush(gNetTestLog);
+		}
+	}
+}
+
 int RunNetTest()
 {
 #if !COOP_SOCKETS_AVAILABLE
-	printf("coop nettest: co-op is not available on this platform\n");
+	LogPrintf("coop nettest: co-op is not available on this platform\n");
 	return 1;
 #else
 	const LaunchOptions& aOptions = GetLaunchOptions();
 	const bool aIsHost = aOptions.mWantHost;
 
+	gNetTestLog = fopen(aIsHost ? "coop-nettest-host.txt" : "coop-nettest-join.txt", "w");
+
 	Session aSession;
 	if (aIsHost)
 	{
-		printf("coop nettest: hosting on port %u, waiting for the other player...\n", aOptions.mPort);
 		if (!aSession.StartHost(aOptions.mPort, aOptions.mDifficulty, 1))
 		{
-			printf("coop nettest: FAILED to host: %s\n", aSession.GetStatusText().c_str());
+			LogPrintf("coop nettest: FAILED to host: %s\n", aSession.GetStatusText().c_str());
 			return 1;
 		}
+
+		// Save the host a trip to ipconfig: tell them exactly what their
+		// friend has to type.
+		const std::vector<std::string> aAddresses = Socket::GetLocalAddresses();
+		LogPrintf("\n");
+		if (aAddresses.empty())
+		{
+			LogPrintf("coop nettest: could not work out this machine's IP address.\n");
+			LogPrintf("coop nettest: run 'ipconfig' and look for the 192.168.x.x one.\n");
+		}
+		else
+		{
+			LogPrintf("==================================================\n");
+			LogPrintf(" Tell the other player to connect to:\n");
+			for (const std::string& aAddress : aAddresses)
+				LogPrintf("     %s:%u\n", aAddress.c_str(), aOptions.mPort);
+			LogPrintf("==================================================\n");
+		}
+		printf("\ncoop nettest: waiting for the other player to join...\n");
 	}
 	else
 	{
-		printf("coop nettest: connecting to %s:%u...\n", aOptions.mJoinHost.c_str(), aOptions.mPort);
+		LogPrintf("coop nettest: connecting to %s:%u...\n", aOptions.mJoinHost.c_str(), aOptions.mPort);
 		if (!aSession.StartJoin(aOptions.mJoinHost, aOptions.mPort))
 		{
-			printf("coop nettest: FAILED to connect: %s\n", aSession.GetStatusText().c_str());
+			LogPrintf("coop nettest: FAILED to connect: %s\n", aSession.GetStatusText().c_str());
 			return 1;
 		}
 	}
@@ -500,19 +549,19 @@ int RunNetTest()
 		aSession.Update();
 		if (aSession.GetState() == Session::State::Failed)
 		{
-			printf("coop nettest: FAILED: %s\n", aSession.GetStatusText().c_str());
+			LogPrintf("coop nettest: FAILED: %s\n", aSession.GetStatusText().c_str());
 			return 1;
 		}
 		if (std::chrono::steady_clock::now() > aDeadline)
 		{
-			printf("coop nettest: FAILED: timed out waiting for the other player.\n");
+			LogPrintf("coop nettest: FAILED: timed out waiting for the other player.\n");
 			return 1;
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(2));
 	}
 
-	printf("coop nettest: connected. %s\n", aSession.GetStatusText().c_str());
-	printf("coop nettest: build and game files match on both machines.\n");
+	LogPrintf("coop nettest: connected. %s\n", aSession.GetStatusText().c_str());
+	LogPrintf("coop nettest: build and game files match on both machines.\n");
 
 	Lockstep aStep;
 	aStep.Begin(&aSession, aSession.GetParams(),
@@ -533,12 +582,12 @@ int RunNetTest()
 
 		if (!aSession.IsConnected())
 		{
-			printf("coop nettest: FAILED: %s\n", aSession.GetStatusText().c_str());
+			LogPrintf("coop nettest: FAILED: %s\n", aSession.GetStatusText().c_str());
 			return 1;
 		}
 		if (aStep.IsDesynced())
 		{
-			printf("coop nettest: FAILED: %s\n", aStep.GetDesyncText().c_str());
+			LogPrintf("coop nettest: FAILED: %s\n", aStep.GetDesyncText().c_str());
 			return 1;
 		}
 
@@ -580,14 +629,14 @@ int RunNetTest()
 		}
 		else if (aStep.ShouldShowWaiting())
 		{
-			printf("coop nettest: waiting for the other player (%u ticks)...\n",
+			LogPrintf("coop nettest: waiting for the other player (%u ticks)...\n",
 				aStep.GetStallTicks());
 			std::this_thread::sleep_for(std::chrono::milliseconds(50));
 		}
 
 		if (std::chrono::steady_clock::now() > aStart + std::chrono::seconds(90))
 		{
-			printf("coop nettest: FAILED: gave up at tick %u of %u.\n",
+			LogPrintf("coop nettest: FAILED: gave up at tick %u of %u.\n",
 				aStep.GetCurrentTick(), TARGET_TICKS);
 			return 1;
 		}
@@ -610,19 +659,27 @@ int RunNetTest()
 
 	printf("\ncoop nettest: ran %u ticks in %lld ms\n",
 		TARGET_TICKS, static_cast<long long>(aElapsedMs));
-	printf("coop nettest: final state 0x%08X (must match on BOTH machines)\n", aState);
-	printf("coop nettest: stalled %u ticks total, slowest tick %u ms\n",
+	LogPrintf("coop nettest: final state 0x%08X (must match on BOTH machines)\n", aState);
+	LogPrintf("coop nettest: stalled %u ticks total, slowest tick %u ms\n",
 		aStep.GetTotalStallTicks(), aSlowestTickMs);
-	printf("coop nettest: input delay settled at %u ticks (%u ms)\n",
+	LogPrintf("coop nettest: input delay settled at %u ticks (%u ms)\n",
 		aStep.GetInputDelay(), aStep.GetInputDelay() * 10);
 
 	if (aStep.GetTotalStallTicks() > TARGET_TICKS / 4)
-		printf("coop nettest: NOTE heavy stalling -- this link is slow or jittery.\n");
+		LogPrintf("coop nettest: NOTE heavy stalling -- this link is slow or jittery.\n");
 	else
-		printf("coop nettest: link looks good.\n");
+		LogPrintf("coop nettest: link looks good.\n");
 
 	aSession.Disconnect("nettest done");
-	printf("coop nettest: PASS\n");
+	LogPrintf("coop nettest: PASS\n");
+	LogPrintf("\n(this output was also saved to %s)\n",
+		aIsHost ? "coop-nettest-host.txt" : "coop-nettest-join.txt");
+
+	if (gNetTestLog != nullptr)
+	{
+		fclose(gNetTestLog);
+		gNetTestLog = nullptr;
+	}
 	return 0;
 #endif
 }
