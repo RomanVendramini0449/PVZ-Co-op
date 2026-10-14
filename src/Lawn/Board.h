@@ -43,8 +43,14 @@ constexpr const int MAX_GRID_SIZE_X = 9;
 constexpr const int MAX_GRID_SIZE_Y = 6;
 constexpr const int MAX_ZOMBIES_IN_WAVE = 50;
 // PvZ Co-op bonus levels (see GAMEMODE_COOP_ONSLAUGHT / _SANDBOX).
-constexpr const int ONSLAUGHT_WAVES = 20;  // a Gargantuar per lane each wave
+// Gargantuar Onslaught: time to set up, then a wave every 30 seconds of three
+// Gargantuars lined up in every lane -- 21 to a lane over the level.
+constexpr const int ONSLAUGHT_WAVES = 7;
 constexpr const int ONSLAUGHT_LANES = 5;
+constexpr const int ONSLAUGHT_PER_LANE = 3;
+constexpr const int ONSLAUGHT_LINE_SPACING = 75;   // pixels between the three in a lane
+constexpr const int ONSLAUGHT_SETUP_TICKS = 4500;  // 45 s before the first wave
+constexpr const int ONSLAUGHT_WAVE_TICKS = 3000;   // 30 s between waves
 constexpr const int UNLIMITED_SUN = 9990;  // the most the sun counter shows
 constexpr const int MAX_ZOMBIE_WAVES = 100;
 constexpr const int MAX_GRAVE_STONES = MAX_GRID_SIZE_X * MAX_GRID_SIZE_Y;

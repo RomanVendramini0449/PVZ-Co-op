@@ -660,11 +660,11 @@ void Board::PickZombieWaves()
 		bool aIsFlagWave = IsFlagWave(aWave);
 		bool aIsFinalWave = aWave == mNumWaves - 1;
 
-		// Gargantuar Onslaught: a Gargantuar for every lane, every wave --
-		// twenty to a lane over the level (see SpawnZombieWave).
+		// Gargantuar Onslaught: three Gargantuars for every lane, every wave
+		// (SpawnZombieWave lines them up).
 		if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
 		{
-			for (int aLane = 0; aLane < ONSLAUGHT_LANES; aLane++)
+			for (int i = 0; i < ONSLAUGHT_LANES * ONSLAUGHT_PER_LANE; i++)
 				PutZombieInWave(ZombieType::ZOMBIE_GARGANTUAR, aWave, &aZombiePicker);
 			continue;
 		}
@@ -1254,6 +1254,10 @@ void Board::InitZombieWaves()
 	else if (mApp->IsSurvivalMode() && mChallenge->mSurvivalStage > 0)
 	{
 		mZombieCountDown = ZOMBIE_COUNTDOWN_RANGE;
+	}
+	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
+	{
+		mZombieCountDown = ONSLAUGHT_SETUP_TICKS;
 	}
 	else
 	{
@@ -5300,9 +5304,14 @@ void Board::SpawnZombieWave()
 
 			if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
 			{
-				// One per lane, in lane order, rather than wherever the
-				// row picker would send them.
-				AddZombieInRow(aZombieType, i % ONSLAUGHT_LANES, mCurrentWave);
+				// Lane by lane rather than wherever the row picker would send
+				// them, each lane's three in a line, one behind the other.
+				Zombie* aZombie = AddZombieInRow(aZombieType, i % ONSLAUGHT_LANES, mCurrentWave);
+				if (aZombie)
+				{
+					aZombie->mPosX += static_cast<float>((i / ONSLAUGHT_LANES) * ONSLAUGHT_LINE_SPACING);
+					aZombie->mX = static_cast<int>(aZombie->mPosX);
+				}
 			}
 			else if (aZombieType == ZombieType::ZOMBIE_BOBSLED && !CanAddBobSled())
 			{
@@ -5859,6 +5868,13 @@ void Board::UpdateZombieSpawning()
 		{
 			mZombieHealthToNextWave = 0;
 			mZombieCountDown = ZOMBIE_COUNTDOWN_BEFORE_REPICK + 1;
+		}
+		else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
+		{
+			// On a fixed beat: killing a wave quickly earns breathing room
+			// rather than the next wave sooner.
+			mZombieHealthToNextWave = -1;
+			mZombieCountDown = ONSLAUGHT_WAVE_TICKS;
 		}
 		else if (IsFlagWave(mCurrentWave) && !(mApp->IsWallnutBowlingLevel() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND))
 		{
