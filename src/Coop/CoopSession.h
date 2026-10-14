@@ -133,7 +133,14 @@ struct LaunchOptions
 
 LaunchOptions& GetLaunchOptions();
 // Consumes argv. Returns false if the arguments were malformed.
+//
+// Co-op flags are stripped out as they are read: the game parses argv itself
+// and treats anything it does not recognise as a fatal error, so it must only
+// ever see the arguments that are its own. Call GetGameArgs() afterwards for
+// the filtered list to hand to the game.
 bool ParseLaunchOptions(int argc, char** argv, std::string& theErrorOut);
+// argv with every co-op flag and its value removed; argv[0] is kept.
+std::vector<char*>& GetGameArgs();
 // Loopback host+client handshake, no game assets needed. Returns 0 on success.
 int RunSelfTest();
 

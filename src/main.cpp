@@ -28,6 +28,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <vector>
 using namespace Sexy;
 
 #ifdef _WIN32
@@ -124,7 +125,11 @@ int main(int argc, char** argv)
 	PvzpStringListSetColors(gLawnStringFormats, gLawnStringFormatCount);
 	gExtractResourcesByName = Sexy::ExtractResourcesByName;
 	gLawnApp = new LawnApp();
-	gLawnApp->SetArgs(argc, argv);
+	// The game must only see its own arguments: its parser treats an
+	// unrecognised one as a fatal error, which is exactly what --host and
+	// --join used to trigger after the session had already connected.
+	std::vector<char*>& aGameArgs = Coop::GetGameArgs();
+	gLawnApp->SetArgs(static_cast<int>(aGameArgs.size()), aGameArgs.data());
 	gLawnApp->Init();
 	gLawnApp->Start();
 #ifndef __EMSCRIPTEN__

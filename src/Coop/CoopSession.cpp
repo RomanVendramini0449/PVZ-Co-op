@@ -647,12 +647,25 @@ namespace
 	}
 }
 
+std::vector<char*>& GetGameArgs()
+{
+	static std::vector<char*> sGameArgs;
+	return sGameArgs;
+}
+
 bool ParseLaunchOptions(int argc, char** argv, std::string& theErrorOut)
 {
 	LaunchOptions& aOptions = GetLaunchOptions();
 
+	std::vector<char*>& aGameArgs = GetGameArgs();
+	aGameArgs.clear();
+	if (argc > 0)
+		aGameArgs.push_back(argv[0]);
+
 	for (int i = 1; i < argc; ++i)
 	{
+		// Anything we recognise is consumed here and kept out of aGameArgs.
+		const int aIndexBefore = i;
 		const std::string aArg = argv[i];
 		std::string aValue;
 
@@ -698,7 +711,16 @@ bool ParseLaunchOptions(int argc, char** argv, std::string& theErrorOut)
 			else if (aValue == "hard") aOptions.mDifficulty = Difficulty::Hard;
 			else { theErrorOut = "--difficulty must be 'normal' or 'hard'"; return false; }
 		}
-		// Unknown arguments belong to the base game; leave them alone.
+		else
+		{
+			// Not ours: hand it to the game untouched.
+			aGameArgs.push_back(argv[i]);
+			continue;
+		}
+
+		// A recognised flag consumed argv[aIndexBefore .. i]; none of it
+		// reaches the game.
+		(void)aIndexBefore;
 	}
 
 	if (aOptions.mWantHost && aOptions.mWantJoin)
