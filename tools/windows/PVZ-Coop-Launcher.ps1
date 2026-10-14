@@ -35,39 +35,108 @@ function Save-Settings {
     try { Set-Content -Path $ConfigPath -Value $lines -Encoding UTF8 } catch { }
 }
 
-# Guess where the game lives, so most people never touch the folder box.
+# Find the game without being told where it is.
+#
+# Asks Steam rather than guessing: the registry gives Steam's own location,
+# and libraryfolders.vdf lists every library folder the user has added, which
+# is the part a list of guessed paths always gets wrong. Guesses are still
+# tried afterwards, for non-Steam copies and for anything the registry misses.
+
+function Get-SteamRoots {
+    $roots = @()
+    foreach ($key in @('HKCU:\Software\Valve\Steam',
+                       'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam',
+                       'HKLM:\SOFTWARE\Valve\Steam')) {
+        try {
+            $item = Get-ItemProperty -Path $key -ErrorAction Stop
+            foreach ($prop in @('SteamPath', 'InstallPath')) {
+                if ($item.$prop) { $roots += [string]$item.$prop }
+            }
+        } catch { }
+    }
+    foreach ($drive in [System.IO.DriveInfo]::GetDrives()) {
+        if (-not $drive.IsReady) { continue }
+        $r = $drive.RootDirectory.FullName
+        $roots += (Join-Path $r 'Program Files (x86)\Steam')
+        $roots += (Join-Path $r 'Program Files\Steam')
+        $roots += (Join-Path $r 'Steam')
+        $roots += (Join-Path $r 'SteamLibrary')
+    }
+    return $roots
+}
+
+# Every library Steam knows about, including ones on other drives.
+function Get-SteamLibraries {
+    $libraries = @()
+    foreach ($root in Get-SteamRoots) {
+        if (-not $root) { continue }
+        if (Test-Path (Join-Path $root 'steamapps')) { $libraries += $root }
+
+        $vdf = Join-Path $root 'steamapps\libraryfolders.vdf'
+        if (Test-Path $vdf) {
+            try {
+                foreach ($line in Get-Content $vdf -ErrorAction Stop) {
+                    # Entries look like:   "path"   "G:\\SteamLibrary"
+                    $m = [regex]::Match($line, '"path"\s+"(.+?)"')
+                    if ($m.Success) {
+                        # VDF escapes its backslashes.
+                        $libraries += $m.Groups[1].Value -replace '\\\\', '\'
+                    }
+                }
+            } catch { }
+        }
+    }
+    return $libraries | Select-Object -Unique
+}
+
+function Get-GameCandidates {
+    $found = @()
+
+    foreach ($library in Get-SteamLibraries) {
+        $common = Join-Path $library 'steamapps\common'
+        if (-not (Test-Path $common)) { continue }
+        try {
+            foreach ($dir in Get-ChildItem -Path $common -Directory -ErrorAction Stop) {
+                if ($dir.Name -notmatch 'Plants') { continue }
+                if (Test-Path (Join-Path $dir.FullName 'main.pak')) { $found += $dir.FullName }
+            }
+        } catch { }
+    }
+
+    # Non-Steam copies: retail, Origin and the EA app all land near here.
+    foreach ($drive in [System.IO.DriveInfo]::GetDrives()) {
+        if (-not $drive.IsReady) { continue }
+        $r = $drive.RootDirectory.FullName
+        foreach ($guess in @(
+            'Program Files (x86)\PopCap Games\Plants vs. Zombies',
+            'Program Files\PopCap Games\Plants vs. Zombies',
+            'Program Files (x86)\Origin Games\Plants vs Zombies',
+            'Program Files (x86)\EA Games\Plants vs. Zombies',
+            'Program Files\EA Games\Plants vs. Zombies',
+            'Games\Plants vs. Zombies',
+            'Plants vs. Zombies')) {
+            $path = Join-Path $r $guess
+            if (Test-Path (Join-Path $path 'main.pak')) { $found += $path }
+        }
+    }
+
+    # A GOTY install is the one this mod targets, so float it to the top.
+    $ranked = @($found | Select-Object -Unique | Sort-Object -Property @{
+        Expression = { if ($_ -match 'GOTY') { 0 } else { 1 } }
+    }, @{ Expression = { $_ } })
+
+    return $ranked
+}
+
 function Find-GameDir {
+    # Whatever worked last time wins, so a deliberate choice is never
+    # overridden by detection.
     if ($Settings.GameDir -and (Test-Path (Join-Path $Settings.GameDir 'main.pak'))) {
         return $Settings.GameDir
     }
-    $candidates = @()
-    foreach ($drive in [System.IO.DriveInfo]::GetDrives()) {
-        if (-not $drive.IsReady) { continue }
-        $root = $drive.RootDirectory.FullName
-        $candidates += Join-Path $root 'Program Files (x86)\Steam\steamapps\common\Plants vs. Zombies GOTY'
-        $candidates += Join-Path $root 'Program Files (x86)\Steam\steamapps\common\Plants Vs Zombies'
-        $candidates += Join-Path $root 'Steam\steamapps\common\Plants vs. Zombies GOTY'
-        $candidates += Join-Path $root 'Steam\steamapps\common\Plants Vs Zombies'
-        $candidates += Join-Path $root 'SteamLibrary\steamapps\common\Plants vs. Zombies GOTY'
-    }
-    foreach ($path in $candidates) {
-        if (Test-Path (Join-Path $path 'main.pak')) { return $path }
-    }
+    $candidates = Get-GameCandidates
+    if ($candidates.Count -gt 0) { return $candidates[0] }
     return ''
-}
-
-# Start-Process joins an argument array with spaces and quotes nothing, so a
-# path like "C:\Program Files (x86)\..." arrives at the game as several
-# separate arguments and it dies on the first stray word. Everything is
-# quoted here instead, and the command line is passed as one string.
-function ConvertTo-QuotedArg([string]$Value) {
-    if ($Value -eq '') { return '""' }
-    if ($Value -notmatch '[ \t"]') { return $Value }
-    # Trailing backslashes would escape the closing quote under the C runtime's
-    # parsing rules, so each run that reaches the end is doubled first.
-    $escaped = $Value -replace '(\\*)$', '$1$1'
-    $escaped = $escaped -replace '"', '\"'
-    return '"' + $escaped + '"'
 }
 
 function Get-LocalAddresses {
