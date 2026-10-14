@@ -33,6 +33,7 @@
 #include "widget/Slider.h"
 #include "widget/Checkbox.h"
 #include "../../PvzpLib/PvzpStringFile.h"
+#include "../../Coop/CoopGame.h"
 
 using namespace Sexy;
 
@@ -101,6 +102,20 @@ NewOptionsDialog::NewOptionsDialog(LawnApp* theApp, bool theFromGameSelector) :
 	{
 		mRestartButton->SetVisible(false);
 	}
+	// Co-op. This dialog no longer pauses anything (see Board::Pause); it is
+	// settings over a running game. What changes is who may leave: the host
+	// decides where both players are (SPEC.md section 3), so restarting the
+	// level is the host's call, and for the joining player "main menu" can
+	// only mean leaving the session.
+	if (Coop::Game::Get().IsFollower())
+	{
+		mRestartButton->SetVisible(false);
+		if (mFromGameSelector)
+			mBackToMainButton->SetVisible(false);  // the credits are the host's to show
+		else
+			mBackToMainButton->SetLabel("Leave Game");
+	}
+
 	if (!mApp->CanShowAlmanac() ||
 		mApp->mGameScene == GameScenes::SCENE_LEVEL_INTRO ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN ||
@@ -317,6 +332,31 @@ void NewOptionsDialog::ButtonDepress(int theId)
 
 	case NewOptionsDialog::NewOptionsDialog_MainMenu:
 	{
+		Coop::Game& aCoop = Coop::Game::Get();
+		if (aCoop.IsConnected() && !mFromGameSelector)
+		{
+			// Leaving ends the level for both machines, so it gets a
+			// confirmation even where single player would not ask.
+			LawnApp* anApp = mApp;
+			const bool aFollower = aCoop.IsFollower();
+			const int aResult = anApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE,
+				aFollower ? "Leave Game?" : "Main Menu?",
+				aFollower ? "Leave the co-op game?\n\nThe host will be told\nyou have gone."
+				          : "Go back to the main menu?\n\nThis ends the level\nfor both players.",
+				"[DIALOG_BUTTON_YES]", "[DIALOG_BUTTON_NO]", Dialog::BUTTONS_YES_NO);
+
+			// The message box ran its own loop, during which the host may
+			// already have moved both players somewhere else. Only act if
+			// the session and the level are still what they were.
+			if (aResult == Dialog::ID_YES && Coop::Game::Get().IsConnected() && (aFollower || anApp->mBoard))
+			{
+				anApp->KillNewOptionsDialog();
+				anApp->mBoardResult = BoardResult::BOARDRESULT_QUIT;
+				anApp->DoBackToMain();
+			}
+			break;
+		}
+
 		if (mFromGameSelector)
 		{
 			mApp->KillNewOptionsDialog();

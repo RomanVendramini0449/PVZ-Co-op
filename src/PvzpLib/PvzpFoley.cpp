@@ -22,7 +22,20 @@
 #include "PvzpFoley.h"
 #include "PvzpDebug.h"
 #include "PvzpCommon.h"
+#include "misc/MTRand.h"
 #include "sound/SoundManager.h"
+
+
+// Sounds pick their pitch and variation from their own generator, never the
+// gameplay one. Whether a sound plays at all depends on this machine alone --
+// whether it played too recently by this machine's clock, whether a channel is
+// free -- so drawing from the shared generator here made two co-op games
+// consume it a different number of times and drift out of sync.
+static Sexy::MTRand& FoleyRand()
+{
+	static Sexy::MTRand sFoleyRand(0xF0137EEDu);
+	return sFoleyRand;
+}
 
 int gFoleyParamArraySize;
 const FoleyParams* gFoleyParamArray;
@@ -279,7 +292,7 @@ void PvzpFoley::PlayFoleyPitch(FoleyType theFoleyType, float thePitch)
 		}
 	}
 	PVZP_ASSERT(aVariations > 0);
-	int aVariation = PvzpPickFromArray(aVariationsArray, aVariations);
+	int aVariation = aVariationsArray[FoleyRand().NextNoAssert(static_cast<unsigned long>(aVariations))];
 	aFoleyData->mLastVariationPlayed = aVariation;
 	SoundInstance* aSoundInstance = gSexyAppBase->mSoundManager->GetSoundInstance(*aFoleyParams->mSfxID[aVariation]);
 	if (aSoundInstance == nullptr)
@@ -303,7 +316,7 @@ void PvzpFoley::PlayFoley(FoleyType theFoleyType)
 	const FoleyParams* aFoleyParams = LookupFoley(theFoleyType);
 	float aPitch = 0.0f;
 	if (aFoleyParams->mPitchRange != 0.0f)
-		aPitch = Sexy::Rand(aFoleyParams->mPitchRange);
+		aPitch = FoleyRand().NextNoAssert(aFoleyParams->mPitchRange);
 	PlayFoleyPitch(theFoleyType, aPitch);
 }
 

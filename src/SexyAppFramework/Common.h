@@ -147,6 +147,12 @@ void				LogErrorLn(std::format_string<Args...> theFmt, Args&&... theArgs)
 int					Rand();
 int					Rand(int range);
 float				Rand(float range);
+// For randomness that is only ever looked at: particles, trails, animation
+// shake. Kept apart from Rand() so that how much of it a machine happens to use
+// can never change the game itself -- which, between two co-op machines that
+// must stay identical, it otherwise could.
+int					CosmeticRand(int range);
+float				CosmeticRand(float range);
 void				SRand(ulong theSeed);
 std::string			GetAppDataFolder();
 void				SetAppDataFolder(std::string_view thePath);

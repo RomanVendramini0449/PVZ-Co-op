@@ -67,6 +67,10 @@ public:
 	bool					mHighlighted;
 	int32_t					mTransparentCounter;
 	int32_t					mSunCount;
+	// Co-op vasebreaker: vases take two hits (see ScaryPotterMalletPot).
+	// Simulation state, so both machines agree; the wobble is only drawn.
+	int32_t					mCoopHitsTaken = 0;
+	int32_t					mCoopWobbleCounter = 0;
 	MotionTrailFrame		mMotionTrailFrames[NUM_MOTION_TRAIL_FRAMES];
 	int32_t					mMotionTrailCount;
 

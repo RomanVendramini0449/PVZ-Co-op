@@ -319,6 +319,8 @@ void GridItem::DrawScaryPot(Graphics* g)
 	int aXPos = mBoard->GridToPixelX(mGridX, mGridY) - 5;
 	int aYPos = mBoard->GridToPixelY(mGridX, mGridY) - 15;
 	PvzpDrawImageCelCenterScaledF(g, IMAGE_PLANTSHADOW2, aXPos - 5.0f, aYPos + 72.0f, 0, 1.3f, 1.3f);
+	if (mCoopWobbleCounter > 0)
+		aXPos += (mCoopWobbleCounter / 3) % 2 == 0 ? 3 : -3;  // cracked: rock it
 
 	if (mTransparentCounter > 0)
 	{
@@ -558,6 +560,9 @@ void GridItem::UpdateBrain()
 
 void GridItem::Update()
 {
+	if (mCoopWobbleCounter > 0)
+		mCoopWobbleCounter--;
+
 	Reanimation* aGridItemReanim = mApp->ReanimationTryToGet(mGridItemReanimID);
 	if (aGridItemReanim)
 	{

@@ -142,6 +142,24 @@ public:
 	void             SlideTo(int theX, int theY);
 	void                        ShowZombatarScreen();
 	void                        ShowAchievementsScreen();
+
+	// ---- host-only level select (docs/SPEC.md section 10.3) -------------
+	// The Mini-games button is repurposed, since this build has no
+	// mini-games mode to reach anyway. Host-only, like every other
+	// outside-a-level decision.
+	bool                        mCoopLevelSelectOpen = false;
+	Widget*                     mCoopLevelSelectPanel = nullptr;  // owned by the widget tree
+	void                        OpenCoopLevelSelect();
+	bool                        CoopHostMayStartLevel();
+	void                        CloseCoopLevelSelect();
+	void                        CoopLevelSelectClicked(int x, int y);
+	bool                        CoopLevelSelectEnabled() const;
+	bool                        CoopDifficultyEnabled() const;
+	void                        DrawCoopButtonLabels(Graphics* g);
+	void                        DrawCoopLevelSelect(Graphics* g);
+	// Returns the campaign level under the point, or 0 for none.
+	int                         CoopLevelSelectHitTest(int x, int y) const;
+	void                        CoopStartLevel(int theLevel);
 };
 
 class GameSelectorOverlay : public Widget

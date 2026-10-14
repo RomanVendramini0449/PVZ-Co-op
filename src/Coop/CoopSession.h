@@ -44,6 +44,16 @@ uint64_t HashGameAssets();
 class Session
 {
 public:
+	// Why a session that was connected stopped being so, for telling the
+	// player in their own terms rather than the socket's.
+	enum class EndReason
+	{
+		None,
+		PeerLeft,   // the other player quit or left
+		LocalLeft,  // this player left
+		Lost,       // the link dropped
+	};
+
 	enum class State
 	{
 		Idle,          // not in co-op
@@ -57,6 +67,7 @@ public:
 
 private:
 	State         mState = State::Idle;
+	EndReason     mEndReason = EndReason::None;
 	bool          mIsHost = false;
 	Socket        mListener;
 	Socket        mPeer;
@@ -68,12 +79,16 @@ private:
 	std::vector<char>   mInbound;
 	std::vector<char>   mOutbound;
 	std::deque<CommandBatch> mPendingBatches;
-	std::deque<std::pair<uint32_t, uint32_t>> mPendingChecksums;  // tick, checksum
+	struct PendingChecksum { uint32_t mEpoch; uint32_t mTick; uint32_t mValue; };
+	std::deque<PendingChecksum> mPendingChecksums;
 	// Host-driven campaign flow (SPEC.md section 3). Queued rather than
 	// applied on arrival: the client acts on these from the game loop, where
 	// building a board is safe.
-	std::deque<LevelSetup>   mPendingLevels;
-	bool                     mPendingLeaveLevel = false;
+	std::deque<FlowEvent>    mPendingFlow;
+	// Host: whether the client has finished loading and clicked through its
+	// title screen. Until then it is not on any screen that can follow us.
+	bool                     mPeerReady = false;
+	bool                     mSentReady = false;
 
 	uint64_t      mLocalBuildHash = 0;
 	uint64_t      mLocalAssetHash = 0;
@@ -105,6 +120,7 @@ public:
 	void Disconnect(const std::string& theReason);
 
 	State       GetState() const { return mState; }
+	EndReason   GetEndReason() const { return mEndReason; }
 	bool        IsActive() const { return mState != State::Idle; }
 	bool        IsConnected() const { return mState == State::Connected; }
 	bool        IsHost() const { return mIsHost; }
@@ -115,19 +131,32 @@ public:
 	const std::string&   GetStatusText() const { return mStatusText; }
 
 	// Per-tick input exchange. Sent every tick, empty or not (see CommandBatch).
-	bool SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands);
-	bool PopCommandBatch(CommandBatch& theBatchOut);
+	//
+	// Pop only ever returns items for the epoch asked for. Older ones are
+	// discarded on the way -- they belong to a level both machines have left.
+	// Newer ones stay queued, because the peer can enter the next level a
+	// moment before we do and its first batches must survive until we arrive.
+	bool SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands, uint32_t theEpoch = 0);
+	bool PopCommandBatch(CommandBatch& theBatchOut, uint32_t theEpoch = 0);
 
 	// Simulation checksums, compared to catch a desync early.
-	bool SendChecksum(uint32_t theTick, uint32_t theChecksum);
-	bool PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut);
+	bool SendChecksum(uint32_t theTick, uint32_t theChecksum, uint32_t theEpoch = 0);
+	bool PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut, uint32_t theEpoch = 0);
 
 	// Host-driven campaign flow. Only the host sends these; only the client
 	// has anything to pop.
 	bool SendEnterLevel(const LevelSetup& theSetup);
-	bool PopEnterLevel(LevelSetup& theSetupOut);
 	bool SendLeaveLevel();
-	bool PopLeaveLevel();
+	// theProfile carries the host's campaign state, so a mirrored award or
+	// store shows the right plant, coins and upgrades.
+	bool SendHostScreen(HostScreen theScreen, int32_t theArg, const LevelSetup& theProfile);
+	// Client: the next flow step, in the order the host took them.
+	bool PopFlowEvent(FlowEvent& theEventOut);
+
+	// Client: say we are past the title screen. Sent once per session.
+	bool SendPeerReady();
+	// Host: has the client said so?
+	bool IsPeerReady() const { return mPeerReady; }
 };
 
 // Parsed from the command line, consumed when the title screen comes up so

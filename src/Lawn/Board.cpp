@@ -363,6 +363,13 @@ void Board::TryToSaveGame()
 
 bool Board::NeedSaveGame()
 {
+	// No mid-level save in co-op (SPEC.md section 10.4): the format holds one
+	// player's seed bank, and on the joining machine it would write a co-op
+	// board over that player's own single-player save. Levels restart cleanly
+	// from their seed instead. Progress between levels is still saved.
+	if (Coop::Game::Get().IsConnected())
+		return false;
+
 	return
 		mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ICE &&
 		mApp->mGameMode != GameMode::GAMEMODE_UPSELL &&
@@ -1276,7 +1283,7 @@ void Board::FreezeEffectsForCutscene(bool theFreeze)
 
 void Board::InitSurvivalStage()
 {
-	RefreshSeedPacketFromCursor();
+	ForEachCoopPlayer([this]() { RefreshSeedPacketFromCursor(); });
 	mApp->mSoundSystem->GamePause(true);
 	FreezeEffectsForCutscene(true);
 	mLevelComplete = false;
@@ -1694,6 +1701,11 @@ void Board::StartLevel()
 	mApp->mLastLevelStats->Reset();
 	mChallenge->StartLevel();
 
+	// The challenge just put its opening packets -- the first Wall-nut of a
+	// bowling level, say -- into the bank it was handed. Every player gets
+	// the same start; their belts and cooldowns go their own way from here.
+	CoopMirrorSeedBank();
+
 	// the unsigned underflow below is intentional
 	unsigned int aSurvivalStage = mApp->mGameMode - GAMEMODE_SURVIVAL_ENDLESS_STAGE_1;
 	if (aSurvivalStage <= 4) {
@@ -1872,7 +1884,7 @@ void Board::FadeOutLevel()
 {
 	if (mApp->mGameScene != GameScenes::SCENE_PLAYING)
 	{
-		RefreshSeedPacketFromCursor();
+		ForEachCoopPlayer([this]() { RefreshSeedPacketFromCursor(); });
 		mApp->mLastLevelStats->Reset();
 		mLevelComplete = true;
 	}
@@ -1941,7 +1953,7 @@ void Board::FadeOutLevel()
 
 	if (!IsSurvivalStageWithRepick())
 	{
-		RefreshSeedPacketFromCursor();
+		ForEachCoopPlayer([this]() { RefreshSeedPacketFromCursor(); });
 		mApp->mLastLevelStats->mUnusedLawnMowers = CountUntriggerLawnMowers();
 
 		mBoardFadeOutCounter = 600;
@@ -3133,10 +3145,14 @@ void Board::ApplyCoopCommand(const Coop::Command& theCommand)
 		mCoopCursorX[aPlayer] = theCommand.mX;
 		mCoopCursorY[aPlayer] = theCommand.mY;
 		mCoopCursorVisible[aPlayer] = true;
+		if (IsCoopHostOnlyMoment() && theCommand.mPlayer != Coop::PlayerId::Host)
+			break;
 		ApplyMouseDown(theCommand.mX, theCommand.mY, theCommand.mArg);
 		break;
 
 	case Coop::CommandType::MouseUp:
+		if (IsCoopHostOnlyMoment() && theCommand.mPlayer != Coop::PlayerId::Host)
+			break;
 		ApplyMouseUp(theCommand.mX, theCommand.mY, theCommand.mArg);
 		break;
 
@@ -3146,6 +3162,15 @@ void Board::ApplyCoopCommand(const Coop::Command& theCommand)
 
 	case Coop::CommandType::LeaveMenu:
 		mCoopCursorVisible[aPlayer] = true;
+		break;
+
+	case Coop::CommandType::Key:
+		ApplyCoopKey(theCommand.mPlayer, static_cast<KeyCode>(theCommand.mArg));
+		break;
+
+	case Coop::CommandType::DebugWin:
+		if (mApp->mGameScene == GameScenes::SCENE_PLAYING)
+			DebugWinLevel();
 		break;
 
 	case Coop::CommandType::ChooserPick:
@@ -3266,6 +3291,16 @@ void Board::ApplyMouseMove(int x, int y)
 
 void Board::MouseDrag(int x, int y)
 {
+	// Moving with a button held is still moving: it drives this player's
+	// cursor on the other screen, and the challenge's drag handling has to
+	// run on both machines alike.
+	if (Coop::Game::Get().IsInGame())
+	{
+		Coop::Game::Get().GetLockstep().QueueLocalCommand(
+			Coop::CommandType::MouseMove, static_cast<int16_t>(x), static_cast<int16_t>(y));
+		return;
+	}
+
 	Widget::MouseDrag(x, y);
 	mChallenge->MouseMove(x, y);
 }
@@ -4372,12 +4407,12 @@ bool Board::MouseHitTest(int x, int y, HitResult* theHitResult)
 		return false;
 	}
 
-	if (mMenuButton->IsMouseOver() && CanInteractWithBoardButtons())
+	if (IsBoardButtonHit(mMenuButton.get(), x, y) && CanInteractWithBoardButtons())
 	{
 		theHitResult->mObjectType = GameObjectType::OBJECT_TYPE_MENU_BUTTON;
 		return true;
 	}
-	else if (mStoreButton && mStoreButton->IsMouseOver() && CanInteractWithBoardButtons())
+	else if (mStoreButton && IsBoardButtonHit(mStoreButton.get(), x, y) && CanInteractWithBoardButtons())
 	{
 		theHitResult->mObjectType = GameObjectType::OBJECT_TYPE_STORE_BUTTON;
 		return true;
@@ -4631,11 +4666,11 @@ void Board::ApplyMouseDown(int x, int y, int theClickCount)
 	if (mChallenge->MouseDown(x, y, theClickCount, &aHitResult))
 		return;
 
-	if (mMenuButton->IsMouseOver() && CanInteractWithBoardButtons() && theClickCount > 0)
+	if (IsBoardButtonHit(mMenuButton.get(), x, y) && CanInteractWithBoardButtons() && theClickCount > 0)
 	{
 		mApp->PlaySample(Sexy::SOUND_GRAVEBUTTON);
 	}
-	else if (mStoreButton && mStoreButton->IsMouseOver() && CanInteractWithBoardButtons() && theClickCount > 0)
+	else if (mStoreButton && IsBoardButtonHit(mStoreButton.get(), x, y) && CanInteractWithBoardButtons() && theClickCount > 0)
 	{
 		if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN || mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM)
 		{
@@ -4850,13 +4885,25 @@ void Board::ApplyMouseUp(int x, int y, int theClickCount)
 
 	if (CanInteractWithBoardButtons() && theClickCount > 0)
 	{
-		if (mMenuButton->IsMouseOver() && !mApp->GetDialog(Dialogs::DIALOG_GAME_OVER) && !mApp->GetDialog(Dialogs::DIALOG_LEVEL_COMPLETE))
+		if (IsBoardButtonHit(mMenuButton.get(), x, y) && !mApp->GetDialog(Dialogs::DIALOG_GAME_OVER) && !mApp->GetDialog(Dialogs::DIALOG_LEVEL_COMPLETE))
 		{
 			mMenuButton->mIsOver = false;
 			mMenuButton->mIsDown = false;
 			UpdateCursor();
 			ClearCursor();
-			if (mTutorialState == TutorialState::TUTORIAL_ZEN_GARDEN_COMPLETED)
+			if (Coop::Game::Get().IsInGame())
+			{
+				// This click is being replayed on both machines. Dropping what
+				// the player held is simulation and happens on both; the menu
+				// is a window on one screen and opens only for whoever
+				// clicked. It no longer pauses anything (see Board::Pause).
+				if (mActivePlayer == Coop::Game::Get().GetLocalPlayerIndex())
+				{
+					mApp->PlaySample(Sexy::SOUND_PAUSE);
+					mApp->DoNewOptions(false);
+				}
+			}
+			else if (mTutorialState == TutorialState::TUTORIAL_ZEN_GARDEN_COMPLETED)
 			{
 				mApp->FinishZenGardenToturial();
 			}
@@ -4871,7 +4918,7 @@ void Board::ApplyMouseUp(int x, int y, int theClickCount)
 				mApp->DoBackToMain();
 			}
 		}
-		else if(mStoreButton && mStoreButton->IsMouseOver())
+		else if(mStoreButton && IsBoardButtonHit(mStoreButton.get(), x, y))
 		{
 			if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN)
 			{
@@ -4905,6 +4952,16 @@ void Board::ShowCoinBank(int theDuration)
 
 void Board::Pause(bool thePause)
 {
+	// Co-op cannot pause. A pause is one machine deciding to stop while the
+	// other carries on, which is exactly the thing lockstep cannot survive:
+	// the paused board still consumes ticks but skips the simulation, the two
+	// games part ways, and both end up stuck "waiting for the other player".
+	// Every dialog funnels through here -- the in-game menu, the almanac, the
+	// pause key -- so refusing it here covers them all. The menu becomes a
+	// settings screen over a running game, for both players.
+	if (thePause && Coop::Game::Get().IsConnected())
+		return;
+
 	if (mPaused == thePause)
 		return;
 
@@ -5265,10 +5322,67 @@ void Board::UpdateGameObjects()
 	}
 	SetActivePlayer(aPreviousPlayer);
 
-	// Tick done. The checksum rides along every so often so a divergence
-	// is reported rather than silently compounding.
-	if (Coop::Game::Get().IsInGame())
-		Coop::Game::Get().GetLockstep().EndTick(ComputeCoopChecksum());
+	// The lockstep tick is closed by Board::Update's simulation scope, on
+	// every way out of the update -- not here, where several early returns
+	// in Board::Update would skip it and leave the next frame waiting on a
+	// tick whose input has already been consumed.
+}
+
+// Did a click at (theX, theY), in board coordinates, land on this button? In
+// single player this is the original local-mouse test, unchanged. In co-op the
+// click is replayed on both machines, so it is tested against the click's own
+// position instead -- otherwise each machine answers from wherever its own
+// mouse happens to be, and the same click opens a menu on one screen and
+// plants a seed on the other.
+// Cutscenes, Crazy Dave and the "zombies ate your brains" screen are the
+// host's to click through (SPEC.md section 3). The joining player's clicks are
+// still replayed -- so the cursor tracks -- but do nothing, on both machines
+// alike, which keeps it deterministic.
+// A key press replayed from the command stream, with the pressing player
+// active. Mirrors KeyDown's game-changing branches; the window-opening ones
+// never get here.
+void Board::ApplyCoopKey(Coop::PlayerId thePlayer, KeyCode theKey)
+{
+	const bool aIsHost = thePlayer == Coop::PlayerId::Host;
+
+	if (mApp->mGameScene == GameScenes::SCENE_LEVEL_INTRO)
+	{
+		if (aIsHost)
+			mCutScene->KeyDown(theKey);
+		return;
+	}
+
+	if (theKey == KeyCode::KEYCODE_RETURN || theKey == KeyCode::KEYCODE_SPACE)
+	{
+		if (aIsHost && IsScaryPotterDaveTalking() && mApp->mCrazyDaveMessageIndex != -1)
+			mChallenge->AdvanceCrazyDaveDialog();
+		return;
+	}
+
+	if (theKey == KeyCode::KEYCODE_ESCAPE && mCursorObject->mCursorType != CursorType::CURSOR_TYPE_NORMAL)
+		RefreshSeedPacketFromCursor();
+}
+
+bool Board::IsCoopHostOnlyMoment()
+{
+	return mApp->mGameScene == GameScenes::SCENE_LEVEL_INTRO
+		|| mApp->mGameScene == GameScenes::SCENE_ZOMBIES_WON
+		|| IsScaryPotterDaveTalking();
+}
+
+bool Board::IsBoardButtonHit(GameButton* theButton, int theX, int theY) const
+{
+	if (theButton == nullptr)
+		return false;
+	if (!Coop::Game::Get().IsInGame())
+		return theButton->IsMouseOver();
+
+	// Unparented buttons are laid out in screen space; parented ones in
+	// their parent's. The board's own position is part of the simulation
+	// (it shakes), so this conversion is the same on both machines.
+	if (theButton->mParentWidget == nullptr)
+		return theButton->ContainsPoint(theX + mX, theY + mY);
+	return theButton->ContainsPoint(theX, theY);
 }
 
 void Board::GetPlayerMouse(int thePlayer, int& theX, int& theY) const
@@ -6019,6 +6133,60 @@ void Board::UpdateGame()
 	UpdateProgressMeter();
 }
 
+Board::CoopSimulationScope::CoopSimulationScope(Board* theBoard, bool theTickBegun)
+	: mBoard(theBoard), mRestingPlayer(theBoard->mActivePlayer), mTickBegun(theTickBegun)
+{
+	mActive = Coop::Game::Get().IsInGame() && theBoard->mCoopPlayerCount > 1;
+	if (mActive)
+		mBoard->SetActivePlayer(0);
+}
+
+Board::CoopSimulationScope::~CoopSimulationScope()
+{
+	if (mActive)
+	{
+		mBoard->CoopSyncSeedBankLayout();
+		mBoard->SetActivePlayer(mRestingPlayer);
+	}
+
+	// A tick that began must end, however the update got out. The checksum
+	// rides along every so often so a divergence is reported rather than
+	// silently compounding. Only if it is still the same level's clock: a
+	// tick that ended the level must not advance the next one's.
+	if (mTickBegun && Coop::Game::Get().IsInGame())
+	{
+		Coop::Lockstep& aLockstep = Coop::Game::Get().GetLockstep();
+		if (aLockstep.GetEpoch() == mBoard->mCoopTickEpoch)
+			aLockstep.EndTick(mBoard->ComputeCoopChecksum());
+	}
+}
+
+// The banks hold different packets and cooldowns, but they occupy one place on
+// screen -- each machine only ever draws its own -- so where the bank is, how
+// wide, how dark during a cutscene, is shared. The simulation moves bank 0; the
+// rest follow. Without this the other player's bank sat wherever it was at
+// level start (off the top of the screen, during the intro), and their clicks
+// on it missed on this machine while landing on theirs.
+void Board::CoopSyncSeedBankLayout()
+{
+	SeedBank* aSource = mSeedBankStorage[0].get();
+	if (aSource == nullptr)
+		return;
+
+	for (int aPlayer = 1; aPlayer < mCoopPlayerCount; aPlayer++)
+	{
+		SeedBank* aTarget = mSeedBankStorage[aPlayer].get();
+		if (aTarget == nullptr)
+			continue;
+		aTarget->mX = aSource->mX;
+		aTarget->mY = aSource->mY;
+		aTarget->mWidth = aSource->mWidth;
+		aTarget->mHeight = aSource->mHeight;
+		aTarget->mVisible = aSource->mVisible;
+		aTarget->mCutSceneDarken = aSource->mCutSceneDarken;
+	}
+}
+
 void Board::Update()
 {
 	PvzpHesitationBracket aHesitation("Board::Update");
@@ -6028,9 +6196,11 @@ void Board::Update()
 	// not advance: drawing carries on, so the game stays responsive, but no
 	// game state moves. Advancing without their input is exactly how the two
 	// games would drift apart.
+	bool aCoopTickBegun = false;
 	if (Coop::Game::Get().IsInGame())
 	{
 		Coop::Lockstep& aLockstep = Coop::Game::Get().GetLockstep();
+		aCoopTickBegun = true;
 		if (!aLockstep.BeginTick())
 		{
 			// Stalled: no game state may move. Keep asking for a redraw
@@ -6040,17 +6210,33 @@ void Board::Update()
 			MarkDirty();
 			return;
 		}
+		mCoopTickEpoch = aLockstep.GetEpoch();
 
-		for (const Coop::Command& aCommand : aLockstep.GetTickCommands())
+		// A copy: applying a command can, in principle, restart the clock.
+		const std::vector<Coop::Command> aCommands = aLockstep.GetTickCommands();
+		for (const Coop::Command& aCommand : aCommands)
 			ApplyCoopCommand(aCommand);
 	}
+
+	// The simulation runs as player 0 on both machines.
+	//
+	// The board rests on the local player -- that is whose bank and cursor
+	// get drawn -- which makes the "active" player different on each machine:
+	// the host rests on 0, the client on 1. Anything in the simulation that
+	// touches the seed bank or cursor without saying whose -- the bank sliding
+	// in during the intro, a cutscene dropping what you hold, a challenge
+	// setting up -- would therefore touch a different player's state on each
+	// machine, and the two games would quietly part. Pinning the simulation to
+	// one canonical player makes those paths identical everywhere; the places
+	// that should reach every player say so explicitly (ForEachCoopPlayer).
+	CoopSimulationScope aSimulationScope(this, aCoopTickBegun);
 
 	Widget::Update();
 	MarkDirty();
 
 	mBoardUpdateCounter++;
 	mCutScene->Update();
-	UpdateMousePosition();
+	aSimulationScope.RunAsLocalPlayer([this]() { UpdateMousePosition(); });
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN)
 	{
 		mApp->mZenGarden->ZenGardenUpdate();
@@ -7788,10 +7974,9 @@ void Board::DrawUITop(Graphics* g)
 		mAdvice->Draw(g);
 	}
 
-	// Above every game object and the board UI, but below your own cursor:
-	// if the two overlap you must never lose track of your own. Drawn here,
-	// outside the sorted render list, so nothing can sort on top of it.
-	DrawRemoteCursor(g);
+	// The other player's cursor is not drawn here any more: the co-op overlay
+	// draws it, above everything -- including the seed chooser and any dialog,
+	// which are separate widgets this pass can never get above.
 
 	if (mTimeStopCounter == 0 && mCursorObject->BeginDraw(g))
 	{
@@ -7996,6 +8181,31 @@ void Board::DoTypingCheck(KeyCode theKey)
 
 void Board::KeyDown(KeyCode theKey)
 {
+	if (Coop::Game::Get().IsInGame())
+	{
+		// A key either opens a window on this screen or changes the game.
+		// The menu is the only window, and stays local; everything else --
+		// skipping the intro, advancing Crazy Dave, letting go of a held
+		// plant -- is scheduled like a click so both machines do it on the
+		// same tick. There is no pause key in co-op (see Board::Pause), and
+		// the typed cheat words are off: they change how zombies behave on
+		// one machine only.
+		const bool aOpensMenu = theKey == KeyCode::KEYCODE_ESCAPE
+			&& mCursorObject->mCursorType == CursorType::CURSOR_TYPE_NORMAL
+			&& mApp->mGameScene != GameScenes::SCENE_LEVEL_INTRO;
+		if (aOpensMenu)
+		{
+			if (CanInteractWithBoardButtons() && mApp->mGameScene != GameScenes::SCENE_ZOMBIES_WON)
+				mApp->DoNewOptions(false);
+		}
+		else
+		{
+			Coop::Game::Get().GetLockstep().QueueLocalCommand(
+				Coop::CommandType::Key, 0, 0, static_cast<int16_t>(theKey));
+		}
+		return;
+	}
+
 	DoTypingCheck(theKey);
 
 	if (mApp->mGameScene == GameScenes::SCENE_LEVEL_INTRO &&
@@ -8031,6 +8241,52 @@ void Board::KeyDown(KeyCode theKey)
 			mApp->DoNewOptions(false);
 		}
 	}
+}
+
+// Win the current level on the spot: the '!' debug key, and the debug test
+// script's "win" step. In co-op the script sends it through the lockstep, so
+// both machines win on the same tick.
+void Board::DebugWinLevel()
+{
+	mApp->mBoardResult = BoardResult::BOARDRESULT_CHEAT;
+	if (IsLastStandStageWithRepick())
+	{
+		if (mNextSurvivalStageCounter == 0)
+		{
+			mCurrentWave = mNumWaves;
+			RemoveAllZombies();
+			FadeOutLevel();
+		}
+	}
+	else if ((mApp->IsScaryPotterLevel() && !IsFinalScaryPotterStage()) || mApp->IsEndlessIZombie(mApp->mGameMode))
+	{
+		if (mNextSurvivalStageCounter == 0)
+		{
+			RemoveAllZombies();
+			FadeOutLevel();
+		}
+	}
+	else if (mApp->IsSurvivalMode())
+	{
+		if (mApp->mGameScene == GameScenes::SCENE_LEVEL_INTRO)
+		{
+			return;
+		}
+
+		mCurrentWave = mNumWaves;
+		//if (!IsSurvivalStageWithRepick())
+		//{
+			RemoveAllZombies();
+		//}
+		FadeOutLevel();
+	}
+	else
+	{
+		RemoveAllZombies();
+		FadeOutLevel();
+		mBoardFadeOutCounter = 200;
+	}
+
 }
 
 static void PvzpCrash()
@@ -8282,44 +8538,7 @@ void Board::KeyChar(char theChar)
 	}
 	else if (theChar == '!')
 	{
-		mApp->mBoardResult = BoardResult::BOARDRESULT_CHEAT;
-		if (IsLastStandStageWithRepick())
-		{
-			if (mNextSurvivalStageCounter == 0)
-			{
-				mCurrentWave = mNumWaves;
-				RemoveAllZombies();
-				FadeOutLevel();
-			}
-		}
-		else if ((mApp->IsScaryPotterLevel() && !IsFinalScaryPotterStage()) || mApp->IsEndlessIZombie(mApp->mGameMode))
-		{
-			if (mNextSurvivalStageCounter == 0)
-			{
-				RemoveAllZombies();
-				FadeOutLevel();
-			}
-		}
-		else if (mApp->IsSurvivalMode())
-		{
-			if (mApp->mGameScene == GameScenes::SCENE_LEVEL_INTRO)
-			{
-				return;
-			}
-
-			mCurrentWave = mNumWaves;
-			//if (!IsSurvivalStageWithRepick())
-			//{
-				RemoveAllZombies();
-			//}
-			FadeOutLevel();
-		}
-		else
-		{
-			RemoveAllZombies();
-			FadeOutLevel();
-			mBoardFadeOutCounter = 200;
-		}
+		DebugWinLevel();
 	}
 	else if (theChar == '+')
 	{
@@ -8801,7 +9020,14 @@ void Board::KeyChar(char theChar)
 
 void Board::AddSunMoney(int theAmount)
 {
-	// Hard mode halves sun from every source (docs/SPEC.md section 8).
+	// Hard mode cuts sun from every source to three fifths (docs/SPEC.md
+	// section 8): a regular sun is worth 15 instead of 25, a small one 9, a
+	// large one 30.
+	//
+	// It was a half, and that lost sun: 25 / 2 is 12 in integer math, so every
+	// sun quietly paid half a point to rounding -- visible as the counter
+	// going up by 12. Three fifths divides every sun value the game has
+	// exactly (they are all multiples of 5), so nothing is lost.
 	//
 	// Here because this is the one chokepoint earned sun passes through --
 	// sunflowers, sky sun, Sun-shroom, Twin Sunflower all arrive via this
@@ -8812,7 +9038,7 @@ void Board::AddSunMoney(int theAmount)
 	// Integer math rather than a float multiplier: both machines must reach
 	// bit-identical results, and a float could differ in the last place.
 	if (theAmount > 0 && Coop::Game::Get().IsHardMode())
-		theAmount /= 2;
+		theAmount = theAmount * 3 / 5;
 
 	mSunMoney += theAmount;
 	mSunMoney = std::min(mSunMoney, 9990);

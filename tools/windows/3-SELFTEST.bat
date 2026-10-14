@@ -2,8 +2,8 @@
 REM Checks the netcode on ONE machine. Needs no network and no game files.
 cd /d "%~dp0"
 
-if not exist "pvz-portable.exe" (
-    echo ERROR: pvz-portable.exe is not in this folder.
+if not exist "PvZ-Coop.exe" (
+    echo ERROR: PvZ-Coop.exe is not in this folder.
     pause
     exit /b 1
 )
@@ -11,5 +11,5 @@ if not exist "pvz-portable.exe" (
 echo Running the co-op self-test (one machine, no network needed)...
 echo.
 
-pvz-portable.exe --coop-selftest
+PvZ-Coop.exe --coop-selftest
 pause

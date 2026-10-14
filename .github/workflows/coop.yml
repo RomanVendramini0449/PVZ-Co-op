@@ -136,8 +136,8 @@ jobs:
           cmake --build build
           ccache --show-stats | head -5
           mkdir -p dist
-          cp build/pvz-portable.exe dist/
-          strip dist/pvz-portable.exe
+          cp build/PvZ-Coop.exe dist/
+          strip dist/PvZ-Coop.exe
           # Double-clickable launchers, so neither playing nor running the
           # tests needs a command line at all.
           cp tools/windows/*.bat dist/
@@ -145,7 +145,7 @@ jobs:
 
       - name: Verify the netcode in the Windows build
         shell: msys2 {0}
-        run: ./dist/pvz-portable.exe --coop-selftest
+        run: ./dist/PvZ-Coop.exe --coop-selftest
 
       - uses: actions/upload-artifact@v7
         with:

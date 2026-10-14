@@ -21,6 +21,9 @@
 
 #include "CoopSocket.h"
 
+#include <chrono>
+#include <thread>
+
 #if COOP_SOCKETS_AVAILABLE
 
 #include <cstring>
@@ -334,6 +337,30 @@ bool Socket::Receive(void* theBuffer, size_t theLen, size_t& theReadOut)
 
 	theReadOut = static_cast<size_t>(aRead);
 	return true;
+}
+
+void Socket::CloseGracefully()
+{
+	if (mHandle != COOP_INVALID_SOCKET && mStatus == Status::Connected)
+	{
+		shutdown(Native(mHandle), 1);  // SD_SEND / SHUT_WR: both are 1
+
+		const auto aDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(150);
+		char aBuffer[4096];
+		while (std::chrono::steady_clock::now() < aDeadline)
+		{
+			const auto aRead = recv(Native(mHandle), aBuffer, static_cast<int>(sizeof(aBuffer)), 0);
+			if (aRead == 0)
+				break;  // the peer has closed too; nothing left to drain
+			if (aRead < 0)
+			{
+				if (COOP_LAST_ERROR != COOP_WOULD_BLOCK)
+					break;
+				std::this_thread::sleep_for(std::chrono::milliseconds(5));
+			}
+		}
+	}
+	Close();
 }
 
 void Socket::Close()

@@ -2,8 +2,8 @@
 REM Double-click this on the SECOND machine, after the host has started.
 cd /d "%~dp0"
 
-if not exist "pvz-portable.exe" (
-    echo ERROR: pvz-portable.exe is not in this folder.
+if not exist "PvZ-Coop.exe" (
+    echo ERROR: PvZ-Coop.exe is not in this folder.
     echo Put this script next to the game executable and try again.
     pause
     exit /b 1
@@ -34,7 +34,7 @@ echo.
 echo Connecting to %HOSTIP%:1337 ...
 echo.
 
-pvz-portable.exe --coop-nettest --join %HOSTIP%:1337
+PvZ-Coop.exe --coop-nettest --join %HOSTIP%:1337
 
 echo.
 echo ==========================================================

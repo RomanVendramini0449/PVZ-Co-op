@@ -506,8 +506,9 @@ void Reanimation::Update()
 
 		if (aTrack->mShakeOverride != 0.0f)
 		{
-			aTrack->mShakeX = RandRangeFloat(-aTrack->mShakeOverride, aTrack->mShakeOverride);
-			aTrack->mShakeY = RandRangeFloat(-aTrack->mShakeOverride, aTrack->mShakeOverride);
+			// Cosmetic: see Sexy::CosmeticRand.
+			aTrack->mShakeX = Sexy::CosmeticRand(2.0f * aTrack->mShakeOverride) - aTrack->mShakeOverride;
+			aTrack->mShakeY = Sexy::CosmeticRand(2.0f * aTrack->mShakeOverride) - aTrack->mShakeOverride;
 		}
 
 		if (strncasecmp(mDefinition->mTracks.tracks[aTrackIndex].mName, "attacher__", 10) == 0)  // IsAttacher

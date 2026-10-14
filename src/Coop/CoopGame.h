@@ -47,6 +47,14 @@ private:
 	// the wire.
 	LevelSetup mLevelSetup;
 	bool       mHasLevelSetup = false;
+	// Host only: the epoch the next level will carry. Starts above zero so
+	// a level is never confused with the "no level yet" state.
+	uint32_t   mNextEpoch = 1;
+	// The difficulty the host has chosen for upcoming levels. The handshake
+	// value is only the starting point; the host can change it between
+	// levels from the main menu.
+	Difficulty mDifficulty = Difficulty::Normal;
+	bool       mDifficultyOverridden = false;
 
 public:
 	static Game& Get();
@@ -64,11 +72,26 @@ public:
 	int GetRemotePlayerIndex() const { return static_cast<int>(GetRemotePlayer()); }
 
 	bool IsHost() const { return mSession.IsHost(); }
+	// Host: is the other player past their title screen and able to follow
+	// us into a level? Starting one before that leaves them behind -- and
+	// their title screen, when they do click through it, goes to the menu and
+	// takes the level down with it.
+	bool IsPeerReady() const { return mSession.IsPeerReady(); }
 	// True on the machine that follows: it does not drive the campaign.
 	bool IsFollower() const { return mSession.IsConnected() && !mSession.IsHost(); }
 
-	Difficulty GetDifficulty() const { return mSession.GetParams().mDifficulty; }
-	bool IsHardMode() const { return GetDifficulty() == Difficulty::Hard; }
+	// The live difficulty: what the current level was started with, which is
+	// what both machines simulate. Outside a level, what the next one will use.
+	Difficulty GetDifficulty() const
+	{
+		if (mHasLevelSetup)
+			return mLevelSetup.mDifficulty;
+		return mDifficultyOverridden ? mDifficulty : mSession.GetParams().mDifficulty;
+	}
+	bool IsHardMode() const { return IsConnected() && GetDifficulty() == Difficulty::Hard; }
+	// Host, between levels. Takes effect from the next level entered.
+	void SetNextDifficulty(Difficulty theDifficulty) { mDifficulty = theDifficulty; mDifficultyOverridden = true; }
+	Difficulty GetNextDifficulty() const { return mDifficultyOverridden ? mDifficulty : mSession.GetParams().mDifficulty; }
 
 	// Host-driven campaign flow (SPEC.md section 3).
 	//
@@ -77,9 +100,14 @@ public:
 	// simply two unrelated games that happen to share a socket.
 	void HostEnterLevel(const LevelSetup& theSetup);
 	void HostLeaveLevel();
-	// Client side: true once, when the host has announced a new level.
-	bool PopEnterLevel(LevelSetup& theSetupOut);
-	bool PopLeaveLevel() { return mSession.PopLeaveLevel(); }
+	// Host: tell the client which screen we are on outside a level.
+	void HostShowScreen(HostScreen theScreen, int32_t theArg, const LevelSetup& theProfile)
+	{
+		mSession.SendHostScreen(theScreen, theArg, theProfile);
+	}
+	// Client: the next step of the host's flow, in order. An EnterLevel event
+	// also becomes the current level setup.
+	bool PopFlowEvent(FlowEvent& theEventOut);
 
 	bool              HasLevelSetup() const { return mHasLevelSetup; }
 	const LevelSetup& GetLevelSetup() const { return mLevelSetup; }
@@ -92,6 +120,10 @@ public:
 
 	// Pumped from the game loop even outside a level, so handshakes progress.
 	void Update();
+
+private:
+	void ReportStatsIfAsked();
+public:
 };
 
 // Acts on --host / --join: opens the connection and blocks until the

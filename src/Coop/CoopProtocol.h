@@ -30,7 +30,7 @@ namespace Coop
 
 // Bumped on any wire-format change. Peers with different versions are rejected
 // at handshake rather than allowed to desync later.
-constexpr uint32_t PROTOCOL_VERSION = 4;
+constexpr uint32_t PROTOCOL_VERSION = 6;
 
 constexpr uint16_t DEFAULT_PORT = 1337;
 
@@ -59,6 +59,21 @@ enum class MsgType : uint8_t
 	Bye = 7,          // either way: clean disconnect
 	EnterLevel = 8,   // host -> client: build this level, with the host's profile
 	LeaveLevel = 9,   // host -> client: level over, follow me out
+	HostScreen = 10,  // host -> client: the screen the host is on, outside a level
+	PeerReady = 11,   // client -> host: past the title screen, ready to follow
+};
+
+// Where the host is when it is not in a level. The client shows the same
+// screen, view-only: outside a level the host drives and the client follows
+// (SPEC.md section 3), so the joining player sees the award, the store and the
+// credits rather than an unexplained menu.
+enum class HostScreen : uint8_t
+{
+	None = 0,     // in a level, or somewhere with nothing to mirror
+	Menu = 1,     // main menu (the game selector)
+	Award = 2,    // arg = AwardType
+	Store = 3,    // arg = store page
+	Credits = 4,
 };
 
 enum class RejectReason : uint8_t
@@ -75,7 +90,7 @@ const char* GetRejectReasonText(RejectReason theReason);
 enum class Difficulty : uint8_t
 {
 	Normal = 0,
-	Hard = 1,  // sun x0.5, zombie health x1.5 (SPEC.md section 8)
+	Hard = 1,  // sun x3/5 (25 -> 15), zombie health x1.5 (SPEC.md section 8)
 };
 
 // Player index. Doubles as the index into Board::mSeedBank[2], so the host is
@@ -118,6 +133,9 @@ enum class CommandType : uint8_t
 	// tick on both machines, which keeps the one chosen line-up identical.
 	ChooserPick = 6,  // clicked a seed packet on the chooser
 	StartPlaying = 7, // host pressed "Let's Rock!"; arg = chosen-seed digest
+	Key = 8,          // a key that acts on the game: skip the intro, advance
+	                  // Crazy Dave, let go of what you hold. arg = KeyCode
+	DebugWin = 9,     // test script only: win the level, on both machines
 };
 
 struct Command
@@ -135,6 +153,12 @@ struct Command
 // it, a player sitting still would stall the other's simulation forever.
 struct CommandBatch
 {
+	// Which level this belongs to. Tick numbers restart at 0 every level, so
+	// without this a batch still in flight from the level just left is
+	// indistinguishable from the new level's batch for the same tick -- and
+	// gets applied to it, or worse, blocks waiting on a tick that will never
+	// be sent again.
+	uint32_t             mEpoch = 0;
 	uint32_t             mTick = 0;
 	std::vector<Command> mCommands;
 };
@@ -154,14 +178,33 @@ constexpr int PURCHASE_COUNT = 80;
 // the session (SPEC.md section 10.4) and never writes it to disk.
 struct LevelSetup
 {
+	uint32_t mEpoch = 0;        // bumped by the host for every level entered
 	uint32_t mLevel = 1;        // campaign level being started
 	int32_t  mGameMode = 0;     // GameMode enum
 	uint32_t mRngSeed = 0;      // reseeds the global MTRand on both sides
+	// Part of the simulation (sun and zombie health), so it travels with
+	// every level rather than only at handshake: the host can change it from
+	// the main menu between levels.
+	Difficulty mDifficulty = Difficulty::Normal;
 
 	int32_t  mProfileLevel = 1;
 	int32_t  mCoins = 0;
 	uint32_t mFinishedAdventure = 0;
 	uint32_t mPurchases[PURCHASE_COUNT] = {};
+};
+
+// One step of the host-driven campaign flow, as the client receives it. These
+// arrive as separate messages but must be applied strictly in order: "the host
+// went back to the menu" followed by "the host entered a level" in a single
+// network read is a level to build, and applying them backwards tears it down.
+struct FlowEvent
+{
+	enum class Kind : uint8_t { EnterLevel, LeaveLevel, Screen };
+
+	Kind       mKind = Kind::Screen;
+	LevelSetup mSetup;                      // the level, or the host's profile
+	HostScreen mScreen = HostScreen::None;  // Kind::Screen only
+	int32_t    mArg = 0;                    // Kind::Screen only
 };
 
 // Everything that must match on both machines before tick 0. Mismatch here is

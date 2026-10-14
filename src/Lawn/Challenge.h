@@ -75,6 +75,10 @@ public:
 	int32_t                 mChallengeScore;
 	int32_t                mShowBowlingLine;
 	SeedType                mLastConveyorSeedType;
+	// Co-op: one belt per player (SPEC.md section 6). Not saved -- co-op has
+	// no mid-level save -- and -1 means "not started yet".
+	int32_t                 mCoopConveyorCounter[2];
+	SeedType                mCoopLastConveyorSeedType[2];
 	int32_t                 mSurvivalStage;
 	int32_t                 mSlotMachineRollCount;
 	ReanimationID           mReanimChallenge;
@@ -146,6 +150,9 @@ public:
 	void                    UpdateRainingSeeds();
 	void         PlayBossEnter();
 	void                    UpdateConveyorBelt();
+	void                    UpdateCoopConveyorBelts();
+	int                     ConveyorBeltInterval();
+	void                    ConveyorBeltDeliverSeed(SeedType& theLastSeedType);
 	void                    PortalStart();
 	void                    UpdatePortalCombat();
 	GridItem*               GetOtherPortal(GridItem* thePortal);

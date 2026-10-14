@@ -25,6 +25,7 @@
 #include <format>
 #include "LawnApp.h"
 #include "Coop/CoopGame.h"
+#include "Lawn/Widget/CoopOverlay.h"
 #include "Resources.h"
 #include "Lawn/LawnCommon.h"
 #include "Lawn/Board.h"
@@ -143,7 +144,15 @@ LawnApp::LawnApp()
 	mProductVersion = PVZP_VERSION;
 	mBuildNum = PVZP_BUILD_NUMBER;
 	mCommitDate = PVZP_COMMIT_DATE;
-	std::string aTitleName = "PvZ Portable";
+	// The product name is the save and registry path, so it stays as it is --
+	// changing it would lose the player's existing profile.
+	std::string aTitleName = "PvZ Co-op";
+	if (Coop::Game::Get().IsConnected())
+	{
+		// Two windows side by side are otherwise indistinguishable, which
+		// matters a great deal when they behave differently on purpose.
+		aTitleName += Coop::Game::Get().IsHost() ? " - Host" : " - Joining";
+	}
 	mTitle = aTitleName;
 	mCustomCursorsEnabled = false;
 	mPlayerInfo = nullptr;
@@ -209,6 +218,10 @@ LawnApp::~LawnApp()
 	{
 		mWidgetManager->RemoveWidget(mCreditScreen.get());
 	}
+	if (mCoopOverlay)
+	{
+		mWidgetManager->RemoveWidget(mCoopOverlay.get());
+	}
 
 	// Must die before the definition tables and allocators are freed below.
 	mGameSelector.reset();
@@ -242,6 +255,11 @@ void LawnApp::Shutdown()
 
 void LawnApp::ShutdownHook()
 {
+	// Say goodbye rather than just vanishing, so the other player gets a
+	// clear reason instead of a timeout.
+	if (Coop::Game::Get().IsConnected())
+		Coop::Game::Get().GetSession().Disconnect("The other player quit the game.");
+
 	// Save mid-level game while the music is still alive, before Shutdown() stops it.
 	if (mBoard)
 	{
@@ -280,6 +298,10 @@ void LawnApp::KillBoard()
 bool LawnApp::CanPauseNow()
 {
 	if (mBoard == nullptr)
+		return false;
+
+	// See Board::Pause: nothing in co-op may stop the clock.
+	if (Coop::Game::Get().IsConnected())
 		return false;
 
 	if (mSeedChooserScreen && mSeedChooserScreen->mMouseVisible)
@@ -342,6 +364,10 @@ bool LawnApp::WriteCurrentUserConfig()
 
 void LawnApp::PreNewGame(GameMode theGameMode, bool theLookForSavedGame)
 {
+	// Only the host starts levels in co-op; the client is put into them.
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	//if (NeedRegister())
 	//{
 	//	ShowGameSelector();
@@ -466,12 +492,29 @@ void LawnApp::NewGame()
 	if (aCoopLevel)
 		aCoop.BeginLevel();
 
+	// Build the level as player 0, the player the simulation always runs as
+	// (see Board::Update). This all happens before the first tick, outside
+	// it: the board would otherwise be resting on the local player, which is
+	// a different player on each machine. The intro hides the seed bank right
+	// here -- and it was hiding bank 0 on the host and bank 1 on the client,
+	// so the client saw the HUD through the intro, and the two machines did
+	// not agree where the bank was for clicks on it.
+	const int aRestingPlayer = mBoard->GetActivePlayer();
+	if (aCoopLevel)
+		mBoard->SetActivePlayer(0);
+
 	mBoard->InitLevel();
 	mBoardResult = BoardResult::BOARDRESULT_NONE;
 	mGameScene = GameScenes::SCENE_LEVEL_INTRO;
 
 	ShowSeedChooserScreen();
 	mBoard->mCutScene->StartLevelIntro();
+
+	if (aCoopLevel)
+	{
+		mBoard->CoopSyncSeedBankLayout();
+		mBoard->SetActivePlayer(aRestingPlayer);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -486,13 +529,28 @@ void LawnApp::NewGame()
 static_assert(sizeof(PlayerInfo::mPurchases) / sizeof(uint32_t) == Coop::PURCHASE_COUNT,
 	"Coop::PURCHASE_COUNT must match PlayerInfo::mPurchases");
 
+Coop::LevelSetup LawnApp::CoopMakeProfileSetup() const
+{
+	Coop::LevelSetup aSetup;
+	if (mPlayerInfo == nullptr)
+		return aSetup;
+
+	aSetup.mProfileLevel = mPlayerInfo->mLevel;
+	aSetup.mCoins = mPlayerInfo->mCoins;
+	aSetup.mFinishedAdventure = mPlayerInfo->mFinishedAdventure;
+	for (int i = 0; i < Coop::PURCHASE_COUNT; i++)
+		aSetup.mPurchases[i] = mPlayerInfo->mPurchases[i];
+	aSetup.mDifficulty = Coop::Game::Get().GetNextDifficulty();
+	return aSetup;
+}
+
 void LawnApp::CoopAnnounceLevel()
 {
 	Coop::Game& aCoop = Coop::Game::Get();
 	if (!aCoop.IsConnected() || !aCoop.IsHost() || mPlayerInfo == nullptr)
 		return;
 
-	Coop::LevelSetup aSetup;
+	Coop::LevelSetup aSetup = CoopMakeProfileSetup();
 	aSetup.mLevel = static_cast<uint32_t>(mPlayerInfo->mLevel);
 	aSetup.mGameMode = static_cast<int32_t>(mGameMode);
 
@@ -504,13 +562,12 @@ void LawnApp::CoopAnnounceLevel()
 	aSetup.mRngSeed = aCoop.GetSession().GetParams().mRngSeed
 		^ (static_cast<uint32_t>(mPlayerInfo->mLevel) * 2654435761u);
 
-	aSetup.mProfileLevel = mPlayerInfo->mLevel;
-	aSetup.mCoins = mPlayerInfo->mCoins;
-	aSetup.mFinishedAdventure = mPlayerInfo->mFinishedAdventure;
-	for (int i = 0; i < Coop::PURCHASE_COUNT; i++)
-		aSetup.mPurchases[i] = mPlayerInfo->mPurchases[i];
-
 	aCoop.HostEnterLevel(aSetup);
+
+	// A level is not a screen to mirror; forget the last one so that leaving
+	// the level re-announces wherever the host lands, even if it is the same
+	// kind of screen as before.
+	mCoopLastScreen = Coop::HostScreen::None;
 }
 
 void LawnApp::CoopBorrowHostProfile(const Coop::LevelSetup& theSetup)
@@ -531,6 +588,8 @@ void LawnApp::CoopBorrowHostProfile(const Coop::LevelSetup& theSetup)
 	mPlayerInfo->mFinishedAdventure = theSetup.mFinishedAdventure;
 	for (int i = 0; i < Coop::PURCHASE_COUNT; i++)
 		mPlayerInfo->mPurchases[i] = theSetup.mPurchases[i];
+
+	mCoopShownDifficulty = theSetup.mDifficulty;
 }
 
 void LawnApp::CoopReturnOwnProfile()
@@ -542,58 +601,292 @@ void LawnApp::CoopReturnOwnProfile()
 	mCoopOwnProfile.reset();
 }
 
+// Takes down whatever the client is showing, so the next screen the host asks
+// for starts from nothing. Dialogs go first: several of them sit over a board
+// or a screen, and the host moving on is not something they can see coming.
+void LawnApp::CoopTearDownForFollow()
+{
+	Coop::Game::Get().EndLevel();  // retire the previous level's clock
+	// Dialogs stay: settings or the almanac can sit over whatever comes next
+	// now that nothing pauses, and closing one from under its own nested
+	// loop risks a crash.
+	KillStoreScreen();
+	KillCreditScreen();
+	KillAwardScreen();
+	KillSeedChooserScreen();
+	KillBoard();
+	KillGameSelector();
+	mCoopWaitingForHost = false;
+}
+
 void LawnApp::CoopFollowIntoLevel(const Coop::LevelSetup& theSetup)
 {
+	// Being moved into a level while the old one was out of sync means the
+	// host restarted it for that reason; say so here too.
+	if (Coop::Game::Get().IsInGame() && Coop::Game::Get().GetLockstep().IsDesynced())
+		mCoopResyncNoticeUntil = SDL_GetTicks() + 6000;
+
 	// The host's progress decides the shape of the level -- how many seed
 	// slots, which seeds exist, whether the roof has mowers -- so it has to be
 	// in place before anything reads it.
 	CoopBorrowHostProfile(theSetup);
-	mCoopWaitingForHost = false;
-
-	Coop::Game::Get().EndLevel();  // retire the previous level's clock
-	KillSeedChooserScreen();
-	KillAwardScreen();
-	KillGameSelector();
-	KillBoard();
+	CoopTearDownForFollow();
 
 	mGameMode = static_cast<GameMode>(theSetup.mGameMode);
 	mBoardResult = BoardResult::BOARDRESULT_NONE;
 	NewGame();
 }
 
+void LawnApp::CoopLeaveLevel()
+{
+	Coop::Game::Get().ClearLevelSetup();
+	CoopTearDownForFollow();
+	// Somewhere to stand until the host says where it has gone; normally the
+	// next flow event replaces this at once.
+	ShowGameSelector();
+	mCoopWaitingForHost = true;
+}
+
+void LawnApp::CoopFollowScreen(Coop::HostScreen theScreen, int theArg, const Coop::LevelSetup& theProfile)
+{
+	// The profile first: a mirrored award shows the plant the host just won,
+	// a mirrored store shows the host's coins and what is already bought.
+	CoopBorrowHostProfile(theProfile);
+	Coop::Game::Get().ClearLevelSetup();
+
+	switch (theScreen)
+	{
+	case Coop::HostScreen::Menu:
+		if (mGameSelector && !mBoard && !mAwardScreen && !mCreditScreen)
+		{
+			KillStoreScreen();
+			mCoopWaitingForHost = true;
+			break;  // already there
+		}
+		CoopTearDownForFollow();
+		ShowGameSelector();
+		mCoopWaitingForHost = true;
+		break;
+
+	case Coop::HostScreen::Award:
+		if (mAwardScreen && static_cast<int>(mAwardScreen->mAwardType) == theArg && !mBoard)
+		{
+			KillStoreScreen();  // the host came back from the store to this award
+			break;
+		}
+		CoopTearDownForFollow();
+		// Achievements are the host's to collect, not this player's, so the
+		// mirrored award never shows them.
+		ShowAwardScreen(static_cast<AwardType>(theArg), false);
+		break;
+
+	case Coop::HostScreen::Store:
+	{
+		// The store sits over whatever the host opened it from. If we are
+		// somewhere it cannot sit over -- still in a level, say -- start
+		// from the menu.
+		if (mBoard || mCreditScreen || (!mGameSelector && !mAwardScreen))
+		{
+			CoopTearDownForFollow();
+			ShowGameSelector();
+		}
+		StoreScreen* aStore = static_cast<StoreScreen*>(GetDialog(Dialogs::DIALOG_STORE));
+		if (aStore == nullptr)
+			aStore = ShowStoreScreen();
+		if (aStore != nullptr && theArg >= 0 && theArg < static_cast<int>(StorePages::NUM_STORE_PAGES)
+			&& static_cast<int>(aStore->mPage) != theArg)
+		{
+			aStore->mPage = static_cast<StorePages>(theArg);
+			aStore->mHatchTimer = 50;  // the same page-turn the host just saw
+		}
+		break;
+	}
+
+	case Coop::HostScreen::Credits:
+		if (mCreditScreen)
+			break;
+		CoopTearDownForFollow();
+		ShowCreditScreen();
+		break;
+
+	case Coop::HostScreen::None:
+	default:
+		break;
+	}
+}
+
+// Host: watch where we are and tell the client when it changes. Watching beats
+// instrumenting every transition -- the award screen alone can lead to the
+// store, the almanac, the credits or the next level, through several nested
+// loops -- and it cannot miss a path nobody thought of.
+void LawnApp::CoopObserveHostScreen()
+{
+	Coop::HostScreen aScreen = Coop::HostScreen::None;
+	int aArg = 0;
+
+	if (StoreScreen* aStore = static_cast<StoreScreen*>(GetDialog(Dialogs::DIALOG_STORE)))
+	{
+		aScreen = Coop::HostScreen::Store;
+		aArg = static_cast<int>(aStore->mPage);
+	}
+	else if (mCreditScreen)
+		aScreen = Coop::HostScreen::Credits;
+	else if (mAwardScreen)
+	{
+		aScreen = Coop::HostScreen::Award;
+		aArg = static_cast<int>(mAwardScreen->mAwardType);
+	}
+	else if (mBoard)
+		aScreen = Coop::HostScreen::None;  // a level: EnterLevel already covered it
+	else if (mGameSelector)
+		aScreen = Coop::HostScreen::Menu;
+
+	if (aScreen == Coop::HostScreen::None)
+		return;
+
+	// Out of a level, by whatever route -- some, like Game Over's Main Menu,
+	// go straight to the menu without passing through DoBackToMain -- so the
+	// level's setup no longer applies.
+	Coop::Game::Get().ClearLevelSetup();
+
+	// What the client displays also depends on the profile -- coins in the
+	// store, difficulty on the menu -- so a purchase counts as a change too.
+	const Coop::LevelSetup aProfile = CoopMakeProfileSetup();
+	uint32_t aHash = 2166136261u;
+	auto aMix = [&aHash](uint32_t theValue) { aHash = (aHash ^ theValue) * 16777619u; };
+	aMix(static_cast<uint32_t>(aProfile.mProfileLevel));
+	aMix(static_cast<uint32_t>(aProfile.mCoins));
+	aMix(aProfile.mFinishedAdventure);
+	aMix(static_cast<uint32_t>(aProfile.mDifficulty));
+	for (int i = 0; i < Coop::PURCHASE_COUNT; i++)
+		aMix(aProfile.mPurchases[i]);
+
+	if (aScreen == mCoopLastScreen && aArg == mCoopLastScreenArg && aHash == mCoopLastProfileHash)
+		return;
+
+	mCoopLastScreen = aScreen;
+	mCoopLastScreenArg = aArg;
+	mCoopLastProfileHash = aHash;
+	Coop::Game::Get().HostShowScreen(aScreen, aArg, aProfile);
+}
+
+// The session has ended, for whatever reason: the other player left, the link
+// dropped, or this player chose to leave. Both machines go back to the menu
+// with the reason on screen (SPEC.md section 2), and the joining player gets
+// their own campaign back before anything can save it.
+void LawnApp::CoopHandleDisconnect()
+{
+	Coop::Session& aSession = Coop::Game::Get().GetSession();
+	const bool aWasHost = aSession.IsHost();
+	std::string aReason;
+	switch (aSession.GetEndReason())
+	{
+	case Coop::Session::EndReason::PeerLeft:
+		aReason = aWasHost ? "The joining player left the game." : "The host left the game.";
+		break;
+	case Coop::Session::EndReason::LocalLeft:
+		aReason = "You left the co-op game.";
+		break;
+	case Coop::Session::EndReason::Lost:
+		aReason = aWasHost ? "Lost the connection to the joining player." : "Lost the connection to the host.";
+		break;
+	default:
+		aReason = aSession.GetStatusText();
+		break;
+	}
+
+	Coop::Game::Get().EndLevel();
+	Coop::Game::Get().ClearLevelSetup();
+
+	// Dialogs are left alone: several run their own nested loop, and closing
+	// one from under that loop is a crash waiting to happen. With nothing
+	// paused any more, an open settings menu or almanac is harmless.
+	if (Coop::Game::Get().GetSession().IsHost())
+	{
+		// The host's award, store and credits are its own and carry on as
+		// single player. Only a level in progress was a co-op one.
+		if (mBoard)
+		{
+			KillSeedChooserScreen();
+			KillBoard();
+			ShowGameSelector();
+		}
+	}
+	else
+	{
+		// Everything the client shows was mirrored from the host. Its store
+		// mirror never runs a nested loop (its buttons are dead), so it is
+		// safe to close.
+		KillStoreScreen();
+		KillCreditScreen();
+		KillAwardScreen();
+		KillSeedChooserScreen();
+		KillBoard();
+		CoopReturnOwnProfile();
+		// The menu was built with Adventure locked; rebuild it now that the
+		// campaign is this player's own again.
+		ShowGameSelector();
+	}
+	mCoopWaitingForHost = false;
+	mCoopLastScreen = Coop::HostScreen::None;
+
+	// A session is set up in the co-op launcher, not in the game, so a new
+	// one starts there too. Offering host/join here would be a second,
+	// different way to do the same thing; closing keeps it to one.
+	const std::string aText = (aReason.empty() ? std::string("The co-op game has ended.") : aReason)
+		+ "\n\nTo play again, start a new\nsession from the co-op launcher.";
+	LawnMessageBox(Dialogs::DIALOG_MESSAGE, "Co-op Ended", aText.c_str(), "Close Game", "", Dialog::BUTTONS_FOOTER);
+	CloseRequestAsync();
+}
+
 void LawnApp::CoopUpdateFlow()
 {
 	Coop::Game& aCoop = Coop::Game::Get();
+	const bool aConnected = aCoop.IsConnected();
 
-	if (!aCoop.IsConnected())
-	{
-		// Session over. Give the client its own campaign back before it can
-		// save anything, so a co-op run never overwrites its progress.
-		CoopReturnOwnProfile();
-		mCoopWaitingForHost = false;
+	// Record the new state before acting on it: the handler shows a message
+	// box, which runs its own loop and comes back through here -- and seeing
+	// "was connected" still set, it would handle the drop again, and again,
+	// until the stack ran out.
+	const bool aJustDisconnected = mCoopWasConnected && !aConnected;
+	mCoopWasConnected = aConnected;
+	if (aJustDisconnected)
+		CoopHandleDisconnect();
+	if (!aConnected)
 		return;
-	}
 
 	if (aCoop.IsHost())
-		return;
-
-	// Order matters: the host may send "level over" and "here is the next
-	// one" in quick succession, and they have to be applied in that order or
-	// the client tears down the level it has just been told to build.
-	if (aCoop.PopLeaveLevel())
 	{
-		aCoop.EndLevel();
-		aCoop.ClearLevelSetup();
-		KillSeedChooserScreen();
-		KillAwardScreen();
-		KillBoard();
-		ShowGameSelector();
-		mCoopWaitingForHost = true;
+		CoopObserveHostScreen();
+		return;
 	}
 
-	Coop::LevelSetup aSetup;
-	if (aCoop.PopEnterLevel(aSetup))
-		CoopFollowIntoLevel(aSetup);
+	// Nothing to follow from, yet: still loading, or on the title screen.
+	// Clicking through the title goes to the menu, which would throw away
+	// anything built underneath it, so the host's steps wait in the queue
+	// until we are past it. Once we are, say so -- the host will not start a
+	// level until we have.
+	if (mTitleScreen || !mLoadingThreadCompleted)
+		return;
+	aCoop.GetSession().SendPeerReady();
+
+	// Strictly in the order the host took them.
+	Coop::FlowEvent anEvent;
+	while (aCoop.PopFlowEvent(anEvent))
+	{
+		switch (anEvent.mKind)
+		{
+		case Coop::FlowEvent::Kind::EnterLevel:
+			CoopFollowIntoLevel(anEvent.mSetup);
+			break;
+		case Coop::FlowEvent::Kind::LeaveLevel:
+			CoopLeaveLevel();
+			break;
+		case Coop::FlowEvent::Kind::Screen:
+			CoopFollowScreen(anEvent.mScreen, anEvent.mArg, anEvent.mSetup);
+			break;
+		}
+	}
 }
 
 void LawnApp::ShowGameSelector()
@@ -726,6 +1019,20 @@ void LawnApp::KillSeedChooserScreen()
 
 void LawnApp::EndLevel()
 {
+	Coop::Game& aCoop = Coop::Game::Get();
+	if (aCoop.IsFollower())
+		return;  // the host retries; the client follows its announcement
+
+	if (aCoop.IsConnected() && !mCoopRunningDeferredEndLevel)
+	{
+		// In co-op this is reached from a click replayed inside Board::Update
+		// -- the "zombies ate your brains" screen -- and rebuilding the board
+		// from inside its own update pulls the floor out from under it,
+		// lockstep included. Do it once the frame is done instead.
+		mCoopPendingEndLevel = true;
+		return;
+	}
+
 	KillBoard();
 	if (IsAdventureMode())
 	{
@@ -763,6 +1070,14 @@ void LawnApp::DoBackToMain()
 		aCoop.HostLeaveLevel();
 		aCoop.EndLevel();
 	}
+	else if (aCoop.IsFollower())
+	{
+		// The joining player has no "main menu" of their own to go to: the
+		// host decides where both of them are. Asking for it means leaving
+		// the session. CoopUpdateFlow sees the drop and tidies up.
+		aCoop.GetSession().Disconnect("You left the co-op game.");
+		return;
+	}
 
 	mMusic->StopAllMusic();
 	mSoundSystem->CancelPausedFoley();
@@ -797,6 +1112,12 @@ void LawnApp::DoNewOptions(bool theFromGameSelector)
 	CenterDialog(aDialog, IMAGE_OPTIONS_MENUBACK->mWidth, IMAGE_OPTIONS_MENUBACK->mHeight);
 	AddDialog(Dialogs::DIALOG_NEWOPTIONS, aDialog);
 	mWidgetManager->SetFocus(aDialog);
+
+	// While this player is in the menu their pointer is not on the lawn, so
+	// the other screen hides it rather than leave it frozen where it was
+	// (SPEC.md section 7). It comes back with their next move on the board.
+	if (Coop::Game::Get().IsInGame())
+		Coop::Game::Get().GetLockstep().QueueLocalCommand(Coop::CommandType::EnterMenu, 0, 0);
 }
 
 void LawnApp::ShowZombatarTOS()
@@ -1580,7 +1901,21 @@ void LawnApp::CheckForGameEnd()
 	if (mBoard == nullptr || !mBoard->mLevelComplete)
 		return;
 
+	// The joining machine finishes the level on the same tick as the host,
+	// but where to go next -- award, store, credits, next level -- is the
+	// host's decision. Running this here too would send the client off on its
+	// own route and advance a profile it is only borrowing.
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	bool aUnlockedNewChallenge = UpdatePlayerProfileForFinishingLevel();
+
+	// Co-op rides the host's profile (SPEC.md section 10.4), so the host's
+	// progress is the campaign's progress: write it the moment a level is
+	// won, not whenever the game next happens to save. A dropped session then
+	// resumes from the next level instead of replaying this one.
+	if (Coop::Game::Get().IsConnected() && Coop::Game::Get().IsHost())
+		WriteCurrentUserConfig();
 
 	if (IsAdventureMode())
 	{
@@ -1744,8 +2079,156 @@ void LawnApp::UpdatePlayTimeStats()
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Debug test script (PVZ_TEST_SCRIPT)
+// ---------------------------------------------------------------------------
+//
+// Testing co-op means driving two game windows at once, and the only mouse on
+// the machine is the tester's. With PVZ_TEST_SCRIPT naming a file, the game
+// feeds itself timed input instead, straight into its own widget manager, so a
+// two-window test runs the same way every time and nobody's mouse is borrowed.
+// Off unless the variable is set. One step per line, '#' for comments:
+//
+//     <seconds> click <x> <y>     game coordinates (800x600)
+//     <seconds> move <x> <y>
+//     <seconds> key escape|space|return
+//     <seconds> snap <png path>   capture the next frame to that file
+//     <seconds> log <text>        a marker in stdout
+//     <seconds> win               win the current level (both machines)
+//
+// Seconds count from when the game started.
+
+namespace Sexy { void RequestFrameDump(const std::string& thePath); }
+
+namespace
+{
+	struct TestStep
+	{
+		uint32_t    mAtMs = 0;
+		std::string mVerb;
+		int         mX = 0;
+		int         mY = 0;
+		std::string mText;
+	};
+
+	std::vector<TestStep> gTestSteps;
+	size_t                gNextTestStep = 0;
+	bool                  gTestScriptLoaded = false;
+
+	void LoadTestScript()
+	{
+		gTestScriptLoaded = true;
+		const char* aPath = getenv("PVZ_TEST_SCRIPT");
+		if (aPath == nullptr || *aPath == '\0')
+			return;
+
+		FILE* aFile = fopen(aPath, "rb");
+		if (aFile == nullptr)
+		{
+			printf("test script: cannot open %s\n", aPath);
+			return;
+		}
+
+		char aLine[512];
+		while (fgets(aLine, sizeof(aLine), aFile))
+		{
+			std::string aText = aLine;
+			while (!aText.empty() && (aText.back() == '\n' || aText.back() == '\r'))
+				aText.pop_back();
+			if (aText.empty() || aText[0] == '#')
+				continue;
+
+			TestStep aStep;
+			double aSeconds = 0;
+			char aVerb[32] = {};
+			int aConsumed = 0;
+			if (sscanf(aText.c_str(), "%lf %31s %n", &aSeconds, aVerb, &aConsumed) < 2)
+				continue;
+			aStep.mAtMs = static_cast<uint32_t>(aSeconds * 1000.0);
+			aStep.mVerb = aVerb;
+			aStep.mText = aText.substr(static_cast<size_t>(aConsumed));
+			sscanf(aStep.mText.c_str(), "%d %d", &aStep.mX, &aStep.mY);
+			gTestSteps.push_back(aStep);
+		}
+		fclose(aFile);
+		std::stable_sort(gTestSteps.begin(), gTestSteps.end(),
+			[](const TestStep& a, const TestStep& b) { return a.mAtMs < b.mAtMs; });
+		printf("test script: %zu steps from %s\n", gTestSteps.size(), aPath);
+		fflush(stdout);
+	}
+}
+
+void LawnApp::RunTestScript()
+{
+	if (!gTestScriptLoaded)
+		LoadTestScript();
+	if (gNextTestStep >= gTestSteps.size() || !mWidgetManager)
+		return;
+
+	const uint32_t aNow = SDL_GetTicks();
+	while (gNextTestStep < gTestSteps.size() && gTestSteps[gNextTestStep].mAtMs <= aNow)
+	{
+		const TestStep& aStep = gTestSteps[gNextTestStep++];
+
+		// Buttons only fire for a focused window, and of two windows side by
+		// side only one can be. Scripted input is input to this window, so
+		// present it as such for the moment it is delivered.
+		struct FocusScope
+		{
+			WidgetManager* mManager;
+			bool           mHadFocus;
+			explicit FocusScope(WidgetManager* theManager) : mManager(theManager), mHadFocus(theManager->mHasFocus) { mManager->mHasFocus = true; }
+			~FocusScope() { mManager->mHasFocus = mHadFocus; }
+		} aFocusScope(mWidgetManager.get());
+
+		if (aStep.mVerb == "click")
+		{
+			mWidgetManager->mMouseIn = true;
+			mWidgetManager->MouseMove(aStep.mX, aStep.mY);
+			mWidgetManager->MouseDown(aStep.mX, aStep.mY, 1);
+			mWidgetManager->MouseUp(aStep.mX, aStep.mY, 1);
+		}
+		else if (aStep.mVerb == "move")
+		{
+			mWidgetManager->mMouseIn = true;
+			mWidgetManager->MouseMove(aStep.mX, aStep.mY);
+		}
+		else if (aStep.mVerb == "key")
+		{
+			KeyCode aKey = KeyCode::KEYCODE_UNKNOWN;
+			if (aStep.mText.rfind("escape", 0) == 0) aKey = KeyCode::KEYCODE_ESCAPE;
+			else if (aStep.mText.rfind("space", 0) == 0) aKey = KeyCode::KEYCODE_SPACE;
+			else if (aStep.mText.rfind("return", 0) == 0) aKey = KeyCode::KEYCODE_RETURN;
+			if (aKey != KeyCode::KEYCODE_UNKNOWN)
+			{
+				mWidgetManager->KeyDown(aKey);
+				mWidgetManager->KeyUp(aKey);
+			}
+		}
+		else if (aStep.mVerb == "win")
+		{
+			// Through the lockstep in co-op, so both machines win together.
+			if (Coop::Game::Get().IsInGame())
+				Coop::Game::Get().GetLockstep().QueueLocalCommand(Coop::CommandType::DebugWin, 0, 0);
+			else if (mBoard)
+				mBoard->DebugWinLevel();
+		}
+		else if (aStep.mVerb == "snap")
+		{
+			Sexy::RequestFrameDump(aStep.mText);
+		}
+		else if (aStep.mVerb == "log")
+		{
+			printf("test script: %s\n", aStep.mText.c_str());
+			fflush(stdout);
+		}
+	}
+}
+
 void LawnApp::UpdateFrames()
 {
+	RunTestScript();
+
 	// Drives the connection even outside a level, so the handshake finishes
 	// and a disconnect is noticed promptly.
 	Coop::Game::Get().Update();
@@ -1791,7 +2274,52 @@ void LawnApp::UpdateFrames()
 			mEffectSystem->ProcessDeleteQueue();
 		}
 
+		// A minimized window normally stops updating its widgets entirely.
+		// In co-op that freezes the other player too -- they cannot advance
+		// without our input -- so the game keeps running behind the taskbar.
+		const bool aWasMinimized = mMinimized;
+		if (Coop::Game::Get().IsConnected())
+			mMinimized = false;
 		SexyApp::UpdateFrames();
+		mMinimized = aWasMinimized;
+
+		// The games fell out of sync. That is a bug, but a dead session is
+		// the worst way to find out: a level restarts deterministically from
+		// its seed, so the host simply starts it again for both of them --
+		// the same retry the "zombies ate your brains" screen uses.
+		{
+			Coop::Game& aCoop = Coop::Game::Get();
+			if (aCoop.IsInGame() && aCoop.IsHost() && aCoop.GetLockstep().IsDesynced()
+				&& mBoard && IsAdventureMode() && !mCoopPendingEndLevel)
+			{
+				printf("co-op: %s Restarting the level.\n", aCoop.GetLockstep().GetDesyncText().c_str());
+				fflush(stdout);
+				mCoopResyncNoticeUntil = SDL_GetTicks() + 6000;
+				mCoopPendingEndLevel = true;
+			}
+		}
+
+		if (mCoopPendingEndLevel)
+		{
+			mCoopPendingEndLevel = false;
+			mCoopRunningDeferredEndLevel = true;
+			EndLevel();
+			mCoopRunningDeferredEndLevel = false;
+		}
+
+		// Status text goes above everything, dialogs included. Created once
+		// the fonts exist, and pulled back to the front every frame because
+		// the board keeps lifting its dialogs over everything else.
+		if (Coop::Game::Get().IsConnected() && mLoadingThreadCompleted && mWidgetManager)
+		{
+			if (!mCoopOverlay)
+			{
+				mCoopOverlay = std::make_unique<CoopOverlay>(this);
+				mCoopOverlay->Resize(0, 0, mWidth, mHeight);
+				mWidgetManager->AddWidget(mCoopOverlay.get());
+			}
+			mWidgetManager->BringToFront(mCoopOverlay.get());
+		}
 
 		mMusic->MusicUpdate();
 
@@ -1930,6 +2458,12 @@ void LawnApp::LoadingCompleted()
 	SafeDeleteWidget(mTitleScreen.release());
 
 	mResourceManager->DeleteImage("IMAGE_TITLESCREEN");
+
+	// A joining player who is already somewhere the host put them must not be
+	// sent to the menu from under it. (The host waits for us to be ready, so
+	// this should not arise; it is the backstop.)
+	if (Coop::Game::Get().IsFollower() && (mBoard || mAwardScreen || mCreditScreen))
+		return;
 
 	ShowGameSelector();
 }

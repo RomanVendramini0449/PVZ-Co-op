@@ -26,6 +26,7 @@
 #include "SexyAppFramework/SexyApp.h"
 #include "PvzpLib/PvzpFoley.h"
 #include <memory>
+#include "Coop/CoopProtocol.h"
 
 class Board;
 class GameSelector;
@@ -43,7 +44,7 @@ class Reanimation;
 class ReanimatorCache;
 class ProfileMgr;
 class PlayerInfo;
-namespace Coop { struct LevelSetup; }
+class CoopOverlay;
 class Music;
 class TitleScreen;
 class ChallengeScreen;
@@ -103,7 +104,21 @@ public:
 	PlayerInfo*						mPlayerInfo;
 	// The client's own campaign progress, parked while it borrows the host's.
 	std::unique_ptr<PlayerInfo>		mCoopOwnProfile;
+	// Co-op status text, kept above every other widget (see CoopOverlay.h).
+	std::unique_ptr<CoopOverlay>	mCoopOverlay;
 	bool							mCoopWaitingForHost = false;
+	bool							mCoopWasConnected = false;
+	// A level retry requested from inside a lockstep tick, run after it.
+	bool							mCoopPendingEndLevel = false;
+	// When to stop showing "the games fell out of sync, level restarted".
+	uint32_t						mCoopResyncNoticeUntil = 0;
+	bool							mCoopRunningDeferredEndLevel = false;
+	// Host: the last screen announced, so it is only sent when it changes.
+	Coop::HostScreen				mCoopLastScreen = Coop::HostScreen::None;
+	int								mCoopLastScreenArg = 0;
+	uint32_t						mCoopLastProfileHash = 0;
+	// Client: the difficulty the host has chosen, for display on the menu.
+	Coop::Difficulty				mCoopShownDifficulty = Coop::Difficulty::Normal;
 	std::unique_ptr<LevelStats>		mLastLevelStats;
 	std::atomic<bool>					mCloseRequest;
 	uint32_t						mAppCounter;
@@ -195,10 +210,21 @@ public:
 	// machines are in the same level with the same line-up rather than two
 	// unrelated games sharing a socket.
 	void							CoopUpdateFlow();
+	// Debug: timed input from PVZ_TEST_SCRIPT (see LawnApp.cpp).
+	void							RunTestScript();
 	// Host: describe the level we are entering so the client can build it.
 	void							CoopAnnounceLevel();
+	// Host: the slice of our profile the client needs to show what we see.
+	Coop::LevelSetup				CoopMakeProfileSetup() const;
+	// Host: notice which screen we are on and tell the client if it changed.
+	void							CoopObserveHostScreen();
 	// Client: build the level the host announced.
 	void							CoopFollowIntoLevel(const Coop::LevelSetup& theSetup);
+	void							CoopLeaveLevel();
+	void							CoopFollowScreen(Coop::HostScreen theScreen, int theArg, const Coop::LevelSetup& theProfile);
+	void							CoopTearDownForFollow();
+	// Either side: the session ended; back to the menu with the reason.
+	void							CoopHandleDisconnect();
 	// Client: borrow the host's campaign progress for the session. Never
 	// written to disk -- the joining player's own profile is left alone.
 	void							CoopBorrowHostProfile(const Coop::LevelSetup& theSetup);

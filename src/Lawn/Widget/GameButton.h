@@ -89,6 +89,11 @@ public:
 	void					Draw(Graphics* g);
 	void			SetDisabled(bool theDisabled);
 	bool			IsMouseOver();
+	// The same rectangle test against a given point instead of the local
+	// mouse, and without the dialog/focus rules. For co-op, where a click is
+	// replayed on both machines and must hit the same thing on each --
+	// regardless of where this machine's own mouse is, or what it has open.
+	bool			ContainsPoint(int theX, int theY) const;
 	void					Update();
 	void			Resize(int theX, int theY, int theWidth, int theHeight);
 	void			SetLabel(std::string_view theLabel);

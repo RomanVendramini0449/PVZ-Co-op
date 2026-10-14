@@ -154,16 +154,18 @@ machines (it is part of the simulation).
 
 | | Normal | Hard |
 |---|---|---|
-| Sun from every source | ×1 | **×0.5** |
+| Sun from every source | ×1 | **×3/5** (a 25-sun is worth 15) |
 | Zombie strength | ×1 | **×1.5** |
 
-- **Sun ×0.5 is universal** — sunflowers, sky sun, Sun-shroom, Twin Sunflower,
-  everything. Implemented at `Board::AddSunMoney()`, a single chokepoint with
-  4 call sites.
+- **Sun ×3/5 is universal** — sunflowers, sky sun, Sun-shroom, Twin Sunflower,
+  everything: a regular sun is worth 15, a small one 9, a large one 30.
+  Implemented at `Board::AddSunMoney()`, a single chokepoint with 4 call sites.
+  It was ×0.5 originally, but 25 / 2 rounds down to 12 in integer math, so
+  every sun lost half a point; 3/5 divides every sun value exactly.
 - **Zombies ×1.5 "stronger" means tougher**: 1.5× health, so they take 1.5×
   more damage to kill. Applied at spawn to `mBodyHealth`, `mBodyMaxHealth`,
   `mHelmHealth`, `mShieldHealth`, `mFlyingHealth` (all plain `int32_t`).
-- Both use **integer rational math** (`x / 2`, `x * 3 / 2`). No floats — a float
+- Both use **integer rational math** (`x * 3 / 5`, `x * 3 / 2`). No floats — a float
   multiplier here could desync the two machines.
 - Level starting sun and any scripted grants get audited so Hard does not make a
   level mathematically unwinnable.

@@ -295,9 +295,9 @@ Trail* TrailHolder::AllocTrailFromDef([[maybe_unused]] int theRenderOrder, Trail
 
 	for (int i = 0; i < 4; i++)
 	{
-		aTrail->mTrailInterp[i] = RandRangeFloat(0.0f, 1.0f);
+		aTrail->mTrailInterp[i] = Sexy::CosmeticRand(1.0f);
 	}
-	float aDurationInterp = RandRangeFloat(0.0f, 1.0f);
+	float aDurationInterp = Sexy::CosmeticRand(1.0f);
 	aTrail->mTrailDuration = static_cast<int>(FloatTrackEvaluate(aTrail->mDefinition->mTrailDuration, 0.0f, aDurationInterp));
 	return aTrail;
 }

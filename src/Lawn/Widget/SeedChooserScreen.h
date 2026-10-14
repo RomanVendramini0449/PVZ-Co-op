@@ -120,6 +120,8 @@ public:
 	// Sentinel in a ChooserPick command's argument, standing in for the
 	// Random button rather than a seed type.
 	static constexpr int16_t CoopChooserRandom = -1;
+	// ...and, from this value up, "the Imitater copies seed (arg - base)".
+	static constexpr int16_t CoopChooserImitaterBase = 1000;
 	void                    ApplySeedPick(SeedType theSeedType);
 	// Called from the command stream on both machines.
 	void                    ApplyCoopPick(int theArg);
@@ -138,6 +140,8 @@ public:
 	void                    MouseUp(int x, int y, int theClickCount) override;
 	void                    UpdateImitaterButton();
 	void                    MouseDown(int x, int y, int theClickCount) override;
+	void                    MouseMove(int x, int y) override;
+	void                    MouseDrag(int x, int y) override;
 	bool         PickedPlantType(SeedType theSeedType);
 	void                    CloseSeedChooser();
 	void                    KeyDown(KeyCode theKey) override;

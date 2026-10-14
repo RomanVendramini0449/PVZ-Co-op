@@ -5,7 +5,7 @@ param([switch]$TestOnly)
 # A small window for starting a co-op session without typing command lines.
 # Launched by PVZ-Coop-Launcher.bat, which sits next to it.
 #
-# It only ever builds a command line and starts pvz-portable.exe with it.
+# It only ever builds a command line and starts PvZ-Coop.exe with it.
 # Nothing here touches your Plants vs. Zombies install.
 
 if (-not $TestOnly) {
@@ -18,7 +18,7 @@ if (-not $TestOnly) {
 $ScriptDir = $PSScriptRoot
 if (-not $ScriptDir) { $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $ScriptDir) { $ScriptDir = (Get-Location).Path }
-$ExePath   = Join-Path $ScriptDir 'pvz-portable.exe'
+$ExePath   = Join-Path $ScriptDir 'PvZ-Coop.exe'
 $ConfigPath = Join-Path $ScriptDir 'coop-launcher-settings.txt'
 
 # ---------------------------------------------------------------- settings --
@@ -415,7 +415,7 @@ $txtDir.Add_TextChanged({ Update-DirState })
 $btnStart.Add_Click({
     if (-not (Test-Path $ExePath)) {
         [System.Windows.Forms.MessageBox]::Show(
-            "pvz-portable.exe is not in this folder.`r`n`r`nKeep the launcher next to the game executable.",
+            "PvZ-Coop.exe is not in this folder.`r`n`r`nKeep the launcher next to the game executable.",
             'Co-op Launcher', 'OK', 'Error') | Out-Null
         return
     }

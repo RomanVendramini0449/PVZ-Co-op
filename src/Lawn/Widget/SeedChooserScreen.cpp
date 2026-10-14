@@ -158,6 +158,19 @@ SeedChooserScreen::SeedChooserScreen()
 		mStoreButton->mDisabled = true;
 	}
 
+	// Co-op: the clock keeps running while the chooser is up, for both
+	// players. The store would let one machine buy a seed slot halfway through
+	// a shared pick -- the banks would no longer even be the same size -- and
+	// both buttons open screens that the host moving on can close from under
+	// them. The store is on the main menu between levels, for the host.
+	if (Coop::Game::Get().IsConnected())
+	{
+		mStoreButton->mBtnNoDraw = true;
+		mStoreButton->mDisabled = true;
+		mAlmanacButton->mBtnNoDraw = true;
+		mAlmanacButton->mDisabled = true;
+	}
+
 	DBG_ASSERT(mApp->GetSeedsAvailable() < NUM_SEED_TYPES);
 	memset(mChosenSeeds, 0, sizeof(mChosenSeeds));
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
@@ -817,6 +830,10 @@ SeedType SeedChooserScreen::FindSeedInBank(int theIndexInBank)
 
 void SeedChooserScreen::EnableStartButton(bool theEnabled)
 {
+	// The host presses Let's Rock (SPEC.md section 4); the overlay says so.
+	if (Coop::Game::Get().IsFollower())
+		theEnabled = false;
+
 	mStartButton->SetDisabled(!theEnabled);
 	if (theEnabled) mStartButton->SetLabelColor(Color::White);
 	else mStartButton->SetLabelColor(Color(64, 64, 64));
@@ -1045,7 +1062,8 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 	}
 	else
 	{
-		if (!mBoard->mSeedBank->ContainsPoint(x, y) && !mAlmanacButton->IsMouseOver() && !mStoreButton->IsMouseOver() && mApp->CanShowAlmanac())
+		if (!mBoard->mSeedBank->ContainsPoint(x, y) && !mAlmanacButton->IsMouseOver() && !mStoreButton->IsMouseOver() && mApp->CanShowAlmanac()
+			&& !Coop::Game::Get().IsConnected())
 		{
 			Zombie* aZombie = mBoard->ZombieHitTest(x - mBoard->mX, y - mBoard->mY);
 			if (aZombie && aZombie->mFromWave == Zombie::ZOMBIE_WAVE_CUTSCENE && aZombie->mZombieType != ZOMBIE_REDEYE_GARGANTUAR)
@@ -1096,6 +1114,28 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 	}
 }
 
+// The chooser covers the board, so the board never sees the mouse move while it
+// is up -- and the other player's cursor sat frozen for the whole pick. The
+// spec wants it visible here (SPEC.md section 7), so the motion is forwarded
+// into the same stream, converted to board coordinates: the camera is panned
+// across the lawn during the pick, identically on both machines, so a board
+// position means the same spot on both screens.
+void SeedChooserScreen::MouseMove(int x, int y)
+{
+	Widget::MouseMove(x, y);
+	if (Coop::Game::Get().IsInGame() && mBoard != nullptr)
+	{
+		Coop::Game::Get().GetLockstep().QueueLocalCommand(Coop::CommandType::MouseMove,
+			static_cast<int16_t>(x + mX - mBoard->mX), static_cast<int16_t>(y + mY - mBoard->mY));
+	}
+}
+
+void SeedChooserScreen::MouseDrag(int x, int y)
+{
+	Widget::MouseDrag(x, y);
+	MouseMove(x, y);
+}
+
 bool SeedChooserScreen::PickedPlantType(SeedType theSeedType)
 {
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
@@ -1141,6 +1181,24 @@ void SeedChooserScreen::ApplyCoopPick(int theArg)
 	{
 		for (int i = 0; i < NUM_SEEDS_IN_CHOOSER; i++)
 			LandFlyingSeed(mChosenSeeds[i]);
+	}
+
+	if (theArg >= CoopChooserImitaterBase)
+	{
+		// The Imitater picked a plant to copy: the same steps the Imitater
+		// dialog takes, run here so they happen on both machines.
+		const SeedType anImitated = static_cast<SeedType>(theArg - CoopChooserImitaterBase);
+		ChosenSeed& anImitater = mChosenSeeds[SEED_IMITATER];
+		if (anImitated < SEED_PEASHOOTER || anImitated >= NUM_SEEDS_IN_CHOOSER)
+			return;
+		if (anImitater.mSeedState != SEED_IN_CHOOSER || SeedNotAllowedToPick(anImitated))
+			return;
+		anImitater.mImitaterType = anImitated;
+		anImitater.mX = mImitaterButton->mX;
+		anImitater.mY = mImitaterButton->mY;
+		ClickedSeedInChooser(anImitater);
+		UpdateImitaterButton();
+		return;
 	}
 
 	if (theArg == CoopChooserRandom)

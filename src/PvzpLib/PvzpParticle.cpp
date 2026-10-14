@@ -294,18 +294,18 @@ void PvzpParticleEmitter::PvzpEmitterInitialize(float theX, float theY, PvzpPart
 	mParticleList.SetAllocator(&theSystem->mParticleHolder->mParticleListNodeAllocator);
 
 	if (FloatTrackIsSet(mEmitterDef->mSystemDuration))
-		mSystemDuration = FloatTrackEvaluate(mEmitterDef->mSystemDuration, 0.0f, Sexy::Rand(1.0f));
+		mSystemDuration = FloatTrackEvaluate(mEmitterDef->mSystemDuration, 0.0f, Sexy::CosmeticRand(1.0f));
 	else
 		mSystemDuration = FloatTrackEvaluate(mEmitterDef->mParticleDuration, 0.0f, 1.0f);
 	mSystemDuration = std::max(1, mSystemDuration);
 
 	for (int i = 0; i < mEmitterDef->mSystemFields.count; i++)
 	{
-		mSystemFieldInterp[i][0] = Sexy::Rand(1.0f);
-		mSystemFieldInterp[i][1] = Sexy::Rand(1.0f);
+		mSystemFieldInterp[i][0] = Sexy::CosmeticRand(1.0f);
+		mSystemFieldInterp[i][1] = Sexy::CosmeticRand(1.0f);
 	}
 	for (int j = 0; j < 10; j++)
-		mTrackInterp[j] = Sexy::Rand(1.0f);
+		mTrackInterp[j] = Sexy::CosmeticRand(1.0f);
 
 	Update();
 }
@@ -335,16 +335,16 @@ PvzpParticle* PvzpParticleEmitter::SpawnParticle(int theIndex, int theSpawnCount
 	PVZP_ASSERT(mEmitterDef->mParticleFields.count <= MAX_PARTICLE_FIELDS);
 	for (int i = 0; i < mEmitterDef->mParticleFields.count; i++)
 	{
-		aParticle->mParticleFieldInterp[i][0] = Sexy::Rand(1.0f);  // random X interp for each particle field
-		aParticle->mParticleFieldInterp[i][1] = Sexy::Rand(1.0f);  // random Y interp for each particle field
+		aParticle->mParticleFieldInterp[i][0] = Sexy::CosmeticRand(1.0f);  // random X interp for each particle field
+		aParticle->mParticleFieldInterp[i][1] = Sexy::CosmeticRand(1.0f);  // random Y interp for each particle field
 	}
 	for (int i = 0; i < static_cast<int>(ParticleTracks::NUM_PARTICLE_TRACKS); i++)
-		aParticle->mParticleInterp[i] = Sexy::Rand(1.0f);  // random interp for each track
+		aParticle->mParticleInterp[i] = Sexy::CosmeticRand(1.0f);  // random interp for each track
 
-	float aParticleDurationInterp = Sexy::Rand(1.0f);
-	float aLaunchSpeedInterp = Sexy::Rand(1.0f);
-	float aEmitterOffsetXInterp = Sexy::Rand(1.0f);
-	float aEmitterOffsetYInterp = Sexy::Rand(1.0f);
+	float aParticleDurationInterp = Sexy::CosmeticRand(1.0f);
+	float aLaunchSpeedInterp = Sexy::CosmeticRand(1.0f);
+	float aEmitterOffsetXInterp = Sexy::CosmeticRand(1.0f);
+	float aEmitterOffsetYInterp = Sexy::CosmeticRand(1.0f);
 	aParticle->mParticleDuration = FloatTrackEvaluate(mEmitterDef->mParticleDuration, mSystemTimeValue, aParticleDurationInterp);
 	aParticle->mParticleDuration = std::max(1, aParticle->mParticleDuration);  // duration is at least 1
 	aParticle->mParticleAge = 0;
@@ -352,9 +352,9 @@ PvzpParticle* PvzpParticleEmitter::SpawnParticle(int theIndex, int theSpawnCount
 	aParticle->mParticleTimeValue = -1.0f;
 	aParticle->mParticleLastTimeValue = -1.0f;
 	if (TestBit(mEmitterDef->mParticleFlags, static_cast<int>(ParticleFlags::PARTICLE_RANDOM_START_TIME)))
-		aParticle->mParticleAge = Sexy::Rand(aParticle->mParticleDuration);  // start at a random age
+		aParticle->mParticleAge = Sexy::CosmeticRand(aParticle->mParticleDuration);  // start at a random age
 	float aLaunchSpeed = FloatTrackEvaluate(mEmitterDef->mLaunchSpeed, mSystemTimeValue, aLaunchSpeedInterp) * 0.01f;
-	float aLaunchAngleInterp = Sexy::Rand(1.0f);
+	float aLaunchAngleInterp = Sexy::CosmeticRand(1.0f);
 
 	float aLaunchAngle;
 	if (mEmitterDef->mEmitterType == EmitterType::EMITTER_CIRCLE_PATH)
@@ -368,7 +368,7 @@ PvzpParticle* PvzpParticleEmitter::SpawnParticle(int theIndex, int theSpawnCount
 		aLaunchAngle = 2 * PI * theIndex / theSpawnCount + DEG_TO_RAD(FloatTrackEvaluate(mEmitterDef->mLaunchAngle, mSystemTimeValue, aLaunchAngleInterp));
 	else if (FloatTrackIsConstantZero(mEmitterDef->mLaunchAngle))
 		// no track defined: use a random launch angle in [0, 2π]
-		aLaunchAngle = Sexy::Rand(static_cast<float>(2 * PI));
+		aLaunchAngle = Sexy::CosmeticRand(static_cast<float>(2 * PI));
 	else
 		aLaunchAngle = DEG_TO_RAD(FloatTrackEvaluate(mEmitterDef->mLaunchAngle, mSystemTimeValue, aLaunchAngleInterp));
 
@@ -379,7 +379,7 @@ PvzpParticle* PvzpParticleEmitter::SpawnParticle(int theIndex, int theSpawnCount
 	case EmitterType::EMITTER_CIRCLE_PATH:
 	case EmitterType::EMITTER_CIRCLE_EVEN_SPACING:
 	{
-		float aEmitterRadiusInterp = Sexy::Rand(1.0f);
+		float aEmitterRadiusInterp = Sexy::CosmeticRand(1.0f);
 		float aRadius = FloatTrackEvaluate(mEmitterDef->mEmitterRadius, mSystemTimeValue, aEmitterRadiusInterp);
 		// angle 0 points straight down
 		aPosX = sin(aLaunchAngle) * aRadius;
@@ -388,8 +388,8 @@ PvzpParticle* PvzpParticleEmitter::SpawnParticle(int theIndex, int theSpawnCount
 	}
 	case EmitterType::EMITTER_BOX:
 	{
-		float aEmitterBoxXInterp = Sexy::Rand(1.0f);
-		float aEmitterBoxYInterp = Sexy::Rand(1.0f);
+		float aEmitterBoxXInterp = Sexy::CosmeticRand(1.0f);
+		float aEmitterBoxYInterp = Sexy::CosmeticRand(1.0f);
 		aPosX = FloatTrackEvaluate(mEmitterDef->mEmitterBoxX, mSystemTimeValue, aEmitterBoxXInterp);
 		aPosY = FloatTrackEvaluate(mEmitterDef->mEmitterBoxY, mSystemTimeValue, aEmitterBoxYInterp);
 		break;
@@ -432,8 +432,8 @@ PvzpParticle* PvzpParticleEmitter::SpawnParticle(int theIndex, int theSpawnCount
 		PVZP_ASSERT(false);
 		break;
 	}
-	float aEmitterSkewXInterp = Sexy::Rand(1.0f);
-	float aEmitterSkewYInterp = Sexy::Rand(1.0f);
+	float aEmitterSkewXInterp = Sexy::CosmeticRand(1.0f);
+	float aEmitterSkewYInterp = Sexy::CosmeticRand(1.0f);
 	float aSkewX = FloatTrackEvaluate(mEmitterDef->mEmitterSkewX, mSystemTimeValue, aEmitterSkewXInterp);
 	float aSkewY = FloatTrackEvaluate(mEmitterDef->mEmitterSkewY, mSystemTimeValue, aEmitterSkewYInterp);
 	aParticle->mPosition.x = mSystemCenter.x + aPosX + aPosY * aSkewX;  // X skew scales with the Y coordinate
@@ -447,10 +447,10 @@ PvzpParticle* PvzpParticleEmitter::SpawnParticle(int theIndex, int theSpawnCount
 	if (mEmitterDef->mAnimated || FloatTrackIsSet(mEmitterDef->mAnimationRate))
 		aParticle->mImageFrame = 0;  // frame computed later from the time value; init to 0 for now
 	else
-		aParticle->mImageFrame = Sexy::Rand(mEmitterDef->mImageFrames);  // fixed-frame particle: pick a random frame once
+		aParticle->mImageFrame = Sexy::CosmeticRand(mEmitterDef->mImageFrames);  // fixed-frame particle: pick a random frame once
 
 	if (TestBit(mEmitterDef->mParticleFlags, static_cast<int>(ParticleFlags::PARTICLE_RANDOM_LAUNCH_SPIN)))
-		aParticle->mSpinPosition = Sexy::Rand(static_cast<float>(2 * PI));  // random initial spin in [0, 2π]
+		aParticle->mSpinPosition = Sexy::CosmeticRand(static_cast<float>(2 * PI));  // random initial spin in [0, 2π]
 	else if (TestBit(mEmitterDef->mParticleFlags, static_cast<int>(ParticleFlags::PARTICLE_ALIGN_LAUNCH_SPIN)))
 		aParticle->mSpinPosition = aLaunchAngle;  // spin aligns with the launch angle
 	else
@@ -751,7 +751,7 @@ bool PvzpParticleEmitter::CrossFadeParticle(PvzpParticle* theParticle, PvzpParti
 		theParticle->mCrossFadeDuration = mEmitterCrossFadeCountDown;  // inherit the source emitter's remaining cross-fade time
 	else
 	{
-		float aCrossFadeDurationInterp = Sexy::Rand(1);
+		float aCrossFadeDurationInterp = Sexy::CosmeticRand(1);
 		int aCrossFadeDuration = FloatTrackEvaluate(theToEmitter->mEmitterDef->mCrossFadeDuration, mSystemTimeValue, aCrossFadeDurationInterp);
 		theParticle->mCrossFadeDuration = std::max(1, aCrossFadeDuration);  // random cross-fade duration, at least 1 frame
 	}
@@ -1176,7 +1176,7 @@ void PvzpParticleEmitter::CrossFadeEmitter(PvzpParticleEmitter* theToEmitter)
 	}
 	PVZP_ASSERT(theToEmitter != this);
 
-	float aCrossFadeDurationInterp = Sexy::Rand(1.0f);
+	float aCrossFadeDurationInterp = Sexy::CosmeticRand(1.0f);
 	mEmitterCrossFadeCountDown = FloatTrackEvaluate(theToEmitter->mEmitterDef->mCrossFadeDuration, mSystemTimeValue, aCrossFadeDurationInterp);
 	mEmitterCrossFadeCountDown = std::max(1, mEmitterCrossFadeCountDown);
 	mCrossFadeEmitterID = static_cast<ParticleEmitterID>(mParticleSystem->mParticleHolder->mEmitters.DataArrayGetID(theToEmitter));

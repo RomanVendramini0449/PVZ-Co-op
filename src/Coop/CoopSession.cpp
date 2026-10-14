@@ -169,6 +169,37 @@ namespace
 	};
 }
 
+namespace
+{
+	void PackSetup(Packer& thePacker, const LevelSetup& theSetup)
+	{
+		thePacker.U32(theSetup.mEpoch);
+		thePacker.U32(theSetup.mLevel);
+		thePacker.U32(static_cast<uint32_t>(theSetup.mGameMode));
+		thePacker.U32(theSetup.mRngSeed);
+		thePacker.U8(static_cast<uint8_t>(theSetup.mDifficulty));
+		thePacker.U32(static_cast<uint32_t>(theSetup.mProfileLevel));
+		thePacker.U32(static_cast<uint32_t>(theSetup.mCoins));
+		thePacker.U32(theSetup.mFinishedAdventure);
+		for (int i = 0; i < PURCHASE_COUNT; i++)
+			thePacker.U32(theSetup.mPurchases[i]);
+	}
+
+	void UnpackSetup(Cursor& theCursor, LevelSetup& theSetup)
+	{
+		theSetup.mEpoch = theCursor.U32();
+		theSetup.mLevel = theCursor.U32();
+		theSetup.mGameMode = static_cast<int32_t>(theCursor.U32());
+		theSetup.mRngSeed = theCursor.U32();
+		theSetup.mDifficulty = static_cast<Difficulty>(theCursor.U8());
+		theSetup.mProfileLevel = static_cast<int32_t>(theCursor.U32());
+		theSetup.mCoins = static_cast<int32_t>(theCursor.U32());
+		theSetup.mFinishedAdventure = theCursor.U32();
+		for (int i = 0; i < PURCHASE_COUNT; i++)
+			theSetup.mPurchases[i] = theCursor.U32();
+	}
+}
+
 uint64_t HashOwnExecutable()
 {
 	const std::string aPath = GetOwnExecutablePath();
@@ -200,6 +231,8 @@ Session::~Session()
 
 void Session::SetFailed(const std::string& theReason)
 {
+	if (mState == State::Connected && mEndReason == EndReason::None)
+		mEndReason = EndReason::Lost;
 	mState = State::Failed;
 	mStatusText = theReason;
 	mPeer.Close();
@@ -267,7 +300,11 @@ void Session::Disconnect(const std::string& theReason)
 		aPacker.U8(static_cast<uint8_t>(MsgType::Bye));
 		SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 		FlushOutbound();
+		// Close politely, so the goodbye actually arrives: see CloseGracefully.
+		mPeer.CloseGracefully();
 	}
+	if (mState == State::Connected && mEndReason == EndReason::None)
+		mEndReason = EndReason::LocalLeft;
 	mPeer.Close();
 	mListener.Close();
 	mState = State::Disconnected;
@@ -416,6 +453,7 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 	case MsgType::Commands:
 	{
 		CommandBatch aBatch;
+		aBatch.mEpoch = aCursor.U32();
 		aBatch.mTick = aCursor.U32();
 		const uint32_t aCount = aCursor.U32();
 		if (!aCursor.mOk || aCount > 256)
@@ -440,11 +478,13 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 
 	case MsgType::Checksum:
 	{
-		const uint32_t aTick = aCursor.U32();
-		const uint32_t aChecksum = aCursor.U32();
+		PendingChecksum aEntry;
+		aEntry.mEpoch = aCursor.U32();
+		aEntry.mTick = aCursor.U32();
+		aEntry.mValue = aCursor.U32();
 		if (!aCursor.mOk)
 			return false;
-		mPendingChecksums.emplace_back(aTick, aChecksum);
+		mPendingChecksums.push_back(aEntry);
 		return true;
 	}
 
@@ -453,19 +493,30 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 		if (mIsHost)
 			return false;  // only the client follows
 
-		LevelSetup aSetup;
-		aSetup.mLevel = aCursor.U32();
-		aSetup.mGameMode = static_cast<int32_t>(aCursor.U32());
-		aSetup.mRngSeed = aCursor.U32();
-		aSetup.mProfileLevel = static_cast<int32_t>(aCursor.U32());
-		aSetup.mCoins = static_cast<int32_t>(aCursor.U32());
-		aSetup.mFinishedAdventure = aCursor.U32();
-		for (int i = 0; i < PURCHASE_COUNT; i++)
-			aSetup.mPurchases[i] = aCursor.U32();
+		FlowEvent anEvent;
+		anEvent.mKind = FlowEvent::Kind::EnterLevel;
+		UnpackSetup(aCursor, anEvent.mSetup);
 		if (!aCursor.mOk)
 			return false;
 
-		mPendingLevels.push_back(aSetup);
+		mPendingFlow.push_back(anEvent);
+		return true;
+	}
+
+	case MsgType::HostScreen:
+	{
+		if (mIsHost)
+			return false;
+
+		FlowEvent anEvent;
+		anEvent.mKind = FlowEvent::Kind::Screen;
+		anEvent.mScreen = static_cast<HostScreen>(aCursor.U8());
+		anEvent.mArg = static_cast<int32_t>(aCursor.U32());
+		UnpackSetup(aCursor, anEvent.mSetup);
+		if (!aCursor.mOk)
+			return false;
+
+		mPendingFlow.push_back(anEvent);
 		return true;
 	}
 
@@ -473,11 +524,21 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 	{
 		if (mIsHost)
 			return false;
-		mPendingLeaveLevel = true;
+		FlowEvent anEvent;
+		anEvent.mKind = FlowEvent::Kind::LeaveLevel;
+		mPendingFlow.push_back(anEvent);
 		return true;
 	}
 
+	case MsgType::PeerReady:
+		if (!mIsHost)
+			return false;
+		mPeerReady = true;
+		return true;
+
 	case MsgType::Bye:
+		if (mEndReason == EndReason::None)
+			mEndReason = EndReason::PeerLeft;
 		mPeer.Close();
 		mState = State::Disconnected;
 		mStatusText = "The other player left the game.";
@@ -525,13 +586,14 @@ bool Session::SendReady()
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 }
 
-bool Session::SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands)
+bool Session::SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands, uint32_t theEpoch)
 {
 	if (!IsConnected())
 		return false;
 
 	Packer aPacker;
 	aPacker.U8(static_cast<uint8_t>(MsgType::Commands));
+	aPacker.U32(theEpoch);
 	aPacker.U32(theTick);
 	aPacker.U32(static_cast<uint32_t>(theCommands.size()));
 	for (const Command& aCommand : theCommands)
@@ -546,33 +608,47 @@ bool Session::SendCommandBatch(uint32_t theTick, const std::vector<Command>& the
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 }
 
-bool Session::PopCommandBatch(CommandBatch& theBatchOut)
+bool Session::PopCommandBatch(CommandBatch& theBatchOut, uint32_t theEpoch)
 {
-	if (mPendingBatches.empty())
+	// Epochs only ever rise and TCP keeps order, so the queue is sorted by
+	// epoch: drop the stale front, stop at the first one from the future.
+	while (!mPendingBatches.empty() && mPendingBatches.front().mEpoch < theEpoch)
+		mPendingBatches.pop_front();
+
+	if (mPendingBatches.empty() || mPendingBatches.front().mEpoch != theEpoch)
 		return false;
+
 	theBatchOut = std::move(mPendingBatches.front());
 	mPendingBatches.pop_front();
 	return true;
 }
 
-bool Session::SendChecksum(uint32_t theTick, uint32_t theChecksum)
+bool Session::SendChecksum(uint32_t theTick, uint32_t theChecksum, uint32_t theEpoch)
 {
 	if (!IsConnected())
 		return false;
 
 	Packer aPacker;
 	aPacker.U8(static_cast<uint8_t>(MsgType::Checksum));
+	aPacker.U32(theEpoch);
 	aPacker.U32(theTick);
 	aPacker.U32(theChecksum);
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 }
 
-bool Session::PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut)
+bool Session::PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut, uint32_t theEpoch)
 {
-	if (mPendingChecksums.empty())
+	// Same rule as command batches. A checksum from the previous level
+	// compared against this level's tick of the same number is a false
+	// "out of sync" waiting to happen.
+	while (!mPendingChecksums.empty() && mPendingChecksums.front().mEpoch < theEpoch)
+		mPendingChecksums.pop_front();
+
+	if (mPendingChecksums.empty() || mPendingChecksums.front().mEpoch != theEpoch)
 		return false;
-	theTickOut = mPendingChecksums.front().first;
-	theChecksumOut = mPendingChecksums.front().second;
+
+	theTickOut = mPendingChecksums.front().mTick;
+	theChecksumOut = mPendingChecksums.front().mValue;
 	mPendingChecksums.pop_front();
 	return true;
 }
@@ -584,25 +660,43 @@ bool Session::SendEnterLevel(const LevelSetup& theSetup)
 
 	Packer aPacker;
 	aPacker.U8(static_cast<uint8_t>(MsgType::EnterLevel));
-	aPacker.U32(theSetup.mLevel);
-	aPacker.U32(static_cast<uint32_t>(theSetup.mGameMode));
-	aPacker.U32(theSetup.mRngSeed);
-	aPacker.U32(static_cast<uint32_t>(theSetup.mProfileLevel));
-	aPacker.U32(static_cast<uint32_t>(theSetup.mCoins));
-	aPacker.U32(theSetup.mFinishedAdventure);
-	for (int i = 0; i < PURCHASE_COUNT; i++)
-		aPacker.U32(theSetup.mPurchases[i]);
+	PackSetup(aPacker, theSetup);
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 }
 
-bool Session::PopEnterLevel(LevelSetup& theSetupOut)
+bool Session::SendHostScreen(HostScreen theScreen, int32_t theArg, const LevelSetup& theProfile)
 {
-	if (mPendingLevels.empty())
+	if (!IsConnected() || !mIsHost)
 		return false;
-	theSetupOut = mPendingLevels.front();
-	mPendingLevels.pop_front();
+
+	Packer aPacker;
+	aPacker.U8(static_cast<uint8_t>(MsgType::HostScreen));
+	aPacker.U8(static_cast<uint8_t>(theScreen));
+	aPacker.U32(static_cast<uint32_t>(theArg));
+	PackSetup(aPacker, theProfile);
+	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
+}
+
+bool Session::SendPeerReady()
+{
+	if (!IsConnected() || mIsHost || mSentReady)
+		return false;
+
+	Packer aPacker;
+	aPacker.U8(static_cast<uint8_t>(MsgType::PeerReady));
+	mSentReady = SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
+	return mSentReady;
+}
+
+bool Session::PopFlowEvent(FlowEvent& theEventOut)
+{
+	if (mPendingFlow.empty())
+		return false;
+	theEventOut = mPendingFlow.front();
+	mPendingFlow.pop_front();
 	return true;
 }
+
 
 bool Session::SendLeaveLevel()
 {
@@ -614,13 +708,6 @@ bool Session::SendLeaveLevel()
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 }
 
-bool Session::PopLeaveLevel()
-{
-	if (!mPendingLeaveLevel)
-		return false;
-	mPendingLeaveLevel = false;
-	return true;
-}
 
 void Session::Update()
 {
@@ -655,18 +742,27 @@ void Session::Update()
 
 	case State::Handshaking:
 	case State::Connected:
-		if (!FlushOutbound() || !PumpInbound())
-		{
-			if (mState != State::Disconnected && mState != State::Failed)
-				SetFailed(mPeer.GetError().empty() ? "Connection lost." : mPeer.GetError());
-			return;
-		}
+	{
+		const bool aFlushed = FlushOutbound();
+		const bool aPumped = PumpInbound();
+
+		// Act on whatever did arrive before declaring the link down. A
+		// goodbye is the last thing a leaving peer sends, so it usually
+		// arrives together with the close -- reporting "connection lost"
+		// first would throw away the one message that says why.
 		if (!ProcessFrames())
 		{
 			if (mState != State::Disconnected && mState != State::Failed)
 				SetFailed("The other player sent something unexpected; disconnected.");
+			return;
+		}
+		if (!aFlushed || !aPumped)
+		{
+			if (mState != State::Disconnected && mState != State::Failed)
+				SetFailed(mPeer.GetError().empty() ? "Connection lost." : mPeer.GetError());
 		}
 		return;
+	}
 
 	default:
 		return;

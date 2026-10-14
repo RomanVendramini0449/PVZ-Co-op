@@ -25,6 +25,7 @@
 #include "../../LawnApp.h"
 #include "ImitaterDialog.h"
 #include "SeedChooserScreen.h"
+#include "../../Coop/CoopGame.h"
 #include "../ToolTipWidget.h"
 #include "../../GameConstants.h"
 #include "widget/WidgetManager.h"
@@ -167,7 +168,14 @@ void ImitaterDialog::MouseDown(int x, int y, int theClickCount)
 	if (aSeedType != SeedType::SEED_NONE)
 	{
 		SeedChooserScreen* aSeedChooser = mApp->mSeedChooserScreen.get();
-		if (!aSeedChooser->SeedNotAllowedToPick(aSeedType))
+		if (Coop::Game::Get().IsInGame() && !aSeedChooser->SeedNotAllowedToPick(aSeedType))
+		{
+			// Shared line-up: schedule the pick for both machines.
+			Coop::Game::Get().GetLockstep().QueueLocalCommand(Coop::CommandType::ChooserPick, 0, 0,
+				static_cast<int16_t>(SeedChooserScreen::CoopChooserImitaterBase + aSeedType));
+			mApp->KillDialog(mId);
+		}
+		else if (!aSeedChooser->SeedNotAllowedToPick(aSeedType))
 		{
 			ChosenSeed& aImitater = aSeedChooser->mChosenSeeds[SeedType::SEED_IMITATER];
 			aImitater.mSeedState = ChosenSeedState::SEED_IN_CHOOSER;

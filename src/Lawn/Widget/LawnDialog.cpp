@@ -31,6 +31,7 @@
 #include "../../PvzpLib/EffectSystem.h"
 #include "../../PvzpLib/PvzpStringFile.h"
 #include "graphics/ImageFont.h"
+#include "../../Coop/CoopGame.h"
 
 constexpr const int DIALOG_HEADER_OFFSET = 45;
 
@@ -471,12 +472,25 @@ GameOverDialog::GameOverDialog(const std::string& theMessage, bool theShowChalle
 
 	gLawnApp->mBoard->mShowShovel = false;
 	gLawnApp->mBoard->mMenuButton->mBtnNoDraw = true;
+
+	// Trying again, or giving up, is the host's call (SPEC.md section 3). The
+	// joining player sees the same Game Over, without the buttons, and the
+	// overlay says the host is deciding.
+	if (Coop::Game::Get().IsFollower())
+	{
+		mMenuButton->SetVisible(false);
+		if (mLawnYesButton)
+			mLawnYesButton->SetVisible(false);
+	}
 }
 
 GameOverDialog::~GameOverDialog() = default;
 
 void GameOverDialog::KeyDown(KeyCode theKey)
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (theKey == KeyCode::KEYCODE_ESCAPE)
 	{
 		ButtonDepress(1);
@@ -488,6 +502,9 @@ void GameOverDialog::KeyDown(KeyCode theKey)
 
 void GameOverDialog::ButtonDepress(int theId)
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (theId == 1)
 	{
 		mApp->KillDialog(Dialogs::DIALOG_GAME_OVER);

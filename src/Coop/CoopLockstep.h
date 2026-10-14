@@ -52,8 +52,10 @@ class Lockstep
 {
 public:
 	static constexpr uint32_t MAX_INPUT_DELAY = 20;     // 200 ms
-	// Never drop below this: some delay is always needed to cover the link.
-	static constexpr uint32_t MIN_INPUT_DELAY = 2;      // 20 ms
+	// Never drop below this. Updates run in bursts of one or two ticks per
+	// 60 Hz frame, so a peer's batch can land a whole frame late even over
+	// loopback; 20 ms left no room for that and showed up as hitches.
+	static constexpr uint32_t MIN_INPUT_DELAY = 3;      // 30 ms
 	// Everything below is measured in milliseconds of real stalling, NOT in
 	// calls to BeginTick(). The caller polls in a tight loop, so counting
 	// calls measured how fast the loop spins rather than how bad the link is:
@@ -63,12 +65,18 @@ public:
 	// Tell the player something is wrong only once it is worth saying.
 	static constexpr uint32_t STALL_MS_BEFORE_WARNING = 500;
 	// Smooth ticks before giving the delay back, so a brief hiccup does not
-	// cost input lag for the rest of the session. 400 ticks is four seconds.
-	static constexpr uint32_t SMOOTH_TICKS_BEFORE_LOWER = 400;
+	// cost input lag for the rest of the session. Ten seconds: lowering too
+	// eagerly made the delay oscillate -- drop, stall, raise, drop -- which is
+	// a hitch every few seconds.
+	static constexpr uint32_t SMOOTH_TICKS_BEFORE_LOWER = 1000;
+	// ...and only if the peer's input has been arriving at least this many
+	// ticks ahead of need the whole time, so there is slack to give back.
+	static constexpr uint32_t HEADROOM_BEFORE_LOWER = 2;
 
 private:
 	Session*    mSession = nullptr;
 	bool        mRunning = false;
+	uint32_t    mEpoch = 0;       // which level's traffic is ours
 	uint32_t    mCurrentTick = 0;
 	uint32_t    mInputDelay = DEFAULT_INPUT_DELAY;
 	PlayerId    mLocalPlayer = PlayerId::Host;
@@ -102,6 +110,7 @@ private:
 	uint32_t    mStallEvents = 0;      // distinct times we had to wait
 	uint64_t    mTotalStallMs = 0;     // how long we waited in total
 	uint32_t    mSmoothTicks = 0;      // consecutive ticks with no waiting
+	uint32_t    mMinHeadroom = 0;      // least slack seen across those ticks
 
 	uint32_t    CurrentStallMs() const;
 
@@ -114,7 +123,7 @@ private:
 
 public:
 	// theParams comes from the handshake, so both machines start identically.
-	void Begin(Session* theSession, const SessionParams& theParams, PlayerId theLocalPlayer);
+	void Begin(Session* theSession, const SessionParams& theParams, PlayerId theLocalPlayer, uint32_t theEpoch = 0);
 	void Reset();
 
 	// Record something this player did. Scheduled automatically.
@@ -129,6 +138,7 @@ public:
 
 	bool     IsRunning() const { return mRunning; }
 	uint32_t GetCurrentTick() const { return mCurrentTick; }
+	uint32_t GetEpoch() const { return mEpoch; }
 	uint32_t GetInputDelay() const { return mInputDelay; }
 	PlayerId GetLocalPlayer() const { return mLocalPlayer; }
 

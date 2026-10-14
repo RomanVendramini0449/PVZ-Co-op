@@ -86,6 +86,12 @@ public:
 	bool        Receive(void* theBuffer, size_t theLen, size_t& theReadOut);
 
 	void        Close();
+	// Close after saying everything: stop sending, then read and discard
+	// whatever the peer still has in flight for a moment before closing.
+	// Closing with unread data in the buffer makes the OS reset the
+	// connection, and a reset can wipe out the last thing we sent -- here,
+	// the goodbye that tells the other player why the game ended.
+	void        CloseGracefully();
 
 	Status      GetStatus() const { return mStatus; }
 	bool        IsConnected() const { return mStatus == Status::Connected; }

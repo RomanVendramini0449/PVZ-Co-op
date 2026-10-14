@@ -369,8 +369,13 @@ GameSelector::GameSelector(LawnApp* theApp)
 	// Disabled rather than removed, so it reads as a deliberate choice
 	// rather than a broken menu. The Store stays: co-op shares money and
 	// upgrades, so Dave's Twiddydinks is still part of the campaign.
-	mMinigameButton->SetDisabled(true);
-	mPuzzleButton->SetDisabled(true);
+	// Mini-games are out of scope, so the button is free. It becomes the
+	// level select instead (SPEC.md section 10.3) for whoever drives the
+	// campaign -- the host in co-op, you in single player.
+	mMinigameButton->SetDisabled(!CoopLevelSelectEnabled());
+	// Puzzle mode is out of scope too; in co-op its tombstone sets the
+	// difficulty, which is the host's to choose (SPEC.md section 8).
+	mPuzzleButton->SetDisabled(!CoopDifficultyEnabled());
 	mSurvivalButton->SetDisabled(true);
 	mZenGardenButton->SetDisabled(true);
 	mZombatarButton->SetDisabled(true);
@@ -379,7 +384,14 @@ GameSelector::GameSelector(LawnApp* theApp)
 	// Letting the client press Adventure here is what produced two players in
 	// two different levels wondering why nothing was shared.
 	if (Coop::Game::Get().IsFollower())
+	{
 		mAdventureButton->SetDisabled(true);
+		// Money and upgrades are the host's to spend, and the profile on
+		// this machine is borrowed from the host for the session -- switching
+		// it out from under the session would not end well.
+		mStoreButton->SetDisabled(true);
+		mChangeUserButton->SetDisabled(true);
+	}
 }
 
 GameSelector::~GameSelector()
@@ -545,6 +557,12 @@ void GameSelector::SyncProfile(bool theShowLoading)
 		}
 	}
 
+	// The repurposed tombstones are not the modes those locks are about.
+	if (CoopLevelSelectEnabled())
+		mMinigamesLocked = false;
+	if (CoopDifficultyEnabled())
+		mPuzzleLocked = false;
+
 	if (mApp->HasFinishedAdventure() && !mApp->IsTrialStageLocked())
 		mHasTrophy = true;
 	else
@@ -610,17 +628,6 @@ void GameSelector::Draw(Graphics* g)
 
 	}
 
-	// The joining player lands here between levels while the host works
-	// through the award screen and Crazy Dave. Say so, or an idle menu looks
-	// like the session has died.
-	if (Coop::Game::Get().IsFollower())
-	{
-		const std::string aWaitStr = "Waiting for the host to start the next level...";
-		const float aWidth = Sexy::FONT_BRIANNETOD16->StringWidth(aWaitStr);
-		g->SetFont(Sexy::FONT_BRIANNETOD16);
-		g->SetColor(Color(255, 245, 200));
-		g->DrawString(aWaitStr, static_cast<int>((mWidth - aWidth) * 0.5f), mHeight - 24);
-	}
 }
 
 void GameSelector::DrawOverlay(Graphics* g)
@@ -726,6 +733,9 @@ void GameSelector::DrawOverlay(Graphics* g)
 	}
 
 	mToolTip->Draw(g);
+
+	DrawCoopButtonLabels(g);
+	DrawCoopLevelSelect(g);
 }
 
 void GameSelector::UpdateTooltip()
@@ -791,6 +801,15 @@ void GameSelector::Update()
 		if (mStartingGameCounter > 450)
 		{
 			mApp->KillGameSelector();
+
+			// Co-op goes straight into the campaign. The detours below -- the
+			// opening cutscene, the Zen Garden tutorial, Dave's store intro --
+			// are single-player modes and screens with no co-op version.
+			if (Coop::Game::Get().IsConnected())
+			{
+				mApp->PreNewGame(GameMode::GAMEMODE_ADVENTURE, false);
+				return;
+			}
 
 			if (mApp->IsIceDemo())
 			{
@@ -1132,6 +1151,204 @@ void GameSelector::MouseDown(int x, int y, [[maybe_unused]] int theClickCount)
 		mStartingGameCounter = 450;
 }
 
+// ---------------------------------------------------------------------------
+// Host-only level select (docs/SPEC.md section 10.3)
+// ---------------------------------------------------------------------------
+
+namespace
+{
+	// Grid geometry, in board coordinates.
+	constexpr int kLevelSelectX = 120;
+	constexpr int kLevelSelectY = 90;
+	constexpr int kLevelCellW = 56;
+	constexpr int kLevelCellH = 34;
+	constexpr int kLevelCols = 10;   // levels within a world
+	constexpr int kLevelRows = 5;    // worlds
+}
+
+namespace
+{
+	// Sits over the whole menu while the level grid is open, purely to take
+	// the clicks. Without it a click on a grid cell went to whichever
+	// tombstone was underneath it -- the grid's first rows cover Adventure --
+	// and started the saved level instead of the chosen one. The grid itself
+	// is still drawn in the selector's overlay pass, above everything.
+	class CoopLevelSelectPanel : public Widget
+	{
+	public:
+		explicit CoopLevelSelectPanel(GameSelector* theOwner) : mOwner(theOwner)
+		{
+			mHasAlpha = true;
+			mHasTransparencies = true;
+		}
+		void MouseDown(int, int, int) override {}
+		void MouseUp(int x, int y, int theClickCount) override
+		{
+			if (theClickCount > 0)
+				mOwner->CoopLevelSelectClicked(x, y);
+		}
+	private:
+		GameSelector* mOwner;
+	};
+}
+
+void GameSelector::OpenCoopLevelSelect()
+{
+	if (mCoopLevelSelectPanel || !CoopHostMayStartLevel())
+		return;
+	mCoopLevelSelectOpen = true;
+	mCoopLevelSelectPanel = new CoopLevelSelectPanel(this);
+	mCoopLevelSelectPanel->Resize(0, 0, mWidth, mHeight);
+	AddWidget(mCoopLevelSelectPanel);
+	BringToFront(mCoopLevelSelectPanel);
+	MarkDirty();
+}
+
+void GameSelector::CloseCoopLevelSelect()
+{
+	mCoopLevelSelectOpen = false;
+	if (mCoopLevelSelectPanel)
+	{
+		RemoveWidget(mCoopLevelSelectPanel);
+		mApp->SafeDeleteWidget(mCoopLevelSelectPanel);
+		mCoopLevelSelectPanel = nullptr;
+	}
+	MarkDirty();
+}
+
+void GameSelector::CoopLevelSelectClicked(int x, int y)
+{
+	const int aLevel = CoopLevelSelectHitTest(x, y);
+	CloseCoopLevelSelect();  // a level, or anywhere else to cancel
+	if (aLevel > 0)
+		CoopStartLevel(aLevel);
+}
+
+bool GameSelector::CoopDifficultyEnabled() const
+{
+	return Coop::Game::Get().IsConnected() && Coop::Game::Get().IsHost();
+}
+
+// The repurposed tombstones still carry their original art, so say what they
+// do now. Drawn in the overlay pass, above the selector's own widgets.
+void GameSelector::DrawCoopButtonLabels(Graphics* g)
+{
+	if (mSelectorState != SelectorAnimState::SELECTOR_IDLE || mCoopLevelSelectOpen)
+		return;
+
+	auto aLabel = [g](Widget* theButton, const std::string& theText, const Color& theColor)
+	{
+		_Font* aFont = Sexy::FONT_BRIANNETOD12;
+		const int aWidth = aFont->StringWidth(theText);
+		const int aX = theButton->mX + theButton->mWidth / 2 - aWidth / 2;
+		const int aY = theButton->mY + theButton->mHeight / 2;
+		g->SetColor(Color(0, 0, 0, 180));
+		g->FillRect(aX - 6, aY - aFont->GetAscent() - 3, aWidth + 12, aFont->GetHeight() + 6);
+		g->SetFont(aFont);
+		g->SetColor(theColor);
+		g->DrawString(theText, aX, aY);
+	};
+
+	if (CoopLevelSelectEnabled())
+		aLabel(mMinigameButton, "LEVEL SELECT", Color(255, 245, 200));
+	if (CoopDifficultyEnabled())
+	{
+		const bool aHard = Coop::Game::Get().GetNextDifficulty() == Coop::Difficulty::Hard;
+		aLabel(mPuzzleButton, aHard ? "DIFFICULTY: HARD" : "DIFFICULTY: NORMAL",
+			aHard ? Color(255, 160, 160) : Color(255, 245, 200));
+	}
+}
+
+bool GameSelector::CoopLevelSelectEnabled() const
+{
+	// The client follows the host and picks nothing (SPEC.md section 3).
+	return !Coop::Game::Get().IsFollower();
+}
+
+int GameSelector::CoopLevelSelectHitTest(int x, int y) const
+{
+	const int aCol = (x - kLevelSelectX) / kLevelCellW;
+	const int aRow = (y - kLevelSelectY) / kLevelCellH;
+	if (x < kLevelSelectX || y < kLevelSelectY)
+		return 0;
+	if (aCol < 0 || aCol >= kLevelCols || aRow < 0 || aRow >= kLevelRows)
+		return 0;
+
+	return aRow * kLevelCols + aCol + 1;
+}
+
+void GameSelector::DrawCoopLevelSelect(Graphics* g)
+{
+	if (!mCoopLevelSelectOpen)
+		return;
+
+	g->SetColor(Color(0, 0, 0, 200));
+	g->FillRect(0, 0, mWidth, mHeight);
+
+	g->SetFont(Sexy::FONT_BRIANNETOD16);
+	g->SetColor(Color(255, 245, 200));
+	g->DrawString("Pick a level to start from", kLevelSelectX, kLevelSelectY - 42);
+
+	g->SetFont(Sexy::FONT_BRIANNETOD12);
+	g->SetColor(Color(200, 200, 190));
+	g->DrawString("Seeds and upgrades are granted to match. This changes your saved progress.",
+		kLevelSelectX, kLevelSelectY - 20);
+
+	for (int aRow = 0; aRow < kLevelRows; aRow++)
+	{
+		for (int aCol = 0; aCol < kLevelCols; aCol++)
+		{
+			const int aX = kLevelSelectX + aCol * kLevelCellW;
+			const int aY = kLevelSelectY + aRow * kLevelCellH;
+
+			g->SetColor(Color(40, 70, 40, 230));
+			g->FillRect(aX + 2, aY + 2, kLevelCellW - 4, kLevelCellH - 4);
+
+			char aLabel[16];
+			snprintf(aLabel, sizeof(aLabel), "%d-%d", aRow + 1, aCol + 1);
+			g->SetFont(Sexy::FONT_BRIANNETOD12);
+			g->SetColor(Color(255, 245, 200));
+			g->DrawString(aLabel, aX + 12, aY + kLevelCellH - 12);
+		}
+	}
+
+	g->SetFont(Sexy::FONT_BRIANNETOD12);
+	g->SetColor(Color(200, 200, 190));
+	g->DrawString("Click anywhere else to cancel.",
+		kLevelSelectX, kLevelSelectY + kLevelRows * kLevelCellH + 22);
+}
+
+void GameSelector::CoopStartLevel(int theLevel)
+{
+	if (theLevel < 1 || mApp->mPlayerInfo == nullptr)
+		return;
+
+	// The seeds a player has are derived from the level they have reached, so
+	// setting the level is most of what "unlock everything up to here" means.
+	mApp->mPlayerInfo->mLevel = theLevel;
+
+	// The rest is bought from Dave rather than earned, and without it the
+	// later levels cannot be played properly at all -- no pool or roof
+	// cleaners, no upgrade plants to test the special stages with. This is a
+	// testing affordance and grants them outright.
+	static const StoreItem kDevItems[] = {
+		StoreItem::STORE_ITEM_POOL_CLEANER,
+		StoreItem::STORE_ITEM_ROOF_CLEANER,
+		StoreItem::STORE_ITEM_RAKE,
+	};
+	for (StoreItem anItem : kDevItems)
+	{
+		if (mApp->mPlayerInfo->mPurchases[anItem] == 0)
+			mApp->mPlayerInfo->mPurchases[anItem] = 1;
+	}
+	// Two extra seed slots, so a late level is not fought with six packets.
+	if (mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_PACKET_UPGRADE] < 2)
+		mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_PACKET_UPGRADE] = 2;
+
+	mApp->KillGameSelector();
+	mApp->PreNewGame(GameMode::GAMEMODE_ADVENTURE, false);
+}
+
 void GameSelector::ButtonMouseEnter(int theId)
 {
 	if ((theId == GameSelector::GameSelector_Minigame && mMinigamesLocked) ||
@@ -1152,8 +1369,25 @@ void GameSelector::ButtonPress(int theId)
 		mApp->PlaySample(Sexy::SOUND_TAP);
 }
 
+// Host: the other player must be past their title screen before a level can
+// start, or they are left behind (see Coop::Game::IsPeerReady). Says why.
+bool GameSelector::CoopHostMayStartLevel()
+{
+	Coop::Game& aCoop = Coop::Game::Get();
+	if (!aCoop.IsConnected() || !aCoop.IsHost() || aCoop.IsPeerReady())
+		return true;
+
+	mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "Not Yet!",
+		"The other player hasn't reached\nthe main menu yet.\n\nWait for them to click through\nthe title screen.",
+		"[DIALOG_BUTTON_OK]", "", Dialog::BUTTONS_FOOTER);
+	return false;
+}
+
 void GameSelector::ClickedAdventure()
 {
+	if (!CoopHostMayStartLevel())
+		return;
+
 	if (mApp->IsTrialStageLocked() && (mLevel >= 25 || mApp->HasFinishedAdventure()))
 	{
 		if (mApp->LawnMessageBox(
@@ -1237,10 +1471,19 @@ void GameSelector::ButtonDepress(int theId)
 		ClickedAdventure();
 		break;
 	case GameSelector::GameSelector_Minigame:
-		mApp->KillGameSelector();
-		mApp->ShowChallengeScreen(ChallengePage::CHALLENGE_PAGE_CHALLENGE);
+		if (CoopLevelSelectEnabled())
+			OpenCoopLevelSelect();
 		break;
 	case GameSelector::GameSelector_Puzzle:
+		if (CoopDifficultyEnabled())
+		{
+			Coop::Game& aCoop = Coop::Game::Get();
+			aCoop.SetNextDifficulty(aCoop.GetNextDifficulty() == Coop::Difficulty::Hard
+				? Coop::Difficulty::Normal : Coop::Difficulty::Hard);
+			mApp->PlaySample(Sexy::SOUND_GRAVEBUTTON);
+			MarkDirty();
+			break;
+		}
 		mApp->KillGameSelector();
 		mApp->ShowChallengeScreen(ChallengePage::CHALLENGE_PAGE_PUZZLE);
 		break;
@@ -1265,7 +1508,7 @@ void GameSelector::ButtonDepress(int theId)
 	{
 		StoreScreen* aStore = mApp->ShowStoreScreen();
 		aStore->WaitForResult(true);
-		if (aStore->mGoToTreeNow)
+		if (aStore->mGoToTreeNow && !Coop::Game::Get().IsConnected())
 		{
 			mApp->KillGameSelector();
 			mApp->PreNewGame(GameMode::GAMEMODE_TREE_OF_WISDOM, false);

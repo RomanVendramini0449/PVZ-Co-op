@@ -50,7 +50,7 @@ automatically. You do not need CMake, a compiler, or MSYS2 for this.
 1. Go to the repo's **Actions** tab on GitHub.
 2. Click the most recent **Co-op build** run with a green tick.
 3. Scroll to **Artifacts** and download **`pvz-coop-windows`**.
-4. Unzip it. Inside is a single `pvz-portable.exe` — it is statically linked,
+4. Unzip it. Inside is a single `PvZ-Coop.exe` — it is statically linked,
    so there are no DLLs to copy around.
 
 **This is also the best way to make sure you and your friend are on the exact
@@ -149,7 +149,7 @@ cmake --build build
 On Linux or macOS, just `cd` to the folder normally and run the same two
 commands.
 
-You get `build/pvz-portable` (`build/pvz-portable.exe` on Windows).
+You get `build/pvz-portable` (`build/PvZ-Coop.exe` on Windows).
 
 ### Check the netcode without the game
 
@@ -245,7 +245,7 @@ there, nothing is modified, Steam stays happy.
 ### Option B — copy the data next to the executable
 
 Copy `main.pak` and the whole `properties\` folder into `build/`, next to
-`pvz-portable.exe`, then just run it:
+`PvZ-Coop.exe`, then just run it:
 
 ```sh
 ./build/pvz-portable

@@ -27,6 +27,7 @@
 #include "../ZenGarden.h"
 #include "../SeedPacket.h"
 #include "../../LawnApp.h"
+#include "../../Coop/CoopGame.h"
 #include "AlmanacDialog.h"
 #include "../System/Music.h"
 #include "../../Resources.h"
@@ -440,6 +441,24 @@ void AwardScreen::Update()
 		}
 	}
 
+	// The joining player watches the host's award: the host is the one who
+	// moves on from it (SPEC.md section 3), and the overlay says so.
+	if (Coop::Game::Get().IsFollower())
+	{
+		mStartButton->mBtnNoDraw = true;
+		mStartButton->mDisabled = true;
+		mMenuButton->mBtnNoDraw = true;
+		mMenuButton->mDisabled = true;
+		mContinueButton->mBtnNoDraw = true;
+		mContinueButton->mDisabled = true;
+
+		// Still fade in and redraw, like the host's: returning before this
+		// left the joining player looking at a blank white screen.
+		MarkDirty();
+		if (mFadeInCounter > 0) mFadeInCounter--;
+		return;
+	}
+
 	if (mApp->GetDialogCount() > 0) return;
 	mStartButton->Update();
 	mMenuButton->Update();
@@ -451,6 +470,9 @@ void AwardScreen::Update()
 
 void AwardScreen::KeyDown(KeyCode theKey)
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (theKey == KeyCode::KEYCODE_SPACE || theKey == KeyCode::KEYCODE_RETURN)
 	{
 		StartButtonPressed();
@@ -473,6 +495,9 @@ void AwardScreen::KeyDown(KeyCode theKey)
 
 void AwardScreen::StartButtonPressed()
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (mApp->GetDialog(DIALOG_STORE))
 		return;
 
@@ -558,7 +583,7 @@ void AwardScreen::StartButtonPressed()
 				aStore->SetupForIntro(3100);
 				aStore->WaitForResult(true);
 			}
-			else if (aLevel == 45)
+			else if (aLevel == 45 && !Coop::Game::Get().IsConnected())  // no co-op Zen Garden
 			{
 				mApp->KillAwardScreen();
 				mApp->PreNewGame(GAMEMODE_CHALLENGE_ZEN_GARDEN, false);
@@ -582,6 +607,9 @@ void AwardScreen::MouseDown([[maybe_unused]] int x, [[maybe_unused]] int y, int 
 
 void AwardScreen::MouseUp([[maybe_unused]] int x, [[maybe_unused]] int y, int theClickCount)
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (theClickCount == 1)
 	{
 		if (mStartButton->IsMouseOver())

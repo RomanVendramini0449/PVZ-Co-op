@@ -31,6 +31,7 @@
 #include "../ZenGarden.h"
 #include "../SeedPacket.h"
 #include "../../LawnApp.h"
+#include "../../Coop/CoopGame.h"
 #include "../../Resources.h"
 #include "../System/Music.h"
 #include "SeedChooserScreen.h"
@@ -653,6 +654,12 @@ void StoreScreen::Update()
 	if (mWaitForDialog)
 		return;
 
+	// The joining player is in the store because the host is (SPEC.md
+	// section 3): money and upgrades are shared, but the host shops. Keep the
+	// buttons dead every frame, since the store re-enables them on its own.
+	if (Coop::Game::Get().IsFollower())
+		EnableButtons(false);
+
 	if (mApp->mCrazyDaveState == CRAZY_DAVE_OFF)
 	{
 		// demo sessions preload by update tick instead of the frame-scheduled mDrawnOnce
@@ -831,6 +838,9 @@ bool StoreScreen::IsPageShown(StorePages thePage)
 
 void StoreScreen::ButtonDepress(int theId)
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (theId == StoreScreen::StoreScreen_Back)
 		mResult = 1000;
 	else if (theId == StoreScreen::StoreScreen_Prev || theId == StoreScreen::StoreScreen_Next)
@@ -864,6 +874,9 @@ void StoreScreen::ButtonDepress(int theId)
 
 void StoreScreen::KeyDown(KeyCode theKey)
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (theKey == KeyCode::KEYCODE_ESCAPE)
 	{
 		ButtonDepress(StoreScreen::StoreScreen_Back);
@@ -1129,6 +1142,9 @@ void StoreScreen::AdvanceCrazyDaveDialog()
 
 void StoreScreen::MouseDown(int x, int y, [[maybe_unused]] int theClickCount)
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (mBubbleClickToContinue)
 	{
 		AdvanceCrazyDaveDialog();

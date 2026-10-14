@@ -29,6 +29,7 @@
 #include "ZenGarden.h"
 #include "LawnMower.h"
 #include "Challenge.h"
+#include "../Coop/CoopGame.h"
 #include "SeedPacket.h"
 #include "Projectile.h"
 #include "../LawnApp.h"
@@ -78,6 +79,11 @@ Challenge::Challenge()
 	mChallengeState = STATECHALLENGE_NORMAL;
 	mShowBowlingLine = false;
 	mLastConveyorSeedType = SEED_NONE;
+	for (int i = 0; i < Coop::PLAYER_COUNT; i++)
+	{
+		mCoopConveyorCounter[i] = -1;
+		mCoopLastConveyorSeedType[i] = SEED_NONE;
+	}
 	mSurvivalStage = 0;
 	mSlotMachineRollCount = 0;
 	mReanimChallenge = REANIMATIONID_NULL;
@@ -186,17 +192,23 @@ void Challenge::StartLevel()
 {
 	if (mApp->IsWhackAZombieLevel())
 	{
-		mBoard->mCursorObject->mCursorType = CURSOR_TYPE_HAMMER;
 		mBoard->mZombieCountDown = 200;
 		mBoard->mZombieCountDownStart = mBoard->mZombieCountDown;
 
+		// A hammer each. The whack handler animates the whacking player's own
+		// hammer, so a player without one would not just look wrong -- the
+		// first swing would reach for a hammer that does not exist.
 		ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_HAMMER, true);
-		mApp->RemoveReanimation(mBoard->mCursorObject->mReanimCursorID);
-		Reanimation* aHammerReanim = mApp->AddReanimation(-25.0f, 16.0f, 0, ReanimationType::REANIM_HAMMER);
-		aHammerReanim->mIsAttachment = true;
-		aHammerReanim->PlayReanim("anim_whack_zombie", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 24.0f);
-		aHammerReanim->mAnimTime = 1.0f;
-		mBoard->mCursorObject->mReanimCursorID = mApp->ReanimationGetID(aHammerReanim);
+		mBoard->ForEachCoopPlayer([this]()
+		{
+			mBoard->mCursorObject->mCursorType = CURSOR_TYPE_HAMMER;
+			mApp->RemoveReanimation(mBoard->mCursorObject->mReanimCursorID);
+			Reanimation* aHammerReanim = mApp->AddReanimation(-25.0f, 16.0f, 0, ReanimationType::REANIM_HAMMER);
+			aHammerReanim->mIsAttachment = true;
+			aHammerReanim->PlayReanim("anim_whack_zombie", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 24.0f);
+			aHammerReanim->mAnimTime = 1.0f;
+			mBoard->mCursorObject->mReanimCursorID = mApp->ReanimationGetID(aHammerReanim);
+		});
 	}
 	if (mApp->IsStormyNightLevel())
 	{
@@ -944,7 +956,8 @@ int Challenge::UpdateToolTip(int theX, int theY, const HitResult* theHitResult)
 
 void Challenge::MouseDownWhackAZombie(int theX, int theY)
 {
-	mApp->ReanimationTryToGet(mBoard->mCursorObject->mReanimCursorID)->mAnimTime = 0.2f;
+	if (Reanimation* aHammer = mApp->ReanimationTryToGet(mBoard->mCursorObject->mReanimCursorID))
+		aHammer->mAnimTime = 0.2f;
 	mApp->PlayFoley(FOLEY_SWING);
 
 	Zombie* aTopZombie = nullptr;
@@ -978,7 +991,18 @@ void Challenge::MouseDownWhackAZombie(int theX, int theY)
 				mApp->PlayFoley(FOLEY_PLASTIC_HIT);
 			}
 
-			aTopZombie->TakeHelmDamage(900, 0U);
+			// Two hammers swing twice as often, so in co-op everything takes
+			// twice the whacks: a cone two instead of one, a bucket four.
+			aTopZombie->TakeHelmDamage(Coop::Game::Get().IsInGame() ? 300 : 900, 0U);
+		}
+		else if (Coop::Game::Get().IsInGame() && aTopZombie->mBodyHealth > aTopZombie->mBodyMaxHealth / 2)
+		{
+			// The first whack of two: knock it down to half -- it flashes and
+			// loses an arm, so the hit plainly landed -- and the next one
+			// finishes it.
+			mApp->PlayFoley(FOLEY_BONK);
+			mApp->AddPvzpParticle(theX - 3, theY + 9, RENDER_LAYER_ABOVE_UI, PARTICLE_POW);
+			aTopZombie->TakeBodyDamage(aTopZombie->mBodyHealth - aTopZombie->mBodyMaxHealth / 2, 0U);
 		}
 		else
 		{
@@ -1380,11 +1404,52 @@ void Challenge::UpdateConveyorBelt()
 	if (mBoard->HasLevelAwardDropped())
 		return;
 
+	if (mBoard->GetCoopPlayerCount() > 1)
+	{
+		UpdateCoopConveyorBelts();
+		return;
+	}
+
 	mBoard->mSeedBank->UpdateConveyorBelt();
 	mConveyorBeltCounter--;
 	if (mConveyorBeltCounter > 0)
 		return;
 
+	mConveyorBeltCounter = ConveyorBeltInterval();
+	ConveyorBeltDeliverSeed(mLastConveyorSeedType);
+}
+
+// Co-op: one belt per player, each at half the normal rate (SPEC.md section 6),
+// so the two of them together earn what one player would -- you cannot each
+// brute-force your own lane with a full belt; you share out what arrives.
+// Each belt runs off its own player's bank, which is also what the weighting
+// below looks at, so a player sitting on three Wall-nuts gets something else.
+void Challenge::UpdateCoopConveyorBelts()
+{
+	const int aPlayerCount = mBoard->GetCoopPlayerCount();
+	const int aPreviousPlayer = mBoard->GetActivePlayer();
+	for (int aPlayer = 0; aPlayer < aPlayerCount && aPlayer < Coop::PLAYER_COUNT; aPlayer++)
+	{
+		mBoard->SetActivePlayer(aPlayer);
+		mBoard->mSeedBank->UpdateConveyorBelt();
+
+		// The first delivery keeps the level's own opening delay, so the
+		// start of a conveyor level feels the same; the halving applies from
+		// then on.
+		int& aCounter = mCoopConveyorCounter[aPlayer];
+		if (aCounter < 0)
+			aCounter = mConveyorBeltCounter;
+		if (--aCounter > 0)
+			continue;
+
+		aCounter = 2 * ConveyorBeltInterval();
+		ConveyorBeltDeliverSeed(mCoopLastConveyorSeedType[aPlayer]);
+	}
+	mBoard->SetActivePlayer(aPreviousPlayer);
+}
+
+int Challenge::ConveyorBeltInterval()
+{
 	float aConveyorSpeedMultiplier = 1;
 	if (mApp->IsFinalBossLevel())
 	{
@@ -1403,8 +1468,11 @@ void Challenge::UpdateConveyorBelt()
 		aConveyorSpeedMultiplier = 3.0f;
 	}
 	int aNumSeedsOnConveyor = mBoard->mSeedBank->GetNumSeedsOnConveyorBelt();
-	mConveyorBeltCounter = aConveyorSpeedMultiplier * (aNumSeedsOnConveyor > 8 ? 1000 : aNumSeedsOnConveyor > 6 ? 500 : aNumSeedsOnConveyor > 4 ? 425 : 400);
+	return static_cast<int>(aConveyorSpeedMultiplier * (aNumSeedsOnConveyor > 8 ? 1000 : aNumSeedsOnConveyor > 6 ? 500 : aNumSeedsOnConveyor > 4 ? 425 : 400));
+}
 
+void Challenge::ConveyorBeltDeliverSeed(SeedType& theLastSeedType)
+{
 	PvzpWeightedArray aSeedPickArray[20];
 	int aSeedPickCount = 0;
 	if (mBoard->mLevel == 10)
@@ -1666,7 +1734,7 @@ void Challenge::UpdateConveyorBelt()
 			{
 				aSeedPick.mWeight = 5;
 			}
-			else if (aSeedType == mLastConveyorSeedType)
+			else if (aSeedType == theLastSeedType)
 			{
 				aSeedPick.mWeight /= 2;
 			}
@@ -1675,7 +1743,7 @@ void Challenge::UpdateConveyorBelt()
 
 	SeedType aSeedType = (SeedType)PvzpPickFromWeightedArray(aSeedPickArray, aSeedPickCount);
 	mBoard->mSeedBank->AddSeed(aSeedType);
-	mLastConveyorSeedType = aSeedType;
+	theLastSeedType = aSeedType;
 }
 
 void Challenge::UpdateRainingSeeds()
@@ -3801,6 +3869,18 @@ void Challenge::ScaryPotterUpdate()
 
 void Challenge::ScaryPotterMalletPot(GridItem* theScaryPot)
 {
+	// Co-op: two people breaking vases go twice as fast, so each vase takes
+	// two hits. The first only cracks it -- a thump and a wobble, so it is
+	// clear the hit counted -- and the second opens it as normal.
+	if (Coop::Game::Get().IsInGame() && theScaryPot->mCoopHitsTaken == 0)
+	{
+		theScaryPot->mCoopHitsTaken = 1;
+		theScaryPot->mCoopWobbleCounter = 30;
+		mApp->PlayFoley(FOLEY_SWING);
+		mApp->PlayFoley(FOLEY_BONK);
+		return;
+	}
+
 	mChallengeGridX = theScaryPot->mGridX;
 	mChallengeGridY = theScaryPot->mGridY;
 	int aXPos = mBoard->GridToPixelX(theScaryPot->mGridX, theScaryPot->mGridY);
@@ -3967,7 +4047,7 @@ void Challenge::PuzzleNextStageClear()
 			}
 		}
 	}
-	mBoard->RefreshSeedPacketFromCursor();
+	mBoard->ForEachCoopPlayer([this]() { mBoard->RefreshSeedPacketFromCursor(); });
 	{
 		for (Coin* aCoin : mBoard->mCoins)
 		{

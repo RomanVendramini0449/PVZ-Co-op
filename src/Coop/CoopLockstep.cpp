@@ -28,15 +28,16 @@
 namespace Coop
 {
 
-void Lockstep::Begin(Session* theSession, const SessionParams& theParams, PlayerId theLocalPlayer)
+void Lockstep::Begin(Session* theSession, const SessionParams& theParams, PlayerId theLocalPlayer, uint32_t theEpoch)
 {
 	Reset();
 
 	mSession = theSession;
+	mEpoch = theEpoch;
 	mLocalPlayer = theLocalPlayer;
 	mInputDelay = theParams.mInputDelay;
-	if (mInputDelay == 0)
-		mInputDelay = 1;                       // a delay of 0 could never be delivered in time
+	if (mInputDelay < MIN_INPUT_DELAY)
+		mInputDelay = MIN_INPUT_DELAY;         // too little could never be delivered in time
 	if (mInputDelay > MAX_INPUT_DELAY)
 		mInputDelay = MAX_INPUT_DELAY;
 
@@ -73,6 +74,7 @@ void Lockstep::Reset()
 	mStallEvents = 0;
 	mTotalStallMs = 0;
 	mSmoothTicks = 0;
+	mMinHeadroom = 0;
 	mLocalChecksums.clear();
 	mDesynced = false;
 	mDesyncText.clear();
@@ -117,7 +119,7 @@ void Lockstep::DrainSession()
 		return;
 
 	CommandBatch aBatch;
-	while (mSession->PopCommandBatch(aBatch))
+	while (mSession->PopCommandBatch(aBatch, mEpoch))
 	{
 		// Trust the batch header for the tick, not the per-command field: the
 		// header is what the sender committed to.
@@ -128,7 +130,7 @@ void Lockstep::DrainSession()
 
 	uint32_t aTick = 0;
 	uint32_t aRemoteChecksum = 0;
-	while (mSession->PopChecksum(aTick, aRemoteChecksum))
+	while (mSession->PopChecksum(aTick, aRemoteChecksum, mEpoch))
 	{
 		auto aFound = mLocalChecksums.find(aTick);
 		if (aFound == mLocalChecksums.end())
@@ -196,7 +198,7 @@ bool Lockstep::BeginTick()
 			}
 
 			const std::vector<Command>& aPayload = aIsInputTick ? mPendingLocal : kEmpty;
-			aSendOk = mSession->SendCommandBatch(mNextSendTick, aPayload);
+			aSendOk = mSession->SendCommandBatch(mNextSendTick, aPayload, mEpoch);
 			if (!aSendOk)
 				break;
 
@@ -260,14 +262,25 @@ bool Lockstep::BeginTick()
 				std::chrono::steady_clock::now() - mStallBegan).count());
 	}
 
+	// How far ahead of need the peer's input is arriving: the ticks after
+	// this one that are already here. That is the slack a lower delay would
+	// spend.
+	uint32_t aHeadroom = 0;
+	while (aHeadroom < HEADROOM_BEFORE_LOWER && mRemoteByTick.count(mCurrentTick + aHeadroom + 1) != 0)
+		++aHeadroom;
+	if (mSmoothTicks == 0 || aHeadroom < mMinHeadroom)
+		mMinHeadroom = aHeadroom;
+
 	// Give the delay back once the link has behaved for a while, so one bad
-	// moment does not cost input lag for the rest of the session. Lowering it
-	// is safe: mNextSendTick only ever advances, so we simply coast without
-	// sending until currentTick + delay catches up with it again.
+	// moment does not cost input lag for the rest of the session -- but only
+	// if there was slack the whole time. Lowering it is safe: mNextSendTick
+	// only ever advances, so we simply coast without sending until
+	// currentTick + delay catches up with it again.
 	++mSmoothTicks;
-	if (mSmoothTicks >= SMOOTH_TICKS_BEFORE_LOWER && mInputDelay > MIN_INPUT_DELAY)
+	if (mSmoothTicks >= SMOOTH_TICKS_BEFORE_LOWER)
 	{
-		--mInputDelay;
+		if (mMinHeadroom >= HEADROOM_BEFORE_LOWER && mInputDelay > MIN_INPUT_DELAY)
+			--mInputDelay;
 		mSmoothTicks = 0;
 	}
 
@@ -306,7 +319,7 @@ void Lockstep::EndTick(uint32_t theChecksum)
 	{
 		mLocalChecksums[mCurrentTick] = theChecksum;
 		if (mSession != nullptr)
-			mSession->SendChecksum(mCurrentTick, theChecksum);
+			mSession->SendChecksum(mCurrentTick, theChecksum, mEpoch);
 	}
 
 	mSentForCurrentTick = false;
@@ -586,6 +599,93 @@ int RunLockstepSelfTest()
 			return 1;
 		}
 		printf("lockstep selftest: recovered from the stall, states still agree (0x%08X)\n",
+			aHostSim.mState);
+	}
+
+	// A level transition, with the race that real play produces: the host
+	// enters the next level first and starts ticking while the client is
+	// still finishing the old one, so the old level's batches and checksums
+	// are still in flight in both directions when the new one begins. Tick
+	// numbers restart at 0, so without epochs those stale frames are read as
+	// the new level's -- a false desync, or a wait for a tick never re-sent.
+	{
+		constexpr uint32_t NEXT_EPOCH = 2;
+		constexpr uint32_t LEVEL_TICKS = 300;
+
+		aHostStep.Begin(&aHostSession, aHostSession.GetParams(), PlayerId::Host, NEXT_EPOCH);
+		aHostSim = FakeSim();
+
+		// The client keeps simulating the old level for a while, pumping out
+		// old-epoch traffic the host has to throw away.
+		const auto aLingerUntil = std::chrono::steady_clock::now() + std::chrono::milliseconds(80);
+		while (std::chrono::steady_clock::now() < aLingerUntil)
+		{
+			aHostSession.Update();
+			aClientSession.Update();
+			if (aHostStep.BeginTick())
+			{
+				aHostSim.ApplyTick(aHostStep.GetCurrentTick(), aHostStep.GetTickCommands());
+				aHostStep.EndTick(aHostSim.Checksum());
+			}
+			if (aClientStep.BeginTick())
+			{
+				aClientSim.ApplyTick(aClientStep.GetCurrentTick(), aClientStep.GetTickCommands());
+				aClientStep.EndTick(aClientSim.Checksum());
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+
+		// Now the client follows. Its old epoch is over.
+		aClientStep.Begin(&aClientSession, aClientSession.GetParams(), PlayerId::Client, NEXT_EPOCH);
+		aClientSim = FakeSim();
+
+		bool aQueued = false;
+		for (int aIteration = 0; aIteration < 400000; ++aIteration)
+		{
+			if (aHostStep.GetCurrentTick() >= LEVEL_TICKS && aClientStep.GetCurrentTick() >= LEVEL_TICKS)
+				break;
+
+			aHostSession.Update();
+			aClientSession.Update();
+
+			if (!aQueued && aClientStep.GetCurrentTick() == 20)
+			{
+				aClientStep.QueueLocalCommand(CommandType::MouseDown, 1, 1, 1);
+				aQueued = true;
+			}
+			if (aHostStep.GetCurrentTick() < LEVEL_TICKS && aHostStep.BeginTick())
+			{
+				aHostSim.ApplyTick(aHostStep.GetCurrentTick(), aHostStep.GetTickCommands());
+				aHostStep.EndTick(aHostSim.Checksum());
+			}
+			if (aClientStep.GetCurrentTick() < LEVEL_TICKS && aClientStep.BeginTick())
+			{
+				aClientSim.ApplyTick(aClientStep.GetCurrentTick(), aClientStep.GetTickCommands());
+				aClientStep.EndTick(aClientSim.Checksum());
+			}
+			if (aHostStep.IsDesynced() || aClientStep.IsDesynced())
+				break;
+		}
+
+		if (aHostStep.IsDesynced() || aClientStep.IsDesynced())
+		{
+			printf("lockstep selftest: FAIL false desync across a level transition: %s%s\n",
+				aHostStep.GetDesyncText().c_str(), aClientStep.GetDesyncText().c_str());
+			return 1;
+		}
+		if (aHostStep.GetCurrentTick() < LEVEL_TICKS || aClientStep.GetCurrentTick() < LEVEL_TICKS)
+		{
+			printf("lockstep selftest: FAIL stuck after a level transition (host %u, client %u of %u)\n",
+				aHostStep.GetCurrentTick(), aClientStep.GetCurrentTick(), LEVEL_TICKS);
+			return 1;
+		}
+		if (aHostSim.mState != aClientSim.mState)
+		{
+			printf("lockstep selftest: FAIL diverged across a level transition (%u vs %u)\n",
+				aHostSim.mState, aClientSim.mState);
+			return 1;
+		}
+		printf("lockstep selftest: level transition with traffic in flight, states agree (0x%08X)\n",
 			aHostSim.mState);
 	}
 

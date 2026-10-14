@@ -186,6 +186,13 @@ else()
 	add_executable(pvz-portable ${SOURCES})
 endif()
 
+# This build is PvZ Co-op, and on Windows the file people double-click should
+# say so. The target keeps its upstream name so merges from PvZ-Portable stay
+# clean; only the produced file changes, and only on Windows.
+if(WIN32)
+	set_target_properties(pvz-portable PROPERTIES OUTPUT_NAME "PvZ-Coop")
+endif()
+
 target_include_directories(pvz-portable PRIVATE
 	${PLAT_INCLUDES}
 	${PROJECT_BINARY_DIR}

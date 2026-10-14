@@ -453,6 +453,43 @@ public:
 	// objects. Commands from the lockstep queue are applied with their own
 	// player active, so each lands on the right cursor and seed bank.
 	void				SetActivePlayer(int thePlayer);
+	// Runs theFunc once per player, with that player active. In single player
+	// that is once, as player 0 -- exactly the original call.
+	template <typename Func>
+	void				ForEachCoopPlayer(Func&& theFunc)
+	{
+		const int aPrevious = mActivePlayer;
+		for (int aPlayer = 0; aPlayer < mCoopPlayerCount; aPlayer++)
+		{
+			SetActivePlayer(aPlayer);
+			theFunc();
+		}
+		SetActivePlayer(aPrevious);
+	}
+	void				CoopSyncSeedBankLayout();
+
+	// Holds the simulation on player 0 for the length of Board::Update, then
+	// hands the board back to the local player, on every way out.
+	class CoopSimulationScope
+	{
+	public:
+		CoopSimulationScope(Board* theBoard, bool theTickBegun);
+		~CoopSimulationScope();
+		template <typename Func>
+		void RunAsLocalPlayer(Func&& theFunc)
+		{
+			if (!mActive) { theFunc(); return; }
+			mBoard->SetActivePlayer(mRestingPlayer);
+			theFunc();
+			mBoard->SetActivePlayer(0);
+		}
+	private:
+		Board* mBoard;
+		int    mRestingPlayer;
+		bool   mActive;
+		bool   mTickBegun;
+	};
+	uint32_t			mCoopTickEpoch = 0;  // the clock the current tick belongs to
 	// Hands every player the active player's seed line-up. Cooldowns diverge
 	// from there, which is the point (SPEC.md section 5).
 	void				CoopMirrorSeedBank();
@@ -465,6 +502,10 @@ public:
 	// cursor objects tracked whichever mouse happened to be local, so the
 	// remote cursor sat on top of your own and showed what YOU were holding.
 	void				GetPlayerMouse(int thePlayer, int& theX, int& theY) const;
+	bool				IsBoardButtonHit(GameButton* theButton, int theX, int theY) const;
+	bool				IsCoopHostOnlyMoment();
+	void				ApplyCoopKey(Coop::PlayerId thePlayer, KeyCode theKey);
+	void				DebugWinLevel();
 	bool				IsPlayerPointerPresent(int thePlayer) const;
 	CursorObject*		GetCursorObject(int thePlayer) { return mCursorStorage[thePlayer].get(); }
 	CursorPreview*		GetCursorPreview(int thePlayer) { return mCursorPreviewStorage[thePlayer].get(); }

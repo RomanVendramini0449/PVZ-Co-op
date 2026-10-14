@@ -22,6 +22,7 @@
 #include "CoopGame.h"
 
 #include <chrono>
+#include <cstdlib>
 #include <cstdio>
 #include <thread>
 
@@ -39,7 +40,8 @@ void Game::BeginLevel()
 	if (!mSession.IsConnected())
 		return;
 
-	mLockstep.Begin(&mSession, mSession.GetParams(), mSession.GetLocalPlayer());
+	mLockstep.Begin(&mSession, mSession.GetParams(), mSession.GetLocalPlayer(),
+		mHasLevelSetup ? mLevelSetup.mEpoch : 0);
 	mInGame = true;
 }
 
@@ -51,8 +53,11 @@ void Game::SetLevelSetup(const LevelSetup& theSetup)
 
 void Game::HostEnterLevel(const LevelSetup& theSetup)
 {
-	SetLevelSetup(theSetup);
-	mSession.SendEnterLevel(theSetup);
+	LevelSetup aSetup = theSetup;
+	aSetup.mEpoch = mNextEpoch++;
+	aSetup.mDifficulty = GetNextDifficulty();
+	SetLevelSetup(aSetup);
+	mSession.SendEnterLevel(aSetup);
 }
 
 void Game::HostLeaveLevel()
@@ -61,11 +66,12 @@ void Game::HostLeaveLevel()
 	mSession.SendLeaveLevel();
 }
 
-bool Game::PopEnterLevel(LevelSetup& theSetupOut)
+bool Game::PopFlowEvent(FlowEvent& theEventOut)
 {
-	if (!mSession.PopEnterLevel(theSetupOut))
+	if (!mSession.PopFlowEvent(theEventOut))
 		return false;
-	SetLevelSetup(theSetupOut);
+	if (theEventOut.mKind == FlowEvent::Kind::EnterLevel)
+		SetLevelSetup(theEventOut.mSetup);
 	return true;
 }
 
@@ -84,6 +90,50 @@ void Game::Update()
 	// divergence to no purpose.
 	if (mInGame && !mSession.IsConnected())
 		EndLevel();
+
+	ReportStatsIfAsked();
+}
+
+// Diagnostics for smoothness complaints. With PVZ_COOP_STATS set, prints how
+// often and how long the simulation waited on the other machine, every five
+// seconds of a level. Every wait is a visible hitch, so this turns "it
+// stutters" into a number that can be compared between builds and links.
+void Game::ReportStatsIfAsked()
+{
+	static const bool sEnabled = getenv("PVZ_COOP_STATS") != nullptr;
+	if (!sEnabled || !IsInGame())
+		return;
+
+	static auto sLastReport = std::chrono::steady_clock::now();
+	static uint32_t sLastEvents = 0;
+	static uint64_t sLastStallMs = 0;
+	static uint32_t sLastTick = 0;
+	const auto aNow = std::chrono::steady_clock::now();
+	if (aNow - sLastReport < std::chrono::seconds(5))
+		return;
+
+	const uint32_t aEvents = mLockstep.GetStallEvents();
+	const uint64_t aStallMs = mLockstep.GetTotalStallMs();
+	const uint32_t aTick = mLockstep.GetCurrentTick();
+	// A new level resets the lockstep's counters; start the deltas over.
+	if (aEvents < sLastEvents || aTick < sLastTick)
+	{
+		sLastEvents = 0;
+		sLastStallMs = 0;
+		sLastTick = 0;
+	}
+
+	const double aSeconds = std::chrono::duration<double>(aNow - sLastReport).count();
+	printf("co-op stats: tick %u (+%u in %.1fs = %.0f/s), delay %u, waits +%u, waited +%llu ms\n",
+		aTick, aTick - sLastTick, aSeconds, (aTick - sLastTick) / aSeconds,
+		mLockstep.GetInputDelay(), aEvents - sLastEvents,
+		static_cast<unsigned long long>(aStallMs - sLastStallMs));
+	fflush(stdout);
+
+	sLastReport = aNow;
+	sLastEvents = aEvents;
+	sLastStallMs = aStallMs;
+	sLastTick = aTick;
 }
 
 bool EstablishSessionFromLaunchOptions()

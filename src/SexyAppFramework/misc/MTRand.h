@@ -31,6 +31,8 @@ public:
 	std::string Serialize();
 
 	static void SetRandAllowed(bool allowed);
+	// False while drawing: see Sexy::Rand.
+	static bool IsRandAllowed();
 };
 
 struct MTAutoDisallowRand

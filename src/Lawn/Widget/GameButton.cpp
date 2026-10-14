@@ -246,6 +246,13 @@ bool GameButton::IsMouseOver()
 	return Rect(mX, mY, mWidth, mHeight).Contains(aMouseX, aMouseY);
 }
 
+bool GameButton::ContainsPoint(int theX, int theY) const
+{
+	if (mDisabled || mBtnNoDraw)
+		return false;
+	return Rect(mX, mY, mWidth, mHeight).Contains(theX, theY);
+}
+
 void GameButton::Update()
 {
 	WidgetManager* aManager = mApp->mWidgetManager.get();

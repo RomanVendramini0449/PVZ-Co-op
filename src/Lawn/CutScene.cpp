@@ -1545,6 +1545,22 @@ void CutScene::AdvanceCrazyDaveDialog(bool theJustSkipping)
 	{
 		mBoard->SetTutorialState(TutorialState::TUTORIAL_SHOVEL_PICKUP);
 		mApp->CrazyDaveLeave();
+
+		// This build skips the tutorial (docs/SPEC.md 10.2), so the request
+		// above is refused and there is nothing to dig. Do what digging up the
+		// last Peashooter would have done instead: clear the Peashooters Dave
+		// planted for the lesson and carry on with his bowling speech. Without
+		// this they stayed on the bowling lawn and the speech never came.
+		if (mBoard->mTutorialState == TutorialState::TUTORIAL_OFF)
+		{
+			for (Plant* aPlant : mBoard->mPlants)
+			{
+				if (!aPlant->mDead && aPlant->mSeedType == SeedType::SEED_PEASHOOTER)
+					aPlant->Die();
+			}
+			mCutsceneTime = 1500;
+			mCrazyDaveDialogStart = 2410;
+		}
 		return;
 	}
 	// "This is your Tree of Wisdom; I'll give you some fertilizer to get started"

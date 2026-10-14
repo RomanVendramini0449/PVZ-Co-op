@@ -94,19 +94,45 @@ void Sexy::DispatchLogLn(SexyLogPriority thePriority, std::string_view theText)
 	}
 }
 
+// Randomness asked for while drawing comes from a separate generator.
+//
+// gMTRand is the gameplay generator, and two machines playing co-op keep
+// identical games only because they draw from it identically, tick by tick.
+// Drawing is not tick by tick: each machine renders as many frames as it
+// happens to, so a random draw made while rendering would advance gameplay's
+// generator a different number of times on each, and the two games would part
+// ways for good. Drawing is meant never to do this -- debug builds assert --
+// but release builds would not notice; this makes it harmless either way.
+static Sexy::MTRand gCosmeticMTRand(0x5EEDC0DEu);
+
+static Sexy::MTRand& RandSource()
+{
+	return Sexy::MTRand::IsRandAllowed() ? gMTRand : gCosmeticMTRand;
+}
+
 int Sexy::Rand()
 {
-	return gMTRand.Next();
+	return RandSource().NextNoAssert();
 }
 
 int Sexy::Rand(int range)
 {
-	return gMTRand.Next((unsigned long)range);
+	return RandSource().NextNoAssert((unsigned long)range);
 }
 
 float Sexy::Rand(float range)
 {
-	return gMTRand.Next(range);
+	return RandSource().NextNoAssert(range);
+}
+
+int Sexy::CosmeticRand(int range)
+{
+	return gCosmeticMTRand.NextNoAssert((unsigned long)range);
+}
+
+float Sexy::CosmeticRand(float range)
+{
+	return gCosmeticMTRand.NextNoAssert(range);
 }
 
 void Sexy::SRand(ulong theSeed)

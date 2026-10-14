@@ -73,6 +73,11 @@ MTRand::MTRand()
 }
 
 static int gRandAllowed = 0;
+bool MTRand::IsRandAllowed()
+{
+	return gRandAllowed == 0;
+}
+
 void MTRand::SetRandAllowed(bool allowed)
 {
 	if (allowed)

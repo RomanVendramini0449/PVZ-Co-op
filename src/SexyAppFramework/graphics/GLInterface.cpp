@@ -32,6 +32,8 @@
 #include "graphics/Graphics.h"
 #include "graphics/MemoryImage.h"
 #include "SexyAppBase.h"
+#include "imagelib/ImageLib.h"
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -1305,9 +1307,99 @@ bool GLInterface::PreDraw()
 	return true;
 }
 
+// Debug aid. With PVZ_FRAME_DUMP set to a file path, the rendered frame is
+// written there on request: create "<path>.req" and the next frame is saved
+// and the request file removed. Some setups hide an OpenGL window from every
+// screen-capture tool (Windows' flip-model optimisation for windowed games),
+// so a game drawing perfectly well looks black from outside; this shows what
+// it actually drew.
+//
+// On request rather than on a timer: the readback and PNG encode take tens of
+// milliseconds, and in co-op a hitch on one machine stalls the other -- a
+// periodic dump showed up as both games stuttering every second.
+// A frame capture asked for from inside the game (the debug test script).
+static std::string gFrameDumpRequest;
+
+namespace Sexy
+{
+	void RequestFrameDump(const std::string& thePath)
+	{
+		gFrameDumpRequest = thePath;
+	}
+}
+
+static void WriteFrameDump(SDL_Window* theWindow, const char* thePath);
+
+static void DebugDumpFrame(SDL_Window* theWindow)
+{
+	if (!gFrameDumpRequest.empty())
+	{
+		const std::string aPath = gFrameDumpRequest;
+		gFrameDumpRequest.clear();
+		WriteFrameDump(theWindow, aPath.c_str());
+	}
+
+	static const char* sPath = getenv("PVZ_FRAME_DUMP");
+	if (sPath == nullptr || *sPath == '\0')
+		return;
+
+	// Checking for the request is a file-system call, so only a few times a
+	// second.
+	static uint32_t sLastCheck = 0;
+	const uint32_t aNow = SDL_GetTicks();
+	if (aNow - sLastCheck < 250)
+		return;
+	sLastCheck = aNow;
+
+	const std::string aRequest = std::string(sPath) + ".req";
+	FILE* aRequestFile = fopen(aRequest.c_str(), "rb");
+	if (aRequestFile == nullptr)
+		return;
+	fclose(aRequestFile);
+	std::remove(aRequest.c_str());
+
+	WriteFrameDump(theWindow, sPath);
+}
+
+static void WriteFrameDump(SDL_Window* theWindow, const char* sPath)
+{
+
+	int aWidth = 0;
+	int aHeight = 0;
+	SDL_GL_GetDrawableSize(theWindow, &aWidth, &aHeight);
+	if (aWidth <= 0 || aHeight <= 0)
+		return;
+
+	std::vector<uint32_t> aPixels(static_cast<size_t>(aWidth) * aHeight);
+	glReadPixels(0, 0, aWidth, aHeight, GL_RGBA, GL_UNSIGNED_BYTE, aPixels.data());
+
+	ImageLib::Image anImage;
+	anImage.mWidth = aWidth;
+	anImage.mHeight = aHeight;
+	anImage.mBits = std::make_unique<uint32_t[]>(static_cast<size_t>(aWidth) * aHeight);
+	uint32_t* aBits = anImage.mBits.get();
+	for (int y = 0; y < aHeight; y++)  // GL rows run bottom-up
+	{
+		const uint32_t* aRow = aPixels.data() + static_cast<size_t>(aHeight - 1 - y) * aWidth;
+		for (int x = 0; x < aWidth; x++)
+			aBits[static_cast<size_t>(y) * aWidth + x] = RgbaToArgb(aRow[x]) | 0xFF000000u;
+	}
+
+	// Write beside and swap in, so a reader never sees half a file.
+	const std::string aTemp = std::string(sPath) + ".tmp.png";
+	if (ImageLib::WritePNGImage(aTemp, &anImage))
+	{
+		std::remove(sPath);
+		std::rename(aTemp.c_str(), sPath);
+	}
+}
+
 void GLInterface::Flush()
 {
 	gNumVertices = 0;
+#if !defined(__SWITCH__) && !defined(__EMSCRIPTEN__)
+	DebugDumpFrame((SDL_Window*)mApp->mWindow);
+#endif
 #ifdef __SWITCH__
 	eglSwapBuffers(mApp->mWindow, mApp->mSurface);
 #else

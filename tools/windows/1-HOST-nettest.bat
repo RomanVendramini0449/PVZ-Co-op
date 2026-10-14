@@ -2,8 +2,8 @@
 REM Double-click this on the HOST machine. No command line needed.
 cd /d "%~dp0"
 
-if not exist "pvz-portable.exe" (
-    echo ERROR: pvz-portable.exe is not in this folder.
+if not exist "PvZ-Coop.exe" (
+    echo ERROR: PvZ-Coop.exe is not in this folder.
     echo Put this script next to the game executable and try again.
     pause
     exit /b 1
@@ -22,7 +22,7 @@ echo.
 echo If Windows Firewall asks, click "Allow access".
 echo.
 
-pvz-portable.exe --coop-nettest --host --port 1337
+PvZ-Coop.exe --coop-nettest --host --port 1337
 
 echo.
 echo ==========================================================

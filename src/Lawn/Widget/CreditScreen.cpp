@@ -22,6 +22,7 @@
 #include "GameButton.h"
 #include "CreditScreen.h"
 #include "../../LawnApp.h"
+#include "../../Coop/CoopGame.h"
 #include "../../Resources.h"
 #include "../System/Music.h"
 #include "../../GameConstants.h"
@@ -1124,6 +1125,14 @@ void CreditScreen::UpdateBlink()
 void CreditScreen::Update()
 {
 	Widget::Update();
+
+	// The joining player watches the ending with the host; leaving or
+	// replaying it is the host's call, and it is not theirs to pause.
+	if (Coop::Game::Get().IsFollower())
+	{
+		mMainMenuButton->SetVisible(false);
+		mReplayButton->SetVisible(false);
+	}
 	if (!mCreditsPaused && !mMainMenuButton->mIsOver && !mReplayButton->mIsOver)
 	{
 		mApp->SetCursor(CURSOR_POINTER);
@@ -1748,6 +1757,9 @@ void CreditScreen::PauseCredits()
 
 void CreditScreen::KeyDown(KeyCode theKey)
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (theKey == KeyCode::KEYCODE_SPACE || theKey == KeyCode::KEYCODE_RETURN || theKey == KeyCode::KEYCODE_ESCAPE)
 	{
 		PauseCredits();
@@ -1768,6 +1780,9 @@ void CreditScreen::ButtonPress(int theId)
 
 void CreditScreen::ButtonDepress(int theId)
 {
+	if (Coop::Game::Get().IsFollower())
+		return;
+
 	if (theId == CreditScreen::Credits_Button_MainMenu)
 	{
 		mApp->KillCreditScreen();
