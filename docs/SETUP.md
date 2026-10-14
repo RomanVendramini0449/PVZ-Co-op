@@ -61,9 +61,37 @@ Then skip to step 3b.
 
 > Note: GitHub requires you to be signed in to download artifacts.
 
+#### Windows will probably warn you about the .exe
+
+Expect **"Windows protected your PC"** (SmartScreen), and possibly a Defender
+scan prompt, the first time you run it. This is not a sign anything is wrong:
+SmartScreen warns about *any* executable that lacks a paid code-signing
+certificate and has no download reputation yet, which describes every freshly
+built binary from a small project.
+
+To run it anyway: **More info** -> **Run anyway**.
+
+If you would rather verify than trust: the file was built by GitHub's own
+runners from the source in this repository, the build log is public under the
+Actions tab, and the artifact page lists a SHA256 digest you can compare
+against the file you downloaded.
+
+The same applies if you ever install MSYS2 — its installer is unsigned and
+SmartScreen flags it too. But you do not need MSYS2 unless you want to compile
+the code yourself.
+
 ### Build-it-yourself way
 
-Only needed if you want to change the code. Continue below.
+Only needed if you want to change the code yourself. Two options on Windows:
+
+- **MSYS2** — what upstream documents and what the CI uses. The installer is
+  unsigned, so SmartScreen tends to flag it.
+- **Visual Studio + vcpkg** — Microsoft-signed, so no SmartScreen friction.
+  Install the "Desktop development with C++" workload, then open this folder
+  in Visual Studio; it reads `CMakeLists.txt` and `vcpkg.json` directly and
+  fetches the dependencies itself.
+
+Continue below for MSYS2.
 
 ---
 
