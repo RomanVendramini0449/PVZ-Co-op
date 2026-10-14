@@ -40,12 +40,50 @@ git pull origin claude/fervent-bohr-3njwft
 
 ---
 
-## 2. Install the toolchain
+## 2. Get a build — the easy way, or the build-it-yourself way
+
+### Easy way: download a prebuilt Windows .exe (no toolchain at all)
+
+Every push to the development branch builds a Windows executable
+automatically. You do not need CMake, a compiler, or MSYS2 for this.
+
+1. Go to the repo's **Actions** tab on GitHub.
+2. Click the most recent **Co-op build** run with a green tick.
+3. Scroll to **Artifacts** and download **`pvz-coop-windows`**.
+4. Unzip it. Inside is a single `pvz-portable.exe` — it is statically linked,
+   so there are no DLLs to copy around.
+
+**This is also the best way to make sure you and your friend are on the exact
+same build**, which the co-op handshake requires. Both of you download the same
+artifact and you are guaranteed to match.
+
+Then skip to step 3b.
+
+> Note: GitHub requires you to be signed in to download artifacts.
+
+### Build-it-yourself way
+
+Only needed if you want to change the code. Continue below.
+
+---
+
+## 2b. Install the toolchain
 
 ### Windows (MSYS2)
 
-Install [MSYS2](https://www.msys2.org/), then open the **UCRT64** terminal
-(not the plain MSYS one — this matters) and run:
+> **Important: this does not work in PowerShell or Command Prompt.** MSYS2
+> installs its own separate terminal application, and the build has to happen
+> in there. If you see
+> `The term 'cmake' is not recognized as the name of a cmdlet`, you are in
+> PowerShell and need to switch terminals.
+
+1. Install [MSYS2](https://www.msys2.org/) (accept the default location,
+   `C:\msys64`).
+2. From the **Start menu**, open **"MSYS2 UCRT64"**. There are several MSYS2
+   entries — you want the one that says **UCRT64**, and the prompt should show
+   a purple `UCRT64` label. The plain `MSYS` one will not work.
+3. Run this (it may ask to close the terminal partway through a first-time
+   update; if so, reopen MSYS2 UCRT64 and run it again):
 
 ```sh
 pacman -S --needed base-devel mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-gcc \
@@ -69,10 +107,19 @@ brew install cmake dylibbundler jpeg-turbo libopenmpt libpng ninja sdl2
 
 ## 3. Build
 
+**Still inside the MSYS2 UCRT64 terminal.**
+
+Windows drive letters look different in MSYS2: `D:\Documents\PVZ_DECOMP\PVZ-Co-op`
+becomes `/d/Documents/PVZ_DECOMP/PVZ-Co-op`. So:
+
 ```sh
+cd /d/Documents/PVZ_DECOMP/PVZ-Co-op
 cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
+
+On Linux or macOS, just `cd` to the folder normally and run the same two
+commands.
 
 You get `build/pvz-portable` (`build/pvz-portable.exe` on Windows).
 
@@ -222,6 +269,7 @@ halved and zombies have 1.5× health.** The joiner inherits it automatically.
 | "Could not host on port 1337" | Something else is using the port, or a firewall is blocking it. Try `--port 1338`. |
 | "Could not reach the host" | Wrong IP, firewall, or port not forwarded. Check you can `ping` them first. |
 | Game starts but is a black screen / missing art | `-resdir` is pointing at the wrong folder, or `main.pak` is not there. |
+| `'cmake' is not recognized...` in PowerShell | The build does not run in PowerShell. Open **MSYS2 UCRT64** from the Start menu, or just download the prebuilt `.exe` from the Actions tab (step 2). |
 
 ---
 
