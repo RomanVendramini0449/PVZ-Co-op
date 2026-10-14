@@ -56,6 +56,20 @@ function Find-GameDir {
     return ''
 }
 
+# Start-Process joins an argument array with spaces and quotes nothing, so a
+# path like "C:\Program Files (x86)\..." arrives at the game as several
+# separate arguments and it dies on the first stray word. Everything is
+# quoted here instead, and the command line is passed as one string.
+function ConvertTo-QuotedArg([string]$Value) {
+    if ($Value -eq '') { return '""' }
+    if ($Value -notmatch '[ \t"]') { return $Value }
+    # Trailing backslashes would escape the closing quote under the C runtime's
+    # parsing rules, so each run that reaches the end is doubled first.
+    $escaped = $Value -replace '(\\*)$', '$1$1'
+    $escaped = $escaped -replace '"', '\"'
+    return '"' + $escaped + '"'
+}
+
 function Get-LocalAddresses {
     try {
         return @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
@@ -281,8 +295,10 @@ $btnStart.Add_Click({
     $Settings.Difficulty = if ($cmbDiff.SelectedIndex -eq 1) { 'hard' } else { 'normal' }
     Save-Settings
 
+    $commandLine = ($argList | ForEach-Object { ConvertTo-QuotedArg $_ }) -join ' '
+
     try {
-        Start-Process -FilePath $ExePath -ArgumentList $argList -WorkingDirectory $ScriptDir
+        Start-Process -FilePath $ExePath -ArgumentList $commandLine -WorkingDirectory $ScriptDir
         $form.Close()
     } catch {
         [System.Windows.Forms.MessageBox]::Show(
