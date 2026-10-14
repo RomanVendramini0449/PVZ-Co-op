@@ -660,6 +660,10 @@ bool ParseLaunchOptions(int argc, char** argv, std::string& theErrorOut)
 		{
 			aOptions.mSelfTest = true;
 		}
+		else if (aArg == "--coop-nettest")
+		{
+			aOptions.mNetTest = true;
+		}
 		else if (aArg == "--host")
 		{
 			aOptions.mWantHost = true;
@@ -700,6 +704,11 @@ bool ParseLaunchOptions(int argc, char** argv, std::string& theErrorOut)
 	if (aOptions.mWantHost && aOptions.mWantJoin)
 	{
 		theErrorOut = "--host and --join cannot both be given";
+		return false;
+	}
+	if (aOptions.mNetTest && !aOptions.mWantHost && !aOptions.mWantJoin)
+	{
+		theErrorOut = "--coop-nettest needs either --host or --join";
 		return false;
 	}
 	return true;

@@ -456,3 +456,175 @@ int RunLockstepSelfTest()
 }
 
 } // namespace Coop
+
+// ---------------------------------------------------------------------------
+// Two-machine network test
+// ---------------------------------------------------------------------------
+
+namespace Coop
+{
+
+int RunNetTest()
+{
+#if !COOP_SOCKETS_AVAILABLE
+	printf("coop nettest: co-op is not available on this platform\n");
+	return 1;
+#else
+	const LaunchOptions& aOptions = GetLaunchOptions();
+	const bool aIsHost = aOptions.mWantHost;
+
+	Session aSession;
+	if (aIsHost)
+	{
+		printf("coop nettest: hosting on port %u, waiting for the other player...\n", aOptions.mPort);
+		if (!aSession.StartHost(aOptions.mPort, aOptions.mDifficulty, 1))
+		{
+			printf("coop nettest: FAILED to host: %s\n", aSession.GetStatusText().c_str());
+			return 1;
+		}
+	}
+	else
+	{
+		printf("coop nettest: connecting to %s:%u...\n", aOptions.mJoinHost.c_str(), aOptions.mPort);
+		if (!aSession.StartJoin(aOptions.mJoinHost, aOptions.mPort))
+		{
+			printf("coop nettest: FAILED to connect: %s\n", aSession.GetStatusText().c_str());
+			return 1;
+		}
+	}
+
+	// Two minutes is enough for a person to start the other side by hand.
+	const auto aDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
+	while (!aSession.IsConnected())
+	{
+		aSession.Update();
+		if (aSession.GetState() == Session::State::Failed)
+		{
+			printf("coop nettest: FAILED: %s\n", aSession.GetStatusText().c_str());
+			return 1;
+		}
+		if (std::chrono::steady_clock::now() > aDeadline)
+		{
+			printf("coop nettest: FAILED: timed out waiting for the other player.\n");
+			return 1;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(2));
+	}
+
+	printf("coop nettest: connected. %s\n", aSession.GetStatusText().c_str());
+	printf("coop nettest: build and game files match on both machines.\n");
+
+	Lockstep aStep;
+	aStep.Begin(&aSession, aSession.GetParams(),
+		aIsHost ? PlayerId::Host : PlayerId::Client);
+
+	// Mirrors the real game: a 100 Hz fixed tick, a fake simulation whose
+	// state both sides must agree on, and input every half second.
+	constexpr uint32_t TARGET_TICKS = 1000;   // 10 seconds
+	uint32_t aState = 12345u;
+	uint32_t aSlowestTickMs = 0;
+
+	const auto aStart = std::chrono::steady_clock::now();
+	auto aNextTickAt = aStart;
+
+	while (aStep.GetCurrentTick() < TARGET_TICKS)
+	{
+		aSession.Update();
+
+		if (!aSession.IsConnected())
+		{
+			printf("coop nettest: FAILED: %s\n", aSession.GetStatusText().c_str());
+			return 1;
+		}
+		if (aStep.IsDesynced())
+		{
+			printf("coop nettest: FAILED: %s\n", aStep.GetDesyncText().c_str());
+			return 1;
+		}
+
+		const auto aNow = std::chrono::steady_clock::now();
+		if (aNow < aNextTickAt)
+		{
+			std::this_thread::sleep_for(std::chrono::microseconds(200));
+			continue;
+		}
+
+		if ((aStep.GetCurrentTick() % 50) == 0)
+			aStep.QueueLocalCommand(CommandType::PlantAt,
+				static_cast<int16_t>(aStep.GetCurrentTick() % 9),
+				static_cast<int16_t>(aStep.GetCurrentTick() % 5), 1);
+
+		const auto aTickStart = std::chrono::steady_clock::now();
+		if (aStep.BeginTick())
+		{
+			aState = aState * 31u + aStep.GetCurrentTick();
+			for (const Command& aCommand : aStep.GetTickCommands())
+			{
+				aState = aState * 31u + static_cast<uint32_t>(aCommand.mType);
+				aState = aState * 31u + static_cast<uint32_t>(aCommand.mX);
+				aState = aState * 31u + static_cast<uint32_t>(aCommand.mY);
+				aState = aState * 31u + static_cast<uint32_t>(aCommand.mPlayer);
+			}
+
+			ChecksumBuilder aBuilder;
+			aBuilder.Add(aState);
+			aStep.EndTick(aBuilder.Get());
+
+			aNextTickAt += std::chrono::milliseconds(10);
+
+			const auto aTickMs = static_cast<uint32_t>(
+				std::chrono::duration_cast<std::chrono::milliseconds>(
+					std::chrono::steady_clock::now() - aTickStart).count());
+			if (aTickMs > aSlowestTickMs)
+				aSlowestTickMs = aTickMs;
+		}
+		else if (aStep.ShouldShowWaiting())
+		{
+			printf("coop nettest: waiting for the other player (%u ticks)...\n",
+				aStep.GetStallTicks());
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		}
+
+		if (std::chrono::steady_clock::now() > aStart + std::chrono::seconds(90))
+		{
+			printf("coop nettest: FAILED: gave up at tick %u of %u.\n",
+				aStep.GetCurrentTick(), TARGET_TICKS);
+			return 1;
+		}
+	}
+
+	const auto aElapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::steady_clock::now() - aStart).count();
+
+	// In lockstep the two machines finish within a few ticks of each other,
+	// not simultaneously. Whoever gets there first must keep the socket open
+	// while the other chews through its last ticks -- hanging up immediately
+	// shows up on the peer as "the other player disconnected" on an otherwise
+	// perfect run. The real game needs the same courtesy at level end.
+	const auto aLingerUntil = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+	while (std::chrono::steady_clock::now() < aLingerUntil && aSession.IsConnected())
+	{
+		aSession.Update();
+		std::this_thread::sleep_for(std::chrono::milliseconds(2));
+	}
+
+	printf("\ncoop nettest: ran %u ticks in %lld ms\n",
+		TARGET_TICKS, static_cast<long long>(aElapsedMs));
+	printf("coop nettest: final state 0x%08X (must match on BOTH machines)\n", aState);
+	printf("coop nettest: stalled %u ticks total, slowest tick %u ms\n",
+		aStep.GetTotalStallTicks(), aSlowestTickMs);
+	printf("coop nettest: input delay settled at %u ticks (%u ms)\n",
+		aStep.GetInputDelay(), aStep.GetInputDelay() * 10);
+
+	if (aStep.GetTotalStallTicks() > TARGET_TICKS / 4)
+		printf("coop nettest: NOTE heavy stalling -- this link is slow or jittery.\n");
+	else
+		printf("coop nettest: link looks good.\n");
+
+	aSession.Disconnect("nettest done");
+	printf("coop nettest: PASS\n");
+	return 0;
+#endif
+}
+
+} // namespace Coop

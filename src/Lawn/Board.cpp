@@ -89,9 +89,14 @@ Board::Board(LawnApp* theApp)
 	}
 	mCoinBankFadeCount = 0;
 	mLevel = 0;
-	mCursorObject = std::make_unique<CursorObject>();
-	mCursorPreview = std::make_unique<CursorPreview>();
-	mSeedBank = std::make_unique<SeedBank>();
+	for (int aPlayer = 0; aPlayer < Coop::PLAYER_COUNT; aPlayer++)
+	{
+		mCursorStorage[aPlayer] = std::make_unique<CursorObject>();
+		mCursorPreviewStorage[aPlayer] = std::make_unique<CursorPreview>();
+		mSeedBankStorage[aPlayer] = std::make_unique<SeedBank>();
+	}
+	mCoopPlayerCount = 1;
+	SetActivePlayer(0);
 	mCutScene = std::make_unique<CutScene>();
 	mSpecialGraveStoneX = -1;
 	mSpecialGraveStoneY = -1;
@@ -4987,13 +4992,45 @@ void Board::UpdateGameObjects()
 		aLawnMower->Update();
 	}
 
-	mCursorPreview->Update();
-	mCursorObject->Update();
-
-	for (int i = 0; i < mSeedBank->mNumPackets; i++)
+	// Every player's cursor and seed bank ticks, not just the active one --
+	// that is what makes the cooldowns independent. Each updates with its
+	// own player active, so anything reaching back through the board sees
+	// the right objects. In single player mCoopPlayerCount is 1, making
+	// this the original loop exactly.
+	const int aPreviousPlayer = mActivePlayer;
+	for (int aPlayer = 0; aPlayer < mCoopPlayerCount; aPlayer++)
 	{
-		mSeedBank->mSeedPackets[i].Update();
+		SetActivePlayer(aPlayer);
+
+		mCursorPreview->Update();
+		mCursorObject->Update();
+
+		for (int i = 0; i < mSeedBank->mNumPackets; i++)
+		{
+			mSeedBank->mSeedPackets[i].Update();
+		}
 	}
+	SetActivePlayer(aPreviousPlayer);
+}
+
+void Board::SetActivePlayer(int thePlayer)
+{
+	if (thePlayer < 0 || thePlayer >= Coop::PLAYER_COUNT)
+		thePlayer = 0;
+
+	mActivePlayer = thePlayer;
+	mCursorObject = mCursorStorage[thePlayer].get();
+	mCursorPreview = mCursorPreviewStorage[thePlayer].get();
+	mSeedBank = mSeedBankStorage[thePlayer].get();
+}
+
+void Board::SetCoopPlayerCount(int theCount)
+{
+	if (theCount < 1)
+		theCount = 1;
+	if (theCount > Coop::PLAYER_COUNT)
+		theCount = Coop::PLAYER_COUNT;
+	mCoopPlayerCount = theCount;
 }
 
 void Board::StopAllZombieSounds()
@@ -6280,7 +6317,7 @@ void Board::DrawGameObjects(Graphics* g)
 	{
 		AddUIRenderItem(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_STORM, MakeRenderOrder(RenderLayer::RENDER_LAYER_FOG, 0, 3));
 	}
-	AddGameObjectRenderItemCursorPreview(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_CURSOR_PREVIEW, mCursorPreview.get());
+	AddGameObjectRenderItemCursorPreview(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_CURSOR_PREVIEW, mCursorPreview);
 
 	std::sort(aRenderList, aRenderList + aRenderItemCount, RenderItemSortFunc);
 

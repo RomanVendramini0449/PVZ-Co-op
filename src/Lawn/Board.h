@@ -58,6 +58,8 @@ class ToolTipWidget;
 class CutScene;
 class Challenge;
 class Reanimation;
+#include "../Coop/CoopProtocol.h"
+
 class DataSync;
 class PvzpParticleSystem;
 namespace Sexy
@@ -134,10 +136,24 @@ public:
 	DataArray<Coin>					mCoins;
 	DataArray<LawnMower>			mLawnMowers;
 	DataArray<GridItem>				mGridItems;
-	std::unique_ptr<CursorObject>		mCursorObject;
-	std::unique_ptr<CursorPreview>		mCursorPreview;
+	// Co-op: each player owns a cursor, a plant preview and a seed bank.
+	// The seed bank is the important one -- it carries both the per-packet
+	// cooldowns and the conveyor belt counter, so one bank per player gives
+	// independent cooldowns and a belt each (docs/SPEC.md sections 5 and 6).
+	std::unique_ptr<CursorObject>		mCursorStorage[Coop::PLAYER_COUNT];
+	std::unique_ptr<CursorPreview>		mCursorPreviewStorage[Coop::PLAYER_COUNT];
+	std::unique_ptr<SeedBank>			mSeedBankStorage[Coop::PLAYER_COUNT];
+	// Non-owning views of the active player's objects. Keeping these named
+	// as they were means every existing `mSeedBank->` and `mCursorObject->`
+	// call site keeps working untouched; SetActivePlayer() swings them.
+	CursorObject*						mCursorObject;
+	CursorPreview*						mCursorPreview;
+	SeedBank*							mSeedBank;
+	int									mActivePlayer;
+	// 1 in single player, 2 in co-op. Guards the per-player loops so a
+	// single-player game behaves exactly as it did before.
+	int									mCoopPlayerCount;
 	std::unique_ptr<MessageWidget>		mAdvice;
-	std::unique_ptr<SeedBank>			mSeedBank;
 	std::unique_ptr<GameButton>			mMenuButton;
 	std::unique_ptr<GameButton>			mStoreButton;
 	bool							mIgnoreMouseUp;
@@ -418,6 +434,16 @@ public:
 	bool							IsValidCobCannonSpotHelper(int theGridX, int theGridY);
 	void							MouseDownCobcannonFire(int x, int y, int theClickCount);
 	int								KillAllZombiesInRadius(int theRow, int theX, int theY, int theRadius, int theRowRange, bool theBurn, int theDamageRangeFlags);
+	// Points mCursorObject / mCursorPreview / mSeedBank at this player's
+	// objects. Commands from the lockstep queue are applied with their own
+	// player active, so each lands on the right cursor and seed bank.
+	void				SetActivePlayer(int thePlayer);
+	int					GetActivePlayer() const { return mActivePlayer; }
+	void				SetCoopPlayerCount(int theCount);
+	int					GetCoopPlayerCount() const { return mCoopPlayerCount; }
+	CursorObject*		GetCursorObject(int thePlayer) { return mCursorStorage[thePlayer].get(); }
+	CursorPreview*		GetCursorPreview(int thePlayer) { return mCursorPreviewStorage[thePlayer].get(); }
+	SeedBank*			GetSeedBank(int thePlayer) { return mSeedBankStorage[thePlayer].get(); }
 	int					GetSeedBankExtraWidth();
 	bool							IsFlagWave(int theWaveNumber);
 	void							DrawHouseDoorTop(Graphics* g);

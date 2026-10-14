@@ -2730,10 +2730,14 @@ static void SyncBoard(SaveGameContext& theContext, Board* theBoard)
 		}
 	}
 
-	theContext.SyncBytes(theBoard->mCursorObject.get(), sizeof(CursorObject));
-	theContext.SyncBytes(theBoard->mCursorPreview.get(), sizeof(CursorPreview));
+	// Player 0's objects explicitly, not the active player's: the save
+	// format is unchanged, and a single-player save must not depend on
+	// which player happened to be active. Co-op has no mid-level
+	// save/resume (SPEC.md section 9); a dropped session replays the level.
+	theContext.SyncBytes(theBoard->GetCursorObject(0), sizeof(CursorObject));
+	theContext.SyncBytes(theBoard->GetCursorPreview(0), sizeof(CursorPreview));
 	theContext.SyncBytes(theBoard->mAdvice.get(), sizeof(MessageWidget));
-	theContext.SyncBytes(theBoard->mSeedBank.get(), sizeof(SeedBank));
+	theContext.SyncBytes(theBoard->GetSeedBank(0), sizeof(SeedBank));
 	theContext.SyncBytes(theBoard->mChallenge.get(), sizeof(Challenge));
 	theContext.SyncBytes(theBoard->mApp->mMusic.get(), sizeof(Music));
 

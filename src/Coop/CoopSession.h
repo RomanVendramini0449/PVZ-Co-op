@@ -128,6 +128,7 @@ struct LaunchOptions
 	uint16_t    mPort = DEFAULT_PORT;
 	Difficulty  mDifficulty = Difficulty::Normal;
 	bool        mSelfTest = false;
+	bool        mNetTest = false;
 };
 
 LaunchOptions& GetLaunchOptions();
@@ -135,6 +136,12 @@ LaunchOptions& GetLaunchOptions();
 bool ParseLaunchOptions(int argc, char** argv, std::string& theErrorOut);
 // Loopback host+client handshake, no game assets needed. Returns 0 on success.
 int RunSelfTest();
+
+// Headless two-machine connection test driven by --host / --join. Runs the
+// real lockstep loop at the real tick rate over the real network and reports
+// stalls and latency, so a link can be checked before the game is involved.
+// Needs no game assets. Returns 0 on success.
+int RunNetTest();
 
 } // namespace Coop
 

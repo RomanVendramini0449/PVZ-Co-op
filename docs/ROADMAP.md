@@ -58,7 +58,7 @@ either way. Only Phase 2 is lockstep-specific.
 
 ---
 
-## Phase 1 — Transport, handshake, lobby
+## Phase 1 — Transport, handshake, lobby  ✅ *(lobby UI still to come)*
 
 - `src/Coop/` module: TCP listener/dialer, `TCP_NODELAY`, length-prefixed frames.
   Reuses `DataReader`/`DataWriter` (`Lawn/System/DataSync.h`) as the wire codec.
@@ -74,7 +74,7 @@ connected icon.
 
 ---
 
-## Phase 2 — Lockstep core
+## Phase 2 — Lockstep core  ✅
 
 - Tick scheduler with input delay `D`; per-tick command ring buffer.
 - A command frame every tick, empty or not.
@@ -87,7 +87,7 @@ injected fault reports as a desync rather than drifting.
 
 ---
 
-## Phase 3 — Two players on one lawn
+## Phase 3 — Two players on one lawn  🔨 *(state split done; input routing and remote cursor next)*
 
 The central refactor: **`Board::mSeedBank` → `mSeedBank[2]`**, which gives
 per-player cooldowns and per-player conveyor belts at once (SPEC §5).

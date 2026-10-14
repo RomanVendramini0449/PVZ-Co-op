@@ -105,6 +105,8 @@ int main(int argc, char** argv)
 	}
 	if (Coop::GetLaunchOptions().mSelfTest)
 		return Coop::RunSelfTest();
+	if (Coop::GetLaunchOptions().mNetTest)
+		return Coop::RunNetTest();
 
 	PvzpStringListSetColors(gLawnStringFormats, gLawnStringFormatCount);
 	gExtractResourcesByName = Sexy::ExtractResourcesByName;

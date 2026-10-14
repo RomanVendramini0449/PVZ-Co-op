@@ -96,6 +96,54 @@ coop selftest: PASS
 
 ---
 
+## 3b. Test the connection between your two machines
+
+**This is the most useful thing you can do right now**, and it still needs no
+game files. It runs the real lockstep loop at the real 100 Hz tick rate over
+your actual network, so it proves the link works before the game is involved.
+
+On the **host** machine:
+
+```sh
+./build/pvz-portable --coop-nettest --host --port 1337
+```
+
+On the **other** machine (replace with the host's IP):
+
+```sh
+./build/pvz-portable --coop-nettest --join 192.168.1.42:1337
+```
+
+Both should print something like:
+
+```
+coop nettest: connected. Player connected.
+coop nettest: build and game files match on both machines.
+
+coop nettest: ran 1000 ticks in 9990 ms
+coop nettest: final state 0xEF658E63 (must match on BOTH machines)
+coop nettest: stalled 0 ticks total, slowest tick 0 ms
+coop nettest: input delay settled at 3 ticks (30 ms)
+coop nettest: link looks good.
+coop nettest: PASS
+```
+
+**What to check, in order of importance:**
+
+1. **`final state` is the same hex number on both machines.** This is the whole
+   ballgame. It means both machines ran 1000 ticks of simulation from the same
+   inputs and landed on bit-identical results. If these differ, tell me the two
+   numbers.
+2. **`stalled`** — 0 on a LAN. A few hundred means the link is jittery.
+3. **`input delay settled at`** — starts at 3 ticks and climbs on its own if the
+   connection needs it. Whatever it ends at is roughly the input lag you will
+   feel when planting.
+
+Send me all of that output from both machines and I will size the defaults to
+your actual connection.
+
+---
+
 ## 4. Point it at your PvZ install
 
 Find your game folder: in Steam, right-click **Plants vs. Zombies: GOTY
@@ -182,6 +230,6 @@ halved and zombies have 1.5× health.** The joiner inherits it automatically.
 I cannot run the game here — no game files, and one machine. From Phase 3
 onward, you are the test loop. I will tell you exactly what to check each time.
 
-**Right now,** if you want to get ahead: do steps 1-3 and run
-`--coop-selftest` on both machines. That confirms both toolchains work before
-we need them, and it needs no game data.
+**Right now:** do steps 1-3, run `--coop-selftest` on each machine, then run
+**step 3b** between them. None of it needs game data, and it tells me what your
+real connection looks like. Send me the output.
