@@ -116,9 +116,17 @@ each, Wall-nut Bowling throws, and the Dr. Zomboss finale.
 
 ---
 
-## Phase 5 — Campaign flow
+## Phase 5 — Campaign flow, menu and saving
 
-- Skip the opening tutorial levels; start at the first real level.
+- Grey out every mode button except Adventure, Store, Options and Quit
+  (SPEC 10.1).
+- Pin `TutorialState` to `TUTORIAL_OFF` so the "click here to plant" prompts
+  never appear; 1-1 is still played, just not narrated (SPEC 10.2).
+- Host-side level select for any campaign level, riding the `mStartLevel`
+  already in the handshake (SPEC 10.3).
+- Save campaign progress between levels off the host's profile (SPEC 10.4).
+  Mid-level saving comes later: it needs both players' seed banks in the save
+  format.
 - Host-driven cutscenes and Crazy Dave dialogue; client input swallowed (SPEC §3).
 - Host-driven level transitions and level complete / game over.
 - Store: shared money, shared upgrades, host navigates.

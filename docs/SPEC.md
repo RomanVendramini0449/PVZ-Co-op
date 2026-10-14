@@ -16,8 +16,8 @@ The campaign's own special levels — the conveyor-belt levels, the Wall-nut
 Bowling levels, and the Dr. Zomboss finale — **are in scope**, because they are
 part of the campaign. They are not "mini-games" for our purposes. See §6.
 
-The opening tutorial levels are skipped. A new co-op session starts at the first
-real level.
+The opening tutorial is skipped -- see section 10. Every campaign level is
+playable, including 1-1; it is the hand-holding that goes, not the levels.
 
 ---
 
@@ -140,9 +140,73 @@ machines (it is part of the simulation).
 
 ---
 
+## 10. Menu, tutorial, level select and saving
+
+### 10.1 Everything except the campaign is greyed out
+
+`GameSelector` owns a named button per mode, so this is a disable call each.
+
+| Button | State |
+|---|---|
+| Adventure | **Enabled** -- the only way in |
+| Mini-games, Puzzle, Survival | Greyed out |
+| Zen Garden, Zombatar, Achievements | Greyed out |
+| Store (Dave's Twiddydinks) | **Enabled** -- shared money and upgrades (section 5) |
+| Options, Quit, Change User | **Enabled** |
+
+Greyed out rather than hidden, so it is obvious the mod removed them on purpose
+rather than the game being broken.
+
+> **Open question:** the Almanac is harmless and read-only. Left enabled for
+> now. Say if you want it greyed too.
+
+### 10.2 Tutorial skipped
+
+`TutorialState` is an enum whose zero value is `TUTORIAL_OFF`, with the
+hand-holding sequences numbered after it:
+`TUTORIAL_LEVEL_1_PICK_UP_PEASHOOTER`, `..._PLANT_PEASHOOTER`,
+`..._REFRESH_PEASHOOTER`, then the same for the Sunflower in level 2, plus the
+shovel and "more sun" sequences.
+
+The mod pins the state to `TUTORIAL_OFF` and never enters those sequences, so
+the arrows, the "click here to plant" prompts and the forced pauses never
+appear. Level 1-1 is still played -- you just play it instead of being walked
+through it.
+
+This matters more in co-op than single player: the tutorial expects exactly one
+player to click exactly one thing in a fixed order, which two people cannot
+satisfy.
+
+### 10.3 Level select
+
+The host picks any campaign level to start from, 1-1 through 5-10, rather than
+only continuing from saved progress.
+
+The handshake already carries `SessionParams::mStartLevel`, so the plumbing is
+there and this is a UI on top of it. Host-only, like every other
+outside-a-level decision (section 3), and locked once the level begins.
+
+### 10.4 Saving progress
+
+**Between levels (the important one).** Beating a level saves: which level is
+next, money, store upgrades, and unlocked seeds. Quit and come back and the
+campaign resumes where you left off. The base game already does this through
+`ProfileMgr::SyncState`; co-op rides the **host's** profile, and the joining
+player's own profile is never touched.
+
+**Mid-level.** Harder, and it needs saying why. The engine can serialise a live
+board (`SaveGame.cpp` writes the whole thing), but in co-op a snapshot has to
+cover **both** players' seed banks and cursors, and the save currently stores
+only player 0's. Doable, but it is a format change and extra surface for
+desyncs, so it comes after the campaign is playable end to end.
+
+Until then a dropped session replays the level it was on, which is cheap
+because the level restarts deterministically from its seed.
+
 ## 9. Non-goals for this build
 
 Worth stating so they do not creep in: no dedicated servers, no more than two
 players, no spectators, no mid-level join, no cross-platform play (both players
-run the same build on the same CPU architecture), no save-scumming a co-op
-session, no rollback netcode.
+run the same build on the same CPU architecture), and no rollback netcode.
+
+Mid-level saving is deferred rather than refused -- see section 10.4.
