@@ -57,6 +57,9 @@ namespace CoopArt
 	// and theHeight tall. theGlow is drawn over him additively; theAlpha
 	// fades him in.
 	Sexy::Image* RomanImage();
+
+	// The Yeti Spray can, standing on (theCenterX, theBottomY), theHeight tall.
+	void DrawYetiSpray(Sexy::Graphics* g, float theCenterX, float theBottomY, float theHeight);
 	void DrawRoman(Sexy::Graphics* g, float theCenterX, float theBottomY, float theHeight,
 		const Sexy::Color& theGlow, int theAlpha);
 }

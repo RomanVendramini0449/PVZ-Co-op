@@ -54,6 +54,9 @@ constexpr const int ONSLAUGHT_LAST_PER_LANE = 3;
 constexpr const int ONSLAUGHT_PRIZE_COINS = 1000;      // $10,000 (coins count in tens)
 // Luca vs. Roman: Roman fills a 3x3 block over the last three columns, which
 // nothing can be planted in, and moves up and down within them.
+// Yeti Spray: how many Yetis level 4-10 brings at full strength.
+constexpr const int YETI_SPRAY_YETIS = 20;
+constexpr const int YETI_SPRAY_LEVEL = 40;  // 4-10, the stormy night
 constexpr const int ROMAN_FIRST_COL = 6;
 constexpr const int ROMAN_CENTER_ROW = 2;
 constexpr const int ROMAN_HEALTH = 60000;               // one and a half Dr. Zombosses

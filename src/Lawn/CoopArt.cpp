@@ -39,6 +39,8 @@ extern const unsigned char gCoopArt_cheese[];
 extern const std::size_t gCoopArt_cheese_size;
 extern const unsigned char gCoopArt_roman[];
 extern const std::size_t gCoopArt_roman_size;
+extern const unsigned char gCoopArt_yeti_spray[];
+extern const std::size_t gCoopArt_yeti_spray_size;
 
 namespace
 {
@@ -57,6 +59,7 @@ namespace
 	Image* gLucaImage = nullptr;
 	Image* gCheeseImage = nullptr;
 	Image* gRomanImage = nullptr;
+	Image* gYetiSprayImage = nullptr;
 	bool   gLoaded = false;
 
 	void LoadArt()
@@ -67,6 +70,7 @@ namespace
 		gLucaImage = gLawnApp->GetImageFromMemory(gCoopArt_luca, gCoopArt_luca_size, "coop/luca.png");
 		gCheeseImage = gLawnApp->GetImageFromMemory(gCoopArt_cheese, gCoopArt_cheese_size, "coop/cheese.png");
 		gRomanImage = gLawnApp->GetImageFromMemory(gCoopArt_roman, gCoopArt_roman_size, "coop/roman.png");
+		gYetiSprayImage = gLawnApp->GetImageFromMemory(gCoopArt_yeti_spray, gCoopArt_yeti_spray_size, "coop/yeti_spray.png");
 	}
 }
 
@@ -163,4 +167,19 @@ void CoopArt::DrawRoman(Graphics* g, float theCenterX, float theBottomY, float t
 		aG.SetColor(Color(theGlow.mRed, theGlow.mGreen, theGlow.mBlue, theGlow.mAlpha * theAlpha / 255));
 		PvzpDrawImageScaledF(&aG, anImage, aLeft, aTop, aScale, aScale);
 	}
+}
+
+void CoopArt::DrawYetiSpray(Graphics* g, float theCenterX, float theBottomY, float theHeight)
+{
+	LoadArt();
+	Image* anImage = gYetiSprayImage;
+	if (anImage == nullptr)
+		return;
+
+	// Drawn with the caller's mode and colour, so the shop's hover highlight
+	// (an additive second pass) works on it like on any other item.
+	const float aScale = theHeight / static_cast<float>(anImage->mHeight);
+	Graphics aG(*g);
+	aG.SetLinearBlend(true);
+	PvzpDrawImageScaledF(&aG, anImage, theCenterX - anImage->mWidth * aScale * 0.5f, theBottomY - theHeight, aScale, aScale);
 }

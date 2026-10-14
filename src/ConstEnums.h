@@ -1168,6 +1168,12 @@ enum StoreItem : int32_t
 	// in the purchases so it saves with the profile and reaches the other
 	// player along with the host's upgrades.
 	STORE_ITEM_UNLOCK_LUCA = 40,
+	// PvZ Co-op: sold in Crazy Dave's shop. Level 4-10 then brings 20 Yetis.
+	STORE_ITEM_YETI_SPRAY = 41,
+	// PvZ Co-op: not sold. Losses on 4-10 since it was last beaten; each one
+	// thins the Yetis by a fifth. Kept with the purchases so it saves, and
+	// reaches the joining player, like them.
+	STORE_ITEM_YETI_SPRAY_LOSSES = 42,
 	STORE_ITEM_INVALID = -1
 };
 enum StorePages : int32_t

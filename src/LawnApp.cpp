@@ -1883,6 +1883,12 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		{
 			mPlayerInfo->mNeedsMagicTacoReward = 1;
 		}
+
+		// Yeti Spray: beaten, so the next visit brings the full 20 again.
+		if (mBoard->mLevel == YETI_SPRAY_LEVEL)
+		{
+			mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_YETI_SPRAY_LOSSES] = 0;
+		}
 	}
 	else if (IsSurvivalMode())
 	{
@@ -2205,6 +2211,9 @@ void LawnApp::UpdatePlayTimeStats()
 //     <seconds> hurtboss <h>      knock the boss down to h x 100 health (co-op)
 //     <seconds> clickzombie       click the leftmost zombie on the lawn
 //     <seconds> tryagain          press Game Over's Try Again, if it is up
+//     <seconds> grant <i> <v>     set purchase <i> to <v> on this profile
+//     <seconds> addcoins <n>      add n coins (n x $10) to this profile
+//     <seconds> saveprofile       write this profile to disk now
 //
 // Seconds count from when the game started.
 
@@ -2343,8 +2352,43 @@ void LawnApp::RunTestScript()
 						aGargantuars++;
 				}
 			}
-			printf("test script: zombies %d, gargantuars %d, wave %d of %d\n", aTotal, aGargantuars,
-				mBoard ? mBoard->mCurrentWave : -1, mBoard ? mBoard->mNumWaves : -1);
+			int aPlannedYetis = 0;
+			if (mBoard)
+			{
+				for (int aWave = 0; aWave < mBoard->mNumWaves; aWave++)
+					for (int i = 0; i < MAX_ZOMBIES_IN_WAVE && mBoard->mZombiesInWave[aWave][i] != ZombieType::ZOMBIE_INVALID; i++)
+						aPlannedYetis += mBoard->mZombiesInWave[aWave][i] == ZombieType::ZOMBIE_YETI;
+			}
+			printf("test script: zombies %d, gargantuars %d, wave %d of %d, yetis planned %d, spray losses %u\n", aTotal, aGargantuars,
+				mBoard ? mBoard->mCurrentWave : -1, mBoard ? mBoard->mNumWaves : -1, aPlannedYetis,
+				mPlayerInfo ? mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_YETI_SPRAY_LOSSES] : 0u);
+			fflush(stdout);
+		}
+		else if (aStep.mVerb == "grant")
+		{
+			// grant <store item> <value>: set a purchase on this machine's profile.
+			if (mPlayerInfo && aStep.mX >= 0 && aStep.mX < 80)
+			{
+				mPlayerInfo->mPurchases[aStep.mX] = static_cast<uint32_t>(aStep.mY);
+				printf("test script: purchase %d = %d\n", aStep.mX, aStep.mY);
+				fflush(stdout);
+			}
+		}
+		else if (aStep.mVerb == "addcoins")
+		{
+			// addcoins <n>: add n coins (shown as n x 10 dollars) to this profile.
+			if (mPlayerInfo)
+			{
+				mPlayerInfo->AddCoins(aStep.mX);
+				printf("test script: coins now %d ($%d)\n", mPlayerInfo->mCoins, mPlayerInfo->mCoins * 10);
+				fflush(stdout);
+			}
+		}
+		else if (aStep.mVerb == "saveprofile")
+		{
+			// Write this machine's profile to disk now.
+			WriteCurrentUserConfig();
+			printf("test script: profile saved\n");
 			fflush(stdout);
 		}
 		else if (aStep.mVerb == "tryagain")
@@ -2570,6 +2614,8 @@ void LawnApp::LoadingThreadProc()
 
 	// PvZ Co-op's own words. The game's strings come from the stock
 	// main.pak, which knows nothing of them.
+	mStringProperties.insert_or_assign("CRAZY_DAVE_3950",
+		"YETI SPRAY! One whiff and every Yeti for miles comes running to the stormy night lawn. TWENTY Yetis! Think of the diamonds!");
 	mStringProperties.insert_or_assign("LUCA", "Luca");
 	mStringProperties.insert_or_assign("LUCA_TOOLTIP", "Shoots cheese and makes sun");
 	mStringProperties.insert_or_assign("LUCA_DESCRIPTION",
@@ -2934,6 +2980,23 @@ bool LawnApp::IsCoopBonusLevel()
 {
 	return mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT || mGameMode == GameMode::GAMEMODE_COOP_SANDBOX ||
 		mGameMode == GameMode::GAMEMODE_COOP_ROMAN;
+}
+
+// Yeti Spray: 20 Yetis on level 4-10, a fifth fewer for every loss there
+// since it was last beaten, and never fewer than one. Read from the profile,
+// which co-op shares, so both machines pick the same waves.
+int LawnApp::YetiSprayYetiCount()
+{
+	if (mPlayerInfo == nullptr || !IsAdventureMode() || mBoard == nullptr || mBoard->mLevel != YETI_SPRAY_LEVEL)
+		return 0;
+	if (mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_YETI_SPRAY] == 0)
+		return 0;
+
+	int aCount = YETI_SPRAY_YETIS;
+	const uint32_t aLosses = std::min<uint32_t>(mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_YETI_SPRAY_LOSSES], 30);
+	for (uint32_t i = 0; i < aLosses; i++)
+		aCount = aCount * 4 / 5;
+	return std::max(aCount, 1);
 }
 
 bool LawnApp::IsCoopRomanLevel()

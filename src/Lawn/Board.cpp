@@ -818,6 +818,20 @@ void Board::PickZombieWaves()
 			ZombieType aZombieType = PickZombieType(aZombiePoints, aWave, &aZombiePicker);
 			PutZombieInWave(aZombieType, aWave, &aZombiePicker);
 		}
+
+		// Yeti Spray: the Yetis it draws, on top of everything else, spread
+		// evenly from the third wave to the last.
+		const int aSprayYetis = mApp->YetiSprayYetiCount();
+		const int aYetiWaves = mNumWaves - 2;
+		if (aSprayYetis > 0 && aYetiWaves > 0 && aWave >= 2)
+		{
+			const int aIndex = aWave - 2;
+			const int aHere = (aIndex + 1) * aSprayYetis / aYetiWaves - aIndex * aSprayYetis / aYetiWaves;
+			for (int i = 0; i < aHere && aZombiePicker.mZombieCount < MAX_ZOMBIES_IN_WAVE; i++)
+			{
+				PutZombieInWave(ZombieType::ZOMBIE_YETI, aWave, &aZombiePicker);
+			}
+		}
 	}
 }
 
@@ -5580,6 +5594,15 @@ void Board::ZombiesWon(Zombie* theZombie)
 
 	ClearAdvice(AdviceType::ADVICE_NONE);
 	mApp->mBoardResult = BoardResult::BOARDRESULT_LOST;
+
+	// Yeti Spray: a loss on 4-10 thins the Yetis a fifth for the next try.
+	// In the simulation, so a co-op client's borrowed copy agrees; the host
+	// saves it now, before a retry reads it back.
+	if (mApp->YetiSprayYetiCount() > 0 && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_YETI_SPRAY_LOSSES] < 30)
+	{
+		mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_YETI_SPRAY_LOSSES]++;
+		mApp->WriteCurrentUserConfig();
+	}
 
 	for (Zombie* aZombie : mZombies)
 	{

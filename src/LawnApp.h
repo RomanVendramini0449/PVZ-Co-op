@@ -365,6 +365,7 @@ public:
 	// Gargantuar Onslaught or the Dev Sandbox, from Level Select.
 	bool					IsCoopBonusLevel();
 	bool					IsCoopRomanLevel();
+	int						YetiSprayYetiCount();
 	bool					IsBossFightLevel();
 	static bool			IsEndlessIZombie(GameMode theGameMode);
 	void							CrazyDaveDoneHanding();
