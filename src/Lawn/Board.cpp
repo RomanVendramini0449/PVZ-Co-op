@@ -247,7 +247,12 @@ Board::Board(LawnApp* theApp)
 	}
 }
 
-Board::~Board() = default;
+Board::~Board()
+{
+	// Leaving the level stops the lockstep; the connection itself stays up so
+	// the players can carry on to the next one.
+	Coop::Game::Get().EndLevel();
+}
 
 void BoardInitForPlayer()
 {
@@ -1639,6 +1644,21 @@ bool Board::ChooseSeedsOnCurrentLevel()
 
 void Board::StartLevel()
 {
+	// Both machines must enter the level from the same random state, or the
+	// first zombie wave alone would put them in different games. The shared
+	// seed was agreed during the handshake.
+	if (Coop::Game::Get().IsConnected())
+	{
+		const uint32_t aSeed = Coop::Game::Get().GetSession().GetParams().mRngSeed;
+		Sexy::SRand(aSeed);
+		mApp->mAppRandSeed = static_cast<int>(aSeed);
+		mBoardRandSeed = static_cast<int>(aSeed);
+
+		SetCoopPlayerCount(Coop::PLAYER_COUNT);
+		SetActivePlayer(Coop::Game::Get().GetLocalPlayerIndex());
+		Coop::Game::Get().BeginLevel();
+	}
+
 	mCoinBankFadeCount = 0;
 	mApp->mLastLevelStats->Reset();
 	mChallenge->StartLevel();
@@ -5737,6 +5757,12 @@ void Board::UpdateTutorial()
 
 void Board::SetTutorialState(TutorialState theTutorialState)
 {
+	// This build skips the tutorial entirely (docs/SPEC.md 10.2). Beyond
+	// being unwanted, it cannot work in co-op: it waits for one player to
+	// click one specific thing in a fixed order, which two people cannot
+	// satisfy, and it would block the level for both of them.
+	theTutorialState = TutorialState::TUTORIAL_OFF;
+
 	switch (theTutorialState)
 	{
 	case TutorialState::TUTORIAL_LEVEL_1_PICK_UP_PEASHOOTER:

@@ -23,6 +23,7 @@
 #include "Resources.h"
 #include "PvzpLib/PvzpStringFile.h"
 #include "Coop/CoopSession.h"
+#include "Coop/CoopGame.h"
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -107,6 +108,18 @@ int main(int argc, char** argv)
 		return Coop::RunSelfTest();
 	if (Coop::GetLaunchOptions().mNetTest)
 		return Coop::RunNetTest();
+
+	// --host / --join without a test flag starts a real co-op session. The
+	// handshake has to finish before the game does anything that depends on
+	// the shared seed or the difficulty.
+	if (Coop::GetLaunchOptions().mWantHost || Coop::GetLaunchOptions().mWantJoin)
+	{
+		if (!Coop::EstablishSessionFromLaunchOptions())
+		{
+			fprintf(stderr, "co-op: could not start the session; not launching.\n");
+			return 1;
+		}
+	}
 
 	PvzpStringListSetColors(gLawnStringFormats, gLawnStringFormatCount);
 	gExtractResourcesByName = Sexy::ExtractResourcesByName;

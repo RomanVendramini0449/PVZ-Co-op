@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <format>
 #include "LawnApp.h"
+#include "Coop/CoopGame.h"
 #include "Resources.h"
 #include "Lawn/LawnCommon.h"
 #include "Lawn/Board.h"
@@ -1550,6 +1551,10 @@ void LawnApp::UpdatePlayTimeStats()
 
 void LawnApp::UpdateFrames()
 {
+	// Drives the connection even outside a level, so the handshake finishes
+	// and a disconnect is noticed promptly.
+	Coop::Game::Get().Update();
+
 	if ((!mActive || mMinimized) && mBoard)
 	{
 		mBoard->ResetFPSStats();

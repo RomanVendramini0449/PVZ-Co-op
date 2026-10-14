@@ -21,6 +21,10 @@
 
 #include "CoopGame.h"
 
+#include <chrono>
+#include <cstdio>
+#include <thread>
+
 namespace Coop
 {
 
@@ -54,6 +58,76 @@ void Game::Update()
 	// divergence to no purpose.
 	if (mInGame && !mSession.IsConnected())
 		EndLevel();
+}
+
+bool EstablishSessionFromLaunchOptions()
+{
+	const LaunchOptions& aOptions = GetLaunchOptions();
+	if (!aOptions.mWantHost && !aOptions.mWantJoin)
+		return false;
+
+	Session& aSession = Game::Get().GetSession();
+
+	if (aOptions.mWantHost)
+	{
+		printf("co-op: hosting on port %u...\n", aOptions.mPort);
+		fflush(stdout);
+		if (!aSession.StartHost(aOptions.mPort, aOptions.mDifficulty, 1))
+		{
+			printf("co-op: %s\n", aSession.GetStatusText().c_str());
+			return false;
+		}
+
+		const std::vector<std::string> aAddresses = Socket::GetLocalAddresses();
+		if (!aAddresses.empty())
+		{
+			printf("\n==================================================\n");
+			printf(" Tell the other player to connect to:\n");
+			for (const std::string& aAddress : aAddresses)
+				printf("     %s:%u\n", aAddress.c_str(), aOptions.mPort);
+			printf("==================================================\n\n");
+		}
+		printf("co-op: waiting for the other player to join...\n");
+		fflush(stdout);
+	}
+	else
+	{
+		printf("co-op: connecting to %s:%u...\n", aOptions.mJoinHost.c_str(), aOptions.mPort);
+		fflush(stdout);
+		if (!aSession.StartJoin(aOptions.mJoinHost, aOptions.mPort))
+		{
+			printf("co-op: %s\n", aSession.GetStatusText().c_str());
+			return false;
+		}
+	}
+
+	// Blocking here is deliberate: the game has not started yet, and both
+	// machines must agree on the seed and difficulty before anything that
+	// uses them runs.
+	const auto aDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
+	while (!aSession.IsConnected())
+	{
+		aSession.Update();
+		if (aSession.GetState() == Session::State::Failed)
+		{
+			printf("co-op: %s\n", aSession.GetStatusText().c_str());
+			return false;
+		}
+		if (std::chrono::steady_clock::now() > aDeadline)
+		{
+			printf("co-op: gave up waiting for the other player.\n");
+			aSession.Disconnect("timed out");
+			return false;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(2));
+	}
+
+	printf("co-op: connected. %s\n", aSession.GetStatusText().c_str());
+	printf("co-op: difficulty %s, shared seed %u\n",
+		aSession.GetParams().mDifficulty == Difficulty::Hard ? "HARD" : "normal",
+		aSession.GetParams().mRngSeed);
+	fflush(stdout);
+	return true;
 }
 
 } // namespace Coop

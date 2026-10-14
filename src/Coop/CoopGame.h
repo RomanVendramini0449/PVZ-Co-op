@@ -68,6 +68,11 @@ public:
 	void Update();
 };
 
+// Acts on --host / --join: opens the connection and blocks until the
+// handshake finishes or it gives up, printing progress. Returns true when a
+// session is ready, false when co-op was not requested or could not start.
+bool EstablishSessionFromLaunchOptions();
+
 } // namespace Coop
 
 #endif

@@ -363,6 +363,16 @@ GameSelector::GameSelector(LawnApp* theApp)
 	AddWidget(mStoreButton);
 	AddWidget(mAlmanacButton);
 	AddWidget(mOverlayWidget);
+
+	// This build is the campaign and nothing else (docs/SPEC.md 10.1).
+	// Disabled rather than removed, so it reads as a deliberate choice
+	// rather than a broken menu. The Store stays: co-op shares money and
+	// upgrades, so Dave's Twiddydinks is still part of the campaign.
+	mMinigameButton->SetDisabled(true);
+	mPuzzleButton->SetDisabled(true);
+	mSurvivalButton->SetDisabled(true);
+	mZenGardenButton->SetDisabled(true);
+	mZombatarButton->SetDisabled(true);
 }
 
 GameSelector::~GameSelector()
