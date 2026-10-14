@@ -8,8 +8,16 @@ Everything on the board is shared: one sun bank, one set of zombies, one set of
 plants, one wave timer. Each player gets their own cursor. The host picks a
 difficulty that can make sun scarcer and zombies tougher.
 
-**Status:** design phase. No code yet — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-for the plan and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the build order.
+**Status:** forked from upstream, Phase 1 in progress.
+
+- [`docs/SPEC.md`](docs/SPEC.md) — what we are building (locked scope)
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the netcode works
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — build order and what's needed from you
+
+**Scope:** campaign only. No mini-games mode, no Survival, no Puzzle mode, no
+Zen Garden. The campaign's own conveyor-belt levels, Wall-nut Bowling levels and
+the Dr. Zomboss finale are included — on those, each player gets their own
+conveyor belt running at half rate, so coordinating matters.
 
 ---
 

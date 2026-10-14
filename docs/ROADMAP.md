@@ -1,122 +1,149 @@
 # Roadmap
 
-Ordered so that the riskiest assumption is tested first and each phase is
-playable or verifiable on its own.
+Scope is locked in [`SPEC.md`](SPEC.md): campaign only, two players, direct IP.
 
 ---
 
-## Phase 0 — Prove determinism before building on it
+## Phase 0 — Determinism check *(yours to run; does not block me)*
 
-**Do this first. It is the cheapest way to find out whether the whole plan works.**
+**Short answer: no, you do not have to do Phase 0 before I start.** I am
+building Phases 1-5 now. But you should run it before we trust a real session,
+and it costs you well under an hour.
 
-1. Fork `wszqkzqk/PvZ-Portable`, build it on both machines, drop in your own
-   `main.pak` + `properties/`, confirm the stock game runs.
-2. Pin the float environment in CMake: `-ffp-contract=off`, no `-ffast-math`,
-   SSE2 math, no x87.
-3. Use the **existing demo recorder**: record a full level on machine A, replay
-   that recording on machine B with the same binary.
-4. If it replays identically, lockstep is viable and everything downstream is
-   mechanical. If it desyncs, the sync asserts
-   (`DemoSyncInt` / `DemoAssertIntEqual`) tell us where, and we fix those sites
-   before writing a line of netcode.
+### What it is, plainly
 
-**Exit criteria:** a recorded level replays bit-identically on the other machine.
+Lockstep co-op works by running the *same* game on both machines and sending
+only the button presses between them. Nothing about the board is transmitted —
+both machines compute identical results from identical inputs. That is what
+keeps it cheap and keeps everything in sync.
 
-> If Phase 0 fails in a way we cannot fix, that is the moment to reconsider
-> host-authoritative snapshots — not later. Everything after this point assumes
-> Phase 0 passed.
+That only holds if the game is **deterministic**: same inputs in, same frame
+out, every time. If one machine computes a zombie's position as `12.0000001`
+and the other gets `12.0`, the two lawns slowly drift apart until they are
+different games.
+
+Phase 0 tests whether that is true, using a recorder the engine already ships.
+
+### 0a — Single machine (do this whenever; catches most problems)
+
+Record a level with the built-in demo recorder, then replay the recording. If it
+plays back identically, the game is internally deterministic.
+
+This catches the common killers: logic that depends on wall-clock time,
+uninitialised memory, anything keyed off a pointer address.
+
+### 0b — Two machines (needs the game on both; the real test)
+
+Record on machine A, replay the same recording on machine B with the same
+binary. This is the one that catches floating-point differences between CPUs
+and compilers.
+
+### If it fails
+
+The engine has built-in sync assertions (`DemoSyncInt`, `DemoAssertIntEqual`)
+that report *where* the two runs diverged, so a failure is diagnosable rather
+than mysterious. We fix those sites.
+
+### Why I am not treating it as a blocker
+
+The risk is genuinely low for your setup. Float determinism breaks across
+*different* compilers, architectures, or build flags — you and your friend will
+run the same binary on the same CPU architecture, which is the easy case. On top
+of that, the engine ships a working, actively maintained demo record/replay
+system, which is itself evidence that deterministic replay holds today.
+
+And most of the work does not depend on the answer: the transport, the lobby,
+the per-player seed banks, the cursors and the campaign flow are all needed
+either way. Only Phase 2 is lockstep-specific.
 
 ---
 
-## Phase 1 — Transport and handshake
+## Phase 1 — Transport, handshake, lobby
 
-- `src/Coop/Net.{h,cpp}`: TCP listener/dialer, `TCP_NODELAY`, length-prefixed
-  frames. Reuse `DataReader`/`DataWriter` (`Lawn/System/DataSync.h`) as the codec
-  — it already does in-memory buffers.
-- Lobby UI: Host / Join-by-IP / port / difficulty, plus CLI flags
-  (`--host`, `--join IP:port`, `--difficulty`) so testing needs no clicking.
-- Handshake with hard rejection on protocol, build-hash or asset-hash mismatch,
-  and a readable error for each.
-- Seed + difficulty + level selection exchange.
+- `src/Coop/` module: TCP listener/dialer, `TCP_NODELAY`, length-prefixed frames.
+  Reuses `DataReader`/`DataWriter` (`Lawn/System/DataSync.h`) as the wire codec.
+- Handshake with hard rejection and a readable error on mismatched protocol
+  version, build hash, or asset hash.
+- Exchange: difficulty, starting level, RNG seed, host's unlock state.
+- **Host Game** / **Join Game** buttons on the main menu; connected-player icon.
+- CLI flags (`--host`, `--join IP:port`, `--difficulty`) so testing needs no
+  clicking.
 
-**Exit criteria:** two instances connect, agree, and print a matching seed.
+**Done when:** two instances connect, agree on a seed, and show each other's
+connected icon.
 
 ---
 
 ## Phase 2 — Lockstep core
 
-- Tick scheduler with input delay `D`; command ring buffer keyed by tick.
-- Send an (often empty) command frame every tick.
-- Stall on missing peer input; keep rendering interpolated frames via
-  `DoUpdateFramesF`; "waiting for player" overlay after ~500 ms; adaptive `D`.
-- Desync checksum every 25 ticks (`mSunMoney`, `mMainCounter`, plant/zombie
-  counts, quantised zombie positions and health) with a clean error on mismatch.
+- Tick scheduler with input delay `D`; per-tick command ring buffer.
+- A command frame every tick, empty or not.
+- Stall on missing peer input, keep rendering interpolated frames, show
+  "waiting for player" after ~500 ms, raise `D` if stalls recur.
+- Desync checksum every 25 ticks with a clean error instead of silent drift.
 
-**Exit criteria:** both machines run the same level in step with one player's
-input, and an injected fault is reported as a desync rather than silently drifting.
-
----
-
-## Phase 3 — Two cursors
-
-- Split `mCursorObject`, `mCursorPreview`, `mIgnoreMouseUp` and the `SeedBank`
-  selection into per-player state indexed by `CoopCommand::player`.
-- Route `Board::MouseDown/MouseMove/MouseUp` through the command layer.
-- Render the remote cursor as a ghost, plus the remote player's seed highlight.
-
-**Exit criteria:** both players can plant on a shared lawn from a shared sun bank.
-*This is the first genuinely playable co-op build.*
+**Done when:** both machines run a level in step from one player's input, and an
+injected fault reports as a desync rather than drifting.
 
 ---
 
-## Phase 4 — Full input coverage
+## Phase 3 — Two players on one lawn
 
-The long tail. Each is a `MouseDown` variant to wrap as a command:
+The central refactor: **`Board::mSeedBank` → `mSeedBank[2]`**, which gives
+per-player cooldowns and per-player conveyor belts at once (SPEC §5).
 
-- Core: plant, shovel, collect sun, collect coin, Flower Pot / Lily Pad placement,
-  Grave Buster, Cherry Bomb / Squash / Jalapeno placement, Cob Cannon fire
-  (`MouseDownCobcannonFire`), Imitater.
-- Minigames and puzzles: Wall-nut Bowling, I Zombie, Vasebreaker,
-  Whack-a-Zombie, Beghouled, Zombiquarium, conveyor-belt levels.
-  Puzzle modes already seed from `Board::GetLevelRandSeed()`, so they are
-  deterministic per level — they just need their inputs routed.
+- Split cursor / held-plant / shovel state per player.
+- Route `Board::MouseDown/MouseMove/MouseUp` through the command layer, tagged
+  with player index.
+- Draw the remote cursor, including what it is holding, with the
+  show/hide rules from SPEC §7.
 
-**Exit criteria:** every interaction in Adventure mode works for both players.
+**Done when:** both players plant on a shared lawn, from a shared sun pool, on
+independent cooldowns. *First genuinely playable co-op build.*
+
+---
+
+## Phase 4 — Campaign interaction coverage
+
+Every in-level interaction routed as a command: plant, shovel, collect sun,
+collect coin, Flower Pot / Lily Pad, Grave Buster, instant-use plants
+(Cherry Bomb, Squash, Jalapeno), Cob Cannon fire, Imitater.
+
+Then the special campaign levels (SPEC §6): split conveyor belts at half rate
+each, Wall-nut Bowling throws, and the Dr. Zomboss finale.
+
+**Done when:** every interaction in the campaign works for both players.
 
 ---
 
 ## Phase 5 — Campaign flow
 
+- Skip the opening tutorial levels; start at the first real level.
+- Host-driven cutscenes and Crazy Dave dialogue; client input swallowed (SPEC §3).
+- Host-driven level transitions and level complete / game over.
+- Store: shared money, shared upgrades, host navigates.
 - Host's Adventure profile is the one that progresses; client's stays untouched.
-- Host drives level transitions, seed chooser (shared selection, host confirms),
-  level complete / game over.
-- Anything outside a level (store, almanac, Zen Garden) is host-driven with a
-  "waiting for host" screen on the client. Big scope reduction, and it matches
-  how people actually play a co-op campaign.
-- Disconnect handling: a level can be restarted deterministically from its seed,
-  so "rejoin and replay the level" is the cheap recovery path.
+- Disconnect handling — a level restarts deterministically from its seed, so
+  "rejoin and replay the level" is the cheap recovery path.
 
-**Exit criteria:** 1-1 through 5-10 playable start to finish without returning to
-the menu.
+**Done when:** the campaign is playable start to finish without touching the menu.
 
 ---
 
 ## Phase 6 — Difficulty and polish
 
-- Sun ×0.5 in `Board::AddSunMoney`; audit level starting sun and tutorial grants
-  so nothing becomes unwinnable.
-- Zombie HP ×1.5 at spawn, integer math.
-- Difficulty indicator in the UI; verify it is locked at handshake.
-- Latency/desync diagnostics overlay.
+- Sun ×0.5 at `Board::AddSunMoney`; audit starting sun so Hard stays winnable.
+- Zombie health ×1.5 at spawn, integer math.
+- Difficulty shown in the UI; verified locked at handshake.
+- Latency and desync diagnostics overlay.
 
 ---
 
-## Scope reality
+## What I need from you, and when
 
-Phases 0-3 are the hard, interesting part and get you a playable shared lawn.
-Phase 4 is where the real time goes — PvZ has a lot of one-off interactions, and
-the minigames each break their own rules. Adventure mode proper is the achievable
-core; full minigame parity is a stretch goal, not a launch requirement.
-
-Worth saying plainly: this is a multi-week project, not a weekend. But it is
-*tractable*, which it would not have been from a Ghidra listing.
+| When | What |
+|---|---|
+| **Now** | Nothing. I am starting Phase 1. |
+| Before we trust a live session | Run **Phase 0a**, then **0b** once you have the game on both machines. |
+| When Phase 3 lands | Play it. Per-player cooldowns change the feel a lot and you should sanity-check the balance. |
+| When Phase 6 lands | Tell me if Hard is too brutal — ×0.5 sun *and* ×1.5 health compounds hard. |
