@@ -33,7 +33,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build libjpeg-dev libopenmpt-dev \
-            libpng-dev libsdl2-dev
+            libpng-dev libsdl2-dev ccache
+
+      # Most of a run is recompiling ~400 unchanged C++ files. Caching the
+      # object files makes a launcher- or docs-only change rebuild in
+      # seconds instead of minutes.
+      - name: Restore compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-linux-${{ github.sha }}
+          restore-keys: ccache-linux-
 
       # The launcher is PowerShell, so the compiler never sees it. A syntax
       # check alone is not enough either: an edit once deleted a function
@@ -41,12 +51,19 @@ jobs:
       # user presses the button. This resolves every command it calls.
       - name: Check the launcher script
         shell: pwsh
-        run: ./tools/check-launcher.ps1
+        run: |
+          ./tools/check-launcher.ps1
+          # Runs the same function the Start button calls, for both the host
+          # and join forms, so a broken command line fails here rather than
+          # in someone's hands.
+          ./tools/windows/PVZ-Coop-Launcher.ps1 -TestOnly
 
       - name: Build
         run: |
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build
+          ccache --show-stats | head -5
 
       # Needs no game assets, so the netcode is verified on every push.
       - name: Run co-op self-tests
@@ -82,10 +99,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # cache: true keeps the downloaded packages between runs, which is
+      # most of the setup time.
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
-          update: true
+          update: false
+          cache: true
           install: >-
             base-devel
             mingw-w64-ucrt-x86_64-cmake
@@ -95,6 +115,14 @@ jobs:
             mingw-w64-ucrt-x86_64-libpng
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-SDL2
+            mingw-w64-ucrt-x86_64-ccache
+
+      - name: Restore compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-windows-${{ github.sha }}
+          restore-keys: ccache-windows-
 
       # BUILD_STATIC so the result is one self-contained .exe with no DLLs
       # to copy around. CONSOLE=ON keeps a console window, which is how the
@@ -102,8 +130,11 @@ jobs:
       - name: Build
         shell: msys2 {0}
         run: |
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DCONSOLE=ON -DBUILD_STATIC=ON
+          export CCACHE_DIR="$(cygpath -u '${{ github.workspace }}')/.ccache"
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DCONSOLE=ON -DBUILD_STATIC=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build
+          ccache --show-stats | head -5
           mkdir -p dist
           cp build/pvz-portable.exe dist/
           strip dist/pvz-portable.exe

@@ -1,3 +1,5 @@
+param([switch]$TestOnly)
+
 # PVZ Co-op Launcher
 #
 # A small window for starting a co-op session without typing command lines.
@@ -6,9 +8,11 @@
 # It only ever builds a command line and starts pvz-portable.exe with it.
 # Nothing here touches your Plants vs. Zombies install.
 
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-[System.Windows.Forms.Application]::EnableVisualStyles()
+if (-not $TestOnly) {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+}
 
 # $PSScriptRoot is the reliable one; the fallback covers odd invocations.
 $ScriptDir = $PSScriptRoot
@@ -167,6 +171,87 @@ function Get-LocalAddresses {
                 Where-Object { $_ -ne '127.0.0.1' })
         } catch { return @() }
     }
+}
+
+# Builds the exact command line the game is started with. Kept out of the
+# button handler so it can be tested without a window: run this script with
+# -TestOnly to check both the host and join forms.
+function Build-GameCommandLine {
+    param(
+        [string]$GameDir,
+        [bool]$IsHost,
+        [string]$Address,
+        [int]$Port,
+        [bool]$Hard
+    )
+
+    $argList = @('-resdir', $GameDir)
+
+    if ($IsHost) {
+        $argList += '--host'
+        $argList += '--port'
+        $argList += "$Port"
+        if ($Hard) { $argList += '--difficulty'; $argList += 'hard' }
+    } else {
+        $target = $Address.Trim()
+        # Accept a bare address or one that already carries a port.
+        if ($target -notmatch ':') { $target = "${target}:${Port}" }
+        $argList += '--join'
+        $argList += $target
+    }
+
+    return ($argList | ForEach-Object { ConvertTo-QuotedArg $_ }) -join ' '
+}
+
+# ------------------------------------------------------------------- self test --
+if ($TestOnly) {
+    $failures = 0
+    function Assert-Line($Label, $Actual, $Expected) {
+        if ($Actual -ceq $Expected) {
+            Write-Host "  OK   $Label"
+            Write-Host "         $Actual"
+        } else {
+            Write-Host "  FAIL $Label"
+            Write-Host "         got      $Actual"
+            Write-Host "         expected $Expected"
+            $script:failures++
+        }
+    }
+
+    Write-Host 'launcher command line test'
+
+    Assert-Line 'host, path with spaces' `
+        (Build-GameCommandLine -GameDir 'G:\Steam\steamapps\common\Plants Vs Zombies' -IsHost $true -Address '' -Port 1337 -Hard $false) `
+        '-resdir "G:\Steam\steamapps\common\Plants Vs Zombies" --host --port 1337'
+
+    Assert-Line 'host, Program Files, hard' `
+        (Build-GameCommandLine -GameDir 'C:\Program Files (x86)\Steam\steamapps\common\Plants vs. Zombies GOTY' -IsHost $true -Address '' -Port 1337 -Hard $true) `
+        '-resdir "C:\Program Files (x86)\Steam\steamapps\common\Plants vs. Zombies GOTY" --host --port 1337 --difficulty hard'
+
+    Assert-Line 'join, bare address gains the port' `
+        (Build-GameCommandLine -GameDir 'G:\Steam\steamapps\common\Plants Vs Zombies' -IsHost $false -Address '192.168.2.40' -Port 1337 -Hard $false) `
+        '-resdir "G:\Steam\steamapps\common\Plants Vs Zombies" --join 192.168.2.40:1337'
+
+    Assert-Line 'join, address already has a port' `
+        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '10.0.0.5:1400' -Port 1337 -Hard $false) `
+        '-resdir C:\pvz --join 10.0.0.5:1400'
+
+    Assert-Line 'join, surrounding spaces trimmed' `
+        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '  192.168.2.40  ' -Port 1337 -Hard $false) `
+        '-resdir C:\pvz --join 192.168.2.40:1337'
+
+    Assert-Line 'trailing separator is escaped' `
+        (Build-GameCommandLine -GameDir 'D:\My Games\PvZ\' -IsHost $true -Address '' -Port 1337 -Hard $false) `
+        '-resdir "D:\My Games\PvZ\\" --host --port 1337'
+
+    if ($failures -gt 0) {
+        Write-Host ""
+        Write-Host "$failures case(s) failed"
+        exit 1
+    }
+    Write-Host ""
+    Write-Host 'all launcher command lines correct'
+    exit 0
 }
 
 # ------------------------------------------------------------------- window --
@@ -349,25 +434,24 @@ $btnStart.Add_Click({
         return
     }
 
-    $argList = @('-resdir', $txtDir.Text)
+    if (-not $rbHost.Checked -and -not $txtAddr.Text.Trim()) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Enter your friend's address.", 'Co-op Launcher', 'OK', 'Error') | Out-Null
+        return
+    }
+
+    $commandLine = Build-GameCommandLine `
+        -GameDir $txtDir.Text `
+        -IsHost $rbHost.Checked `
+        -Address $txtAddr.Text `
+        -Port $port `
+        -Hard ($cmbDiff.SelectedIndex -eq 1)
 
     if ($rbHost.Checked) {
-        $argList += '--host'
-        $argList += '--port'; $argList += "$port"
-        if ($cmbDiff.SelectedIndex -eq 1) { $argList += '--difficulty'; $argList += 'hard' }
         $lblStatus.Text = "Starting as host on port $port." + [Environment]::NewLine +
             'The console window waits for your friend; the game opens once they connect.'
     } else {
-        $address = $txtAddr.Text.Trim()
-        if (-not $address) {
-            [System.Windows.Forms.MessageBox]::Show(
-                "Enter your friend's address.", 'Co-op Launcher', 'OK', 'Error') | Out-Null
-            return
-        }
-        # Accept a bare address or one that already carries a port.
-        if ($address -notmatch ':') { $address = "${address}:${port}" }
-        $argList += '--join'; $argList += $address
-        $lblStatus.Text = "Connecting to $address." + [Environment]::NewLine +
+        $lblStatus.Text = "Connecting to $($txtAddr.Text.Trim())." + [Environment]::NewLine +
             'The game opens once the host accepts.'
     }
 
@@ -377,8 +461,6 @@ $btnStart.Add_Click({
     $Settings.Port = "$port"
     $Settings.Difficulty = if ($cmbDiff.SelectedIndex -eq 1) { 'hard' } else { 'normal' }
     Save-Settings
-
-    $commandLine = ($argList | ForEach-Object { ConvertTo-QuotedArg $_ }) -join ' '
 
     try {
         Start-Process -FilePath $ExePath -ArgumentList $commandLine -WorkingDirectory $ScriptDir
