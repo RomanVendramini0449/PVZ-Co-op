@@ -26,6 +26,7 @@
 #include "Board.h"
 #include "../ConstEnums.h"
 #include "Zombie.h"
+#include "../Coop/CoopGame.h"
 #include "Cutscene.h"
 #include "GridItem.h"
 #include "LawnMower.h"
@@ -881,6 +882,18 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 	if (mVariant)
 	{
 		ReanimShowPrefix("anim_tongue", RENDER_GROUP_NORMAL);
+	}
+
+	// Hard mode: zombies need 1.5x more damage to kill (docs/SPEC.md 8).
+	// Applied before the maximums are taken, so health bars still read full
+	// on spawn, and following the same pattern the Little Trouble level above
+	// uses to scale health. Integer math so both machines agree exactly.
+	if (Coop::Game::Get().IsHardMode())
+	{
+		mBodyHealth = mBodyHealth * 3 / 2;
+		mHelmHealth = mHelmHealth * 3 / 2;
+		mShieldHealth = mShieldHealth * 3 / 2;
+		mFlyingHealth = mFlyingHealth * 3 / 2;
 	}
 
 	mBodyMaxHealth = mBodyHealth;

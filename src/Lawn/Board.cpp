@@ -8688,6 +8688,19 @@ void Board::KeyChar(char theChar)
 
 void Board::AddSunMoney(int theAmount)
 {
+	// Hard mode halves sun from every source (docs/SPEC.md section 8).
+	//
+	// Here because this is the one chokepoint earned sun passes through --
+	// sunflowers, sky sun, Sun-shroom, Twin Sunflower all arrive via this
+	// function. A level's starting sun is assigned directly elsewhere and is
+	// deliberately left alone, so hard mode cannot make a level unwinnable
+	// before it begins.
+	//
+	// Integer math rather than a float multiplier: both machines must reach
+	// bit-identical results, and a float could differ in the last place.
+	if (theAmount > 0 && Coop::Game::Get().IsHardMode())
+		theAmount /= 2;
+
 	mSunMoney += theAmount;
 	mSunMoney = std::min(mSunMoney, 9990);
 	if (mSunMoney >= 8000)

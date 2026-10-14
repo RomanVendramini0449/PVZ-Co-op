@@ -139,6 +139,20 @@ function Find-GameDir {
     return ''
 }
 
+# Start-Process joins an argument array with spaces and quotes nothing, so a
+# path like "C:\Program Files (x86)\..." would arrive at the game as several
+# separate arguments and it would die on the first stray word. Everything is
+# quoted here instead, and the command line is passed as one string.
+function ConvertTo-QuotedArg([string]$Value) {
+    if ($Value -eq '') { return '""' }
+    if ($Value -notmatch '[ \t"]') { return $Value }
+    # Trailing backslashes would escape the closing quote under the C
+    # runtime's parsing rules, so each run that reaches the end is doubled.
+    $escaped = $Value -replace '(\\*)$', '$1$1'
+    $escaped = $escaped -replace '"', '\"'
+    return '"' + $escaped + '"'
+}
+
 function Get-LocalAddresses {
     try {
         return @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |

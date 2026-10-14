@@ -35,6 +35,14 @@ jobs:
           sudo apt-get install -y cmake ninja-build libjpeg-dev libopenmpt-dev \
             libpng-dev libsdl2-dev
 
+      # The launcher is PowerShell, so the compiler never sees it. A syntax
+      # check alone is not enough either: an edit once deleted a function
+      # while leaving its call site, which parses fine and only fails when a
+      # user presses the button. This resolves every command it calls.
+      - name: Check the launcher script
+        shell: pwsh
+        run: ./tools/check-launcher.ps1
+
       - name: Build
         run: |
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
