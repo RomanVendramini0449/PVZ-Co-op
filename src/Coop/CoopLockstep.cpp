@@ -67,12 +67,24 @@ void Lockstep::Reset()
 	mLastSentTick = 0;
 	mHasSentAny = false;
 	mSentForCurrentTick = false;
-	mStallTicks = 0;
-	mTotalStallTicks = 0;
-	mStallSinceDelayRaise = 0;
+	mStalling = false;
+	mStallBegan = {};
+	mLastDelayRaise = {};
+	mStallEvents = 0;
+	mTotalStallMs = 0;
+	mSmoothTicks = 0;
 	mLocalChecksums.clear();
 	mDesynced = false;
 	mDesyncText.clear();
+}
+
+uint32_t Lockstep::CurrentStallMs() const
+{
+	if (!mStalling)
+		return 0;
+	return static_cast<uint32_t>(
+		std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - mStallBegan).count());
 }
 
 void Lockstep::QueueLocalCommand(CommandType theType, int16_t theX, int16_t theY, int16_t theArg)
@@ -201,27 +213,54 @@ bool Lockstep::BeginTick()
 	auto aFound = mRemoteByTick.find(mCurrentTick);
 	if (aFound == mRemoteByTick.end())
 	{
-		++mStallTicks;
-		++mTotalStallTicks;
-		++mStallSinceDelayRaise;
+		const auto aNow = std::chrono::steady_clock::now();
+		if (!mStalling)
+		{
+			mStalling = true;
+			mStallBegan = aNow;
+			mLastDelayRaise = aNow;
+			++mStallEvents;
+		}
+		mSmoothTicks = 0;
 
-		// A persistent stall means the link is slower than our delay assumes.
-		// Raising it costs a little input lag and buys back smoothness. This
-		// is safe to do unilaterally: every command carries the tick it
-		// executes on, so the peer applies it at the same tick regardless.
+		// A sustained stall means the link is slower than our delay assumes.
+		// Raising it costs a little input lag and buys back smoothness, and
+		// is safe to do unilaterally: every command carries the tick it runs
+		// on, so the peer applies it at the same tick regardless.
 		//
-		// mStallTicks itself is left alone so the "waiting for player" notice
-		// still fires on a long stall rather than being reset by a raise.
-		if (mStallSinceDelayRaise >= STALL_BEFORE_DELAY_RAISE && mInputDelay < MAX_INPUT_DELAY)
+		// Paced by elapsed time, not by how often this function is called.
+		// The caller polls in a tight loop, so counting calls raised the
+		// delay dozens of steps during a single hiccup and pinned it at the
+		// ceiling for the rest of the session.
+		const auto aSinceRaise = std::chrono::duration_cast<std::chrono::milliseconds>(
+			aNow - mLastDelayRaise).count();
+		if (aSinceRaise >= static_cast<long long>(STALL_MS_BEFORE_RAISE)
+			&& mInputDelay < MAX_INPUT_DELAY)
 		{
 			++mInputDelay;
-			mStallSinceDelayRaise = 0;
+			mLastDelayRaise = aNow;
 		}
 		return false;
 	}
 
-	mStallTicks = 0;
-	mStallSinceDelayRaise = 0;
+	if (mStalling)
+	{
+		mStalling = false;
+		mTotalStallMs += static_cast<uint64_t>(
+			std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now() - mStallBegan).count());
+	}
+
+	// Give the delay back once the link has behaved for a while, so one bad
+	// moment does not cost input lag for the rest of the session. Lowering it
+	// is safe: mNextSendTick only ever advances, so we simply coast without
+	// sending until currentTick + delay catches up with it again.
+	++mSmoothTicks;
+	if (mSmoothTicks >= SMOOTH_TICKS_BEFORE_LOWER && mInputDelay > MIN_INPUT_DELAY)
+	{
+		--mInputDelay;
+		mSmoothTicks = 0;
+	}
 
 	// Both players' input for this tick: ours and theirs.
 	mTickCommands.clear();
@@ -450,7 +489,7 @@ int RunLockstepSelfTest()
 	printf("lockstep selftest: %u ticks in step, states agree (0x%08X)\n",
 		TARGET_TICKS, aHostSim.mState);
 	printf("lockstep selftest: stalls host=%u client=%u, delay host=%u client=%u\n",
-		aHostStep.GetTotalStallTicks(), aClientStep.GetTotalStallTicks(),
+		aHostStep.GetStallEvents(), aClientStep.GetStallEvents(),
 		aHostStep.GetInputDelay(), aClientStep.GetInputDelay());
 
 	// Now the case that loopback never produces on its own: a real stall.
@@ -464,7 +503,11 @@ int RunLockstepSelfTest()
 
 		// Host keeps running while the client is frozen: no pumping, so its
 		// batches stop arriving and the host starts waiting.
-		for (int aIteration = 0; aIteration < 4000; ++aIteration)
+		// Real time has to pass now, because the delay is paced in
+		// milliseconds rather than in polls.
+		const auto aFreezeUntil = std::chrono::steady_clock::now()
+			+ std::chrono::milliseconds(600);
+		while (std::chrono::steady_clock::now() < aFreezeUntil)
 		{
 			aHostSession.Update();
 			if (aHostStep.BeginTick())
@@ -472,17 +515,28 @@ int RunLockstepSelfTest()
 				aHostSim.ApplyTick(aHostStep.GetCurrentTick(), aHostStep.GetTickCommands());
 				aHostStep.EndTick(aHostSim.Checksum());
 			}
-			if (aHostStep.GetInputDelay() > aDelayBefore && aHostStep.GetStallTicks() > 100)
-				break;
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
 
-		if (aHostStep.GetTotalStallTicks() == 0)
+		if (aHostStep.GetStallEvents() == 0)
 		{
 			printf("lockstep selftest: FAIL expected the host to stall while the client was frozen\n");
 			return 1;
 		}
-		printf("lockstep selftest: host stalled %u ticks, delay %u -> %u\n",
-			aHostStep.GetTotalStallTicks(), aDelayBefore, aHostStep.GetInputDelay());
+		if (aHostStep.GetInputDelay() <= aDelayBefore)
+		{
+			printf("lockstep selftest: FAIL expected the delay to rise during a 600ms stall\n");
+			return 1;
+		}
+		// A 600 ms stall should cost a handful of steps, not slam the ceiling.
+		if (aHostStep.GetInputDelay() >= Lockstep::MAX_INPUT_DELAY)
+		{
+			printf("lockstep selftest: FAIL delay hit the ceiling (%u) after one short stall\n",
+				aHostStep.GetInputDelay());
+			return 1;
+		}
+		printf("lockstep selftest: host stalled %u time(s), delay %u -> %u\n",
+			aHostStep.GetStallEvents(), aDelayBefore, aHostStep.GetInputDelay());
 
 		// Unfreeze. Both must now catch up and finish in step. Before the fix
 		// this hung forever: the raised delay had skipped tick numbers, and
@@ -740,10 +794,9 @@ int RunNetTest()
 			// each buried the useful output under hundreds of near-identical
 			// ones. Console writes are slow enough on Windows to make the
 			// stall worse, too.
-			if ((aStep.GetStallTicks() % 100) == 0)
-				LogPrintf("coop nettest: waiting for the other player (%u ticks, delay %u)...\n",
-					aStep.GetStallTicks(), aStep.GetInputDelay());
-			std::this_thread::sleep_for(std::chrono::milliseconds(5));
+			LogPrintf("coop nettest: waiting for the other player (%u ms, delay %u)...\n",
+				aStep.CurrentStallMsPublic(), aStep.GetInputDelay());
+			std::this_thread::sleep_for(std::chrono::milliseconds(250));
 		}
 
 		if (std::chrono::steady_clock::now() > aStart + std::chrono::seconds(90))
@@ -772,13 +825,15 @@ int RunNetTest()
 	printf("\ncoop nettest: ran %u ticks in %lld ms\n",
 		TARGET_TICKS, static_cast<long long>(aElapsedMs));
 	LogPrintf("coop nettest: final state 0x%08X (must match on BOTH machines)\n", aState);
-	LogPrintf("coop nettest: stalled %u ticks total, slowest tick %u ms\n",
-		aStep.GetTotalStallTicks(), aSlowestTickMs);
-	LogPrintf("coop nettest: input delay settled at %u ticks (%u ms)\n",
+	LogPrintf("coop nettest: waited %u time(s) for the other player, %llu ms in total\n",
+		aStep.GetStallEvents(), static_cast<unsigned long long>(aStep.GetTotalStallMs()));
+	LogPrintf("coop nettest: slowest single tick %u ms\n", aSlowestTickMs);
+	LogPrintf("coop nettest: input delay settled at %u ticks (%u ms of planting lag)\n",
 		aStep.GetInputDelay(), aStep.GetInputDelay() * 10);
 
-	if (aStep.GetTotalStallTicks() > TARGET_TICKS / 4)
-		LogPrintf("coop nettest: NOTE heavy stalling -- this link is slow or jittery.\n");
+	// 10 seconds of ticks; a tenth of that spent waiting is a rough link.
+	if (aStep.GetTotalStallMs() > 1000)
+		LogPrintf("coop nettest: NOTE this link is jittery -- expect some input lag.\n");
 	else
 		LogPrintf("coop nettest: link looks good.\n");
 

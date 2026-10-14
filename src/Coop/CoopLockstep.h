@@ -26,6 +26,7 @@
 #include "CoopSession.h"
 
 #include <algorithm>
+#include <chrono>
 #include <map>
 #include <string>
 #include <vector>
@@ -50,11 +51,20 @@ namespace Coop
 class Lockstep
 {
 public:
-	static constexpr uint32_t MAX_INPUT_DELAY = 20;    // 200 ms
-	// Half a second of stalling is when we tell the player something is wrong.
-	static constexpr uint32_t STALL_WARN_TICKS = 50;
-	// Sustained stalling means the link is worse than our delay assumes.
-	static constexpr uint32_t STALL_BEFORE_DELAY_RAISE = 25;
+	static constexpr uint32_t MAX_INPUT_DELAY = 20;     // 200 ms
+	// Never drop below this: some delay is always needed to cover the link.
+	static constexpr uint32_t MIN_INPUT_DELAY = 2;      // 20 ms
+	// Everything below is measured in milliseconds of real stalling, NOT in
+	// calls to BeginTick(). The caller polls in a tight loop, so counting
+	// calls measured how fast the loop spins rather than how bad the link is:
+	// a single hiccup was enough to ratchet the delay to its ceiling in
+	// microseconds, where it then stayed for the whole session.
+	static constexpr uint32_t STALL_MS_BEFORE_RAISE = 120;
+	// Tell the player something is wrong only once it is worth saying.
+	static constexpr uint32_t STALL_MS_BEFORE_WARNING = 500;
+	// Smooth ticks before giving the delay back, so a brief hiccup does not
+	// cost input lag for the rest of the session. 400 ticks is four seconds.
+	static constexpr uint32_t SMOOTH_TICKS_BEFORE_LOWER = 400;
 
 private:
 	Session*    mSession = nullptr;
@@ -85,9 +95,15 @@ private:
 	// BeginTick() instead would flood the peer whenever we stall.
 	bool        mSentForCurrentTick = false;
 
-	uint32_t    mStallTicks = 0;
-	uint32_t    mTotalStallTicks = 0;
-	uint32_t    mStallSinceDelayRaise = 0;
+	// Stall accounting, in real time rather than poll counts.
+	bool        mStalling = false;
+	std::chrono::steady_clock::time_point mStallBegan{};
+	std::chrono::steady_clock::time_point mLastDelayRaise{};
+	uint32_t    mStallEvents = 0;      // distinct times we had to wait
+	uint64_t    mTotalStallMs = 0;     // how long we waited in total
+	uint32_t    mSmoothTicks = 0;      // consecutive ticks with no waiting
+
+	uint32_t    CurrentStallMs() const;
 
 	// Our own checksums, kept until the peer's arrive to compare against.
 	std::map<uint32_t, uint32_t> mLocalChecksums;
@@ -116,11 +132,12 @@ public:
 	uint32_t GetInputDelay() const { return mInputDelay; }
 	PlayerId GetLocalPlayer() const { return mLocalPlayer; }
 
-	bool     IsStalled() const { return mStallTicks > 0; }
-	// True once the stall is long enough to be worth telling the player about.
-	bool     ShouldShowWaiting() const { return mStallTicks >= STALL_WARN_TICKS; }
-	uint32_t GetStallTicks() const { return mStallTicks; }
-	uint32_t GetTotalStallTicks() const { return mTotalStallTicks; }
+	bool     IsStalled() const { return mStalling; }
+	// True once we have been waiting long enough to be worth mentioning.
+	bool     ShouldShowWaiting() const { return CurrentStallMs() >= STALL_MS_BEFORE_WARNING; }
+	uint32_t GetStallEvents() const { return mStallEvents; }
+	uint64_t GetTotalStallMs() const { return mTotalStallMs; }
+	uint32_t CurrentStallMsPublic() const { return CurrentStallMs(); }
 
 	bool               IsDesynced() const { return mDesynced; }
 	const std::string& GetDesyncText() const { return mDesyncText; }
