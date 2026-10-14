@@ -44,7 +44,11 @@ NewOptionsDialog::NewOptionsDialog(LawnApp* theApp, bool theFromGameSelector) :
 	mFromGameSelector = theFromGameSelector;
 	SetButtonTextColor(Color(255, 255, 100));
 	mAlmanacButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Almanac, this, "[VIEW_ALMANAC_BUTTON]");
-	mRestartButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Restart, this, "[RESTART_LEVEL]");
+	// Not [RESTART_LEVEL]: in the Steam release's strings that key holds the
+	// whole "Are you sure that you want to restart the level?" sentence, which
+	// the button cut down to "...at you want to re...".
+	mRestartButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Restart, this,
+		PvzpStringListExists("[RESTART_LEVEL_BUTTON]") ? "[RESTART_LEVEL_BUTTON]" : "Restart Level");
 	mBackToMainButton = MakeButton(NewOptionsDialog::NewOptionsDialog_MainMenu, this, "[MAIN_MENU_BUTTON]");
 
 	mBackToGameButton = MakeNewButton(

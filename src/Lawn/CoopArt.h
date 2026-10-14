@@ -1,0 +1,56 @@
+/*
+ * Copyright (C) 2026 PVZ-Co-op contributors
+ *
+ * SPDX-License-Identifier: LGPL-3.0-or-later
+ *
+ * This file is part of PVZ-Co-op, a two-player co-op mod of PvZ-Portable.
+ *
+ * PVZ-Co-op is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PVZ-Co-op is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with PVZ-Co-op. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#ifndef __COOPART_H__
+#define __COOPART_H__
+
+namespace Sexy
+{
+	class Graphics;
+	class Image;
+}
+
+// The mod's own art: the Luca plant and the cheese it shoots. The PNGs live in
+// assets/coop and are compiled into the executable (see CMakeLists.txt), so
+// nothing has to be copied next to the game.
+//
+// Both are stored larger than they are drawn on the lawn, so they stay smooth
+// when the award screen draws them large.
+namespace CoopArt
+{
+	// Built on first use, once the renderer exists; nullptr if one failed to
+	// decode, and every caller copes with that by drawing nothing.
+	Sexy::Image* LucaImage();
+	Sexy::Image* CheeseImage();
+
+	// Luca standing in a plant's 80x80 frame whose top-left is (theX, theY),
+	// the frame scaled by theScaleX/Y (a seed packet draws plants at half
+	// size). theSquashX/Y bend it about its base for the idle sway and the
+	// shooting recoil. theGlow (0-255) is the brightening a Sunflower shows
+	// as it makes sun.
+	void DrawLuca(Sexy::Graphics* g, float theX, float theY, float theScaleX, float theScaleY,
+		float theSquashX = 1.0f, float theSquashY = 1.0f, int theGlow = 0);
+
+	// The cheese, centred on (theCenterX, theCenterY), turned by theRotation.
+	void DrawCheese(Sexy::Graphics* g, float theCenterX, float theCenterY, float theRotation);
+}
+
+#endif

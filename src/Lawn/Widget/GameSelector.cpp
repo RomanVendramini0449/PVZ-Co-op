@@ -61,6 +61,45 @@ GameSelectorOverlay::GameSelectorOverlay(GameSelector* theGameSelector)
 	mHasAlpha = true;
 }
 
+namespace
+{
+	// "Delete All Saves": a plain box in the menu's top-right corner, clear
+	// of every tombstone and sign, so it is found when wanted and not hit by
+	// accident. It only opens a confirmation; nothing is lost on one click.
+	class DeleteSavesButton : public Widget
+	{
+	public:
+		explicit DeleteSavesButton(GameSelector* theOwner) : mOwner(theOwner)
+		{
+			mHasAlpha = true;
+			mHasTransparencies = true;
+			mDoFinger = true;
+		}
+		void Draw(Graphics* g) override
+		{
+			g->SetColor(mIsOver ? Color(160, 45, 40, 235) : Color(80, 25, 20, 200));
+			g->FillRect(0, 0, mWidth, mHeight);
+			g->SetColor(Color(0, 0, 0, 160));
+			g->DrawRect(0, 0, mWidth - 1, mHeight - 1);
+
+			_Font* aFont = Sexy::FONT_BRIANNETOD12;
+			const std::string aLabel = "Delete All Saves";
+			g->SetFont(aFont);
+			g->SetColor(Color(255, 225, 205));
+			g->DrawString(aLabel, (mWidth - aFont->StringWidth(aLabel)) / 2, mHeight / 2 + aFont->GetAscent() / 2 - 1);
+		}
+		void MouseEnter() override { Widget::MouseEnter(); MarkDirty(); }
+		void MouseLeave() override { Widget::MouseLeave(); MarkDirty(); }
+		void MouseUp(int, int, int theClickCount) override
+		{
+			if (theClickCount > 0)
+				mOwner->ClickedDeleteAllSaves();
+		}
+	private:
+		GameSelector* mOwner;
+	};
+}
+
 GameSelector::GameSelector(LawnApp* theApp)
 {
 	mLoadedResourceNames.push_back("DelayLoad_Zombatar");
@@ -363,6 +402,10 @@ GameSelector::GameSelector(LawnApp* theApp)
 	AddWidget(mHelpButton);
 	AddWidget(mStoreButton);
 	AddWidget(mAlmanacButton);
+	mDeleteSavesButton = new DeleteSavesButton(this);
+	mDeleteSavesButton->Resize(648, 6, 144, 24);
+	mDeleteSavesButton->mVisible = !Coop::Game::Get().IsFollower();
+	AddWidget(mDeleteSavesButton);
 	AddWidget(mOverlayWidget);
 
 	// This build is the campaign and nothing else (docs/SPEC.md 10.1).
@@ -1164,6 +1207,18 @@ namespace
 	constexpr int kLevelCellH = 34;
 	constexpr int kLevelCols = 10;   // levels within a world
 	constexpr int kLevelRows = 5;    // worlds
+
+	// The bonus levels, in a row of their own under the campaign grid. They
+	// come back from the hit test as these codes rather than level numbers.
+	constexpr int kBonusY = kLevelSelectY + kLevelRows * kLevelCellH + 42;
+	constexpr int kBonusH = 40;
+	constexpr int kBonusOnslaught = 1001;
+	constexpr int kBonusSandbox = 1002;
+	struct BonusButton { int mCode; int mX; int mWidth; };
+	constexpr BonusButton kBonusButtons[] = {
+		{ kBonusOnslaught, kLevelSelectX, 300 },
+		{ kBonusSandbox,   kLevelSelectX + 312, 248 },
+	};
 }
 
 namespace
@@ -1190,6 +1245,21 @@ namespace
 	private:
 		GameSelector* mOwner;
 	};
+}
+
+void GameSelector::ClickedDeleteAllSaves()
+{
+	// The joining player is playing on the host's save; theirs is not in play.
+	if (Coop::Game::Get().IsFollower())
+		return;
+
+	mApp->PlaySample(Sexy::SOUND_TAP);
+	if (mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "Delete All Saves?",
+		"This erases every player's progress:\nthe adventure, coins, upgrades,\ntrophies, the Zen Garden and Luca.\n\nIt cannot be undone.",
+		"DELETE", "CANCEL", Dialog::BUTTONS_YES_NO) != Dialog::ID_YES)
+		return;
+
+	mApp->DeleteAllSaves();
 }
 
 void GameSelector::OpenCoopLevelSelect()
@@ -1220,7 +1290,11 @@ void GameSelector::CoopLevelSelectClicked(int x, int y)
 {
 	const int aLevel = CoopLevelSelectHitTest(x, y);
 	CloseCoopLevelSelect();  // a level, or anywhere else to cancel
-	if (aLevel > 0)
+	if (aLevel == kBonusOnslaught)
+		CoopStartBonusLevel(GameMode::GAMEMODE_COOP_ONSLAUGHT);
+	else if (aLevel == kBonusSandbox)
+		CoopStartBonusLevel(GameMode::GAMEMODE_COOP_SANDBOX);
+	else if (aLevel > 0)
 		CoopStartLevel(aLevel);
 }
 
@@ -1267,6 +1341,12 @@ bool GameSelector::CoopLevelSelectEnabled() const
 
 int GameSelector::CoopLevelSelectHitTest(int x, int y) const
 {
+	for (const BonusButton& aButton : kBonusButtons)
+	{
+		if (x >= aButton.mX && x < aButton.mX + aButton.mWidth && y >= kBonusY && y < kBonusY + kBonusH)
+			return aButton.mCode;
+	}
+
 	const int aCol = (x - kLevelSelectX) / kLevelCellW;
 	const int aRow = (y - kLevelSelectY) / kLevelCellH;
 	if (x < kLevelSelectX || y < kLevelSelectY)
@@ -1312,10 +1392,44 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 		}
 	}
 
+	// The bonus levels: not part of the campaign, and they leave the saved
+	// progress alone.
+	g->SetFont(Sexy::FONT_BRIANNETOD12);
+	g->SetColor(Color(200, 200, 190));
+	g->DrawString("Bonus levels (not part of the campaign; your progress is left alone):",
+		kLevelSelectX, kBonusY - 8);
+
+	const bool aHasLuca = mApp->mPlayerInfo && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] > 0;
+	for (const BonusButton& aButton : kBonusButtons)
+	{
+		const bool aOnslaught = aButton.mCode == kBonusOnslaught;
+		g->SetColor(aOnslaught ? Color(110, 45, 30, 235) : Color(35, 55, 100, 235));
+		g->FillRect(aButton.mX + 2, kBonusY + 2, aButton.mWidth - 4, kBonusH - 4);
+
+		g->SetFont(Sexy::FONT_BRIANNETOD16);
+		g->SetColor(Color(255, 245, 200));
+		g->DrawString(aOnslaught ? "Gargantuar Onslaught" : "Dev Sandbox", aButton.mX + 12, kBonusY + 20);
+
+		g->SetFont(Sexy::FONT_BRIANNETOD12);
+		g->SetColor(Color(220, 210, 180));
+		const char* aNote = aOnslaught
+			? (aHasLuca ? "100 Gargantuars, endless sun. Luca: unlocked" : "100 Gargantuars, endless sun. Win: unlock Luca")
+			: "Every plant, endless sun, no recharge";
+		g->DrawString(aNote, aButton.mX + 12, kBonusY + 34);
+	}
+
 	g->SetFont(Sexy::FONT_BRIANNETOD12);
 	g->SetColor(Color(200, 200, 190));
 	g->DrawString("Click anywhere else to cancel.",
-		kLevelSelectX, kLevelSelectY + kLevelRows * kLevelCellH + 22);
+		kLevelSelectX, kBonusY + kBonusH + 22);
+}
+
+// The bonus levels need no campaign progress, so unlike CoopStartLevel this
+// leaves the profile exactly as it is.
+void GameSelector::CoopStartBonusLevel(GameMode theGameMode)
+{
+	mApp->KillGameSelector();
+	mApp->PreNewGame(theGameMode, false);
 }
 
 void GameSelector::CoopStartLevel(int theLevel)

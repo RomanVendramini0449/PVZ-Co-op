@@ -186,6 +186,8 @@ public:
 	std::string						GetFormattedString(std::string_view theComponentId, std::string_view theDefault, ...);
 	void							DoConfirmDeleteUserDialog(const std::string& theName);
 	void							FinishConfirmDeleteUserDialog(bool isYes);
+	// "Delete All Saves" on the main menu.
+	void							DeleteAllSaves();
 	void							DoRenameUserDialog(const std::string& theName);
 	void							FinishRenameUserDialog(bool isYes);
 	void							FinishNameError(int theId);
@@ -210,6 +212,9 @@ public:
 	// machines are in the same level with the same line-up rather than two
 	// unrelated games sharing a socket.
 	void							CoopUpdateFlow();
+	// "PvZ Co-op - Host - 1 player connected" and friends, kept current.
+	std::string						CoopWindowTitle() const;
+	void							CoopRefreshWindowTitle();
 	// Debug: timed input from PVZ_TEST_SCRIPT (see LawnApp.cpp).
 	void							RunTestScript();
 	// Host: describe the level we are entering so the client can build it.
@@ -357,6 +362,8 @@ public:
 	bool							CanPauseNow();
 	bool					IsPuzzleMode();
 	bool					IsChallengeMode();
+	// Gargantuar Onslaught or the Dev Sandbox, from Level Select.
+	bool					IsCoopBonusLevel();
 	static bool			IsEndlessIZombie(GameMode theGameMode);
 	void							CrazyDaveDoneHanding();
 	inline std::string				GetCurrentLevelName() { return "Unknown"; }

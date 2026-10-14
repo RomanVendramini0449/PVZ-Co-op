@@ -160,6 +160,11 @@ public:
 	// Returns the campaign level under the point, or 0 for none.
 	int                         CoopLevelSelectHitTest(int x, int y) const;
 	void                        CoopStartLevel(int theLevel);
+	// "Delete All Saves", with a confirmation first.
+	Widget*                     mDeleteSavesButton = nullptr;  // owned by the widget tree
+	void                        ClickedDeleteAllSaves();
+	// Gargantuar Onslaught or the Dev Sandbox.
+	void                        CoopStartBonusLevel(GameMode theGameMode);
 };
 
 class GameSelectorOverlay : public Widget

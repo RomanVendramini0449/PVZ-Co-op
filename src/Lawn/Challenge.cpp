@@ -2545,6 +2545,34 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_DOLPHIN_RIDER] = true;
 		aList[ZOMBIE_BALLOON] = true;
 	}
+	else if (aGameMode == GAMEMODE_COOP_ONSLAUGHT)
+	{
+		// The waves themselves are written out in Board::PickZombieWaves.
+		aList[ZOMBIE_GARGANTUAR] = true;
+	}
+	else if (aGameMode == GAMEMODE_COOP_SANDBOX)
+	{
+		// A bit of everything a pool lawn can hold, to try plants against.
+		aList[ZOMBIE_NORMAL] = true;
+		aList[ZOMBIE_TRAFFIC_CONE] = true;
+		aList[ZOMBIE_PAIL] = true;
+		aList[ZOMBIE_POLEVAULTER] = true;
+		aList[ZOMBIE_NEWSPAPER] = true;
+		aList[ZOMBIE_DOOR] = true;
+		aList[ZOMBIE_FOOTBALL] = true;
+		aList[ZOMBIE_DANCER] = true;
+		aList[ZOMBIE_SNORKEL] = true;
+		aList[ZOMBIE_ZAMBONI] = true;
+		aList[ZOMBIE_DOLPHIN_RIDER] = true;
+		aList[ZOMBIE_JACK_IN_THE_BOX] = true;
+		aList[ZOMBIE_BALLOON] = true;
+		aList[ZOMBIE_DIGGER] = true;
+		aList[ZOMBIE_POGO] = true;
+		aList[ZOMBIE_BUNGEE] = true;
+		aList[ZOMBIE_LADDER] = true;
+		aList[ZOMBIE_CATAPULT] = true;
+		aList[ZOMBIE_GARGANTUAR] = true;
+	}
 	else
 	{
 		aList[ZOMBIE_NORMAL] = true;
@@ -2552,7 +2580,7 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_PAIL] = true;
 	}
 
-	if (mApp->CanSpawnYetis() && !mApp->IsWhackAZombieLevel() && !mApp->IsLittleTroubleLevel())
+	if (mApp->CanSpawnYetis() && !mApp->IsWhackAZombieLevel() && !mApp->IsLittleTroubleLevel() && aGameMode != GAMEMODE_COOP_ONSLAUGHT)
 		aList[ZOMBIE_YETI] = true;
 }
 

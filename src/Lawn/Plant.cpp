@@ -21,6 +21,7 @@
 
 #include "Coin.h"
 #include "Plant.h"
+#include "CoopArt.h"
 #include "Board.h"
 #include "Zombie.h"
 #include "Cutscene.h"
@@ -44,6 +45,9 @@
 #include "Widget/AchievementsScreen.h"
 #include <algorithm>
 #include <format>
+
+// Ticks between Luca's suns: the same as a Sunflower's launch rate.
+static constexpr int LUCA_SUN_RATE = 2500;
 
 constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_PEASHOOTER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_PEASHOOTER,    .mPacketIndex = 0,  .mSeedCost = 100, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "PEASHOOTER" },
@@ -95,6 +99,9 @@ constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_SPIKEROCK,         .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_SPIKEROCK,     .mPacketIndex = 27, .mSeedCost = 125, .mRefreshTime = 5000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "SPIKEROCK" },
 	{ .mSeedType = SeedType::SEED_COBCANNON,         .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_COBCANNON,     .mPacketIndex = 16, .mSeedCost = 500, .mRefreshTime = 5000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 600,  .mPlantName = "COB_CANNON" },
 	{ .mSeedType = SeedType::SEED_IMITATER,          .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_IMITATER,      .mPacketIndex = 33, .mSeedCost = 0,   .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "IMITATER" },
+	// PvZ Co-op. A Peashooter underneath -- its reanimation still runs, unseen,
+	// so it aims and fires exactly like one -- drawn as its own art instead.
+	{ .mSeedType = SeedType::SEED_LUCA,              .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_PEASHOOTER,    .mPacketIndex = 0,  .mSeedCost = 300, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "LUCA" },
 	{ .mSeedType = SeedType::SEED_EXPLODE_O_NUT,     .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_WALLNUT,       .mPacketIndex = 2,  .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "EXPLODE_O_NUT" },
 	{ .mSeedType = SeedType::SEED_GIANT_WALLNUT,     .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_WALLNUT,       .mPacketIndex = 2,  .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "GIANT_WALLNUT" },
 	{ .mSeedType = SeedType::SEED_SPROUT,            .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_ZENGARDEN_SPROUT, .mPacketIndex = 33, .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "SPROUT" },
@@ -221,6 +228,13 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 	case SeedType::SEED_REPEATER:
 	case SeedType::SEED_LEFTPEATER:
 	case SeedType::SEED_GATLINGPEA:
+	case SeedType::SEED_LUCA:
+		if (theSeedType == SeedType::SEED_LUCA)
+		{
+			// Luca's sun comes on a Sunflower's clock, kept apart from the
+			// shooter's: mLaunchCounter already belongs to the shooting.
+			mStateCountdown = RandRangeInt(300, LUCA_SUN_RATE / 2);
+		}
 		if (aBodyReanim)
 		{
 			aBodyReanim->mAnimRate = RandRangeFloat(15.0f, 20.0f);
@@ -1070,6 +1084,27 @@ void Plant::UpdateProductionPlant()
 				mBoard->AddCoin(mX, mY, CoinType::COIN_SILVER, CoinMotion::COIN_MOTION_COIN);
 			}
 		}
+	}
+}
+
+// Luca makes sun the way a Sunflower does -- the same rhythm, the same glow
+// building as it gets close -- on its own clock (see PlantInitialize).
+void Plant::UpdateLucaSun()
+{
+	if (!IsInPlay() || mApp->IsIZombieLevel() || mBoard->HasLevelAwardDropped())
+		return;
+
+	// mStateCountdown is counted down for every plant in UpdateAbilities.
+	if (mStateCountdown <= 100)
+	{
+		int aFlashCountdown = PvzpAnimateCurve(100, 0, mStateCountdown, 0, 100, PvzpCurves::CURVE_LINEAR);
+		mEatenFlashCountdown = std::max(mEatenFlashCountdown, aFlashCountdown);
+	}
+	if (mStateCountdown <= 0)
+	{
+		mStateCountdown = RandRangeInt(LUCA_SUN_RATE - 150, LUCA_SUN_RATE);
+		mApp->PlayFoley(FoleyType::FOLEY_SPAWN_SUN);
+		mBoard->AddCoin(mX, mY, CoinType::COIN_SUN, CoinMotion::COIN_MOTION_FROM_PLANT);
 	}
 }
 
@@ -2568,6 +2603,7 @@ void Plant::UpdateAbilities()
 	else if (mSeedType == SeedType::SEED_GOLD_MAGNET)                                           UpdateGoldMagnetShroom();
 	else if (mSeedType == SeedType::SEED_SUNSHROOM)                                             UpdateSunShroom();
 	else if (MakesSun() || mSeedType == SeedType::SEED_MARIGOLD)                                UpdateProductionPlant();
+	else if (mSeedType == SeedType::SEED_LUCA)                                                  UpdateLucaSun();
 	else if (mSeedType == SeedType::SEED_GRAVEBUSTER)                                           UpdateGraveBuster();
 	else if (mSeedType == SeedType::SEED_TORCHWOOD)                                             UpdateTorchwood();
 	else if (mSeedType == SeedType::SEED_POTATOMINE)                                            UpdatePotato();
@@ -2961,7 +2997,8 @@ Reanimation* Plant::AttachBlinkAnim(Reanimation* theReanimBody)
 			aTrackToAttach = "anim_face2";
 		}
 	}
-	else if (mSeedType == SeedType::SEED_PEASHOOTER || mSeedType == SeedType::SEED_SNOWPEA || mSeedType == SeedType::SEED_REPEATER || mSeedType == SeedType::SEED_LEFTPEATER || mSeedType == SeedType::SEED_GATLINGPEA)
+	else if (mSeedType == SeedType::SEED_PEASHOOTER || mSeedType == SeedType::SEED_SNOWPEA || mSeedType == SeedType::SEED_REPEATER || mSeedType == SeedType::SEED_LEFTPEATER || mSeedType == SeedType::SEED_GATLINGPEA ||
+		mSeedType == SeedType::SEED_LUCA)
 	{
 		if (theReanimBody->TrackExists("anim_stem"))
 		{
@@ -3506,6 +3543,7 @@ float PlantFlowerPotHeightOffset(SeedType theSeedType, float theFlowerPotScale)
 	case SeedType::SEED_PEASHOOTER:
 	case SeedType::SEED_REPEATER:
 	case SeedType::SEED_LEFTPEATER:
+	case SeedType::SEED_LUCA:
 	case SeedType::SEED_SNOWPEA:
 	case SeedType::SEED_THREEPEATER:
 	case SeedType::SEED_SUNFLOWER:
@@ -4027,6 +4065,10 @@ void Plant::Draw(Graphics* g)
 		{
 			mBoard->mChallenge->IZombieDrawPlant(g, this);
 		}
+		else if (mSeedType == SeedType::SEED_LUCA)
+		{
+			DrawLuca(g, aOffsetX, aOffsetY);
+		}
 		else if (mBodyReanimID != ReanimationID::REANIMATIONID_NULL)
 		{
 			Reanimation* aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
@@ -4096,6 +4138,31 @@ void Plant::Draw(Graphics* g)
 	}
 }
 
+// Luca has no animation of its own, so it is brought to life here: a slow
+// sway, a recoil as it shoots, and the Sunflower's glow as sun comes.
+void Plant::DrawLuca(Graphics* g, float theOffsetX, float theOffsetY)
+{
+	const uint32_t aCounter = IsOnBoard() ? mBoard->mMainCounter : mApp->mAppCounter;
+	const float aTime = static_cast<float>(fmod((mRow * 97.0 + mPlantCol * 61.0 + static_cast<double>(aCounter)) * 0.045, 2.0 * PI));
+	float aSquashX = 1.0f + 0.025f * sin(aTime);
+	float aSquashY = 1.0f - 0.025f * sin(aTime);
+
+	if (mShootingCounter > 0)
+	{
+		const float aRecoil = sin(PI * std::clamp(35 - mShootingCounter, 0, 35) / 35.0f);
+		aSquashX *= 1.0f + 0.10f * aRecoil;
+		aSquashY *= 1.0f - 0.08f * aRecoil;
+	}
+
+	int aGlow = 0;
+	if (mHighlighted)
+		aGlow = 196;
+	else if (mEatenFlashCountdown > 0)
+		aGlow = std::clamp(mEatenFlashCountdown * 3, 0, 255);
+
+	CoopArt::DrawLuca(g, theOffsetX, theOffsetY, 1.0f, 1.0f, aSquashX, aSquashY, aGlow);
+}
+
 void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitaterType, DrawVariation theDrawVariation, float thePosX, float thePosY)
 {
 	Graphics aSeedG(*g);
@@ -4154,6 +4221,12 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
 			aSeedG.mScaleX *= 1.4f;
 			aSeedG.mScaleY *= 1.4f;
 			PvzpDrawImageScaledF(&aSeedG, IMAGE_REANIM_WALLNUT_BODY, thePosX - 53.0f, thePosY - 56.0f, aSeedG.mScaleX, aSeedG.mScaleY);
+		}
+		else if (aSeedType == SeedType::SEED_LUCA)
+		{
+			// Its reanimation is a Peashooter's, kept only for the aiming;
+			// what it looks like is its own art.
+			CoopArt::DrawLuca(&aSeedG, thePosX + aOffsetX, thePosY + aOffsetY, aSeedG.mScaleX, aSeedG.mScaleY);
 		}
 		else if (aPlantDef.mReanimationType != ReanimationType::REANIM_NONE)
 		{
@@ -4506,6 +4579,9 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 	case SeedType::SEED_SNOWPEA:
 		aProjectileType = ProjectileType::PROJECTILE_SNOWPEA;
 		break;
+	case SeedType::SEED_LUCA:
+		aProjectileType = ProjectileType::PROJECTILE_CHEESE;
+		break;
 	case SeedType::SEED_PUFFSHROOM:
 	case SeedType::SEED_SCAREDYSHROOM:
 	case SeedType::SEED_SEASHROOM:
@@ -4591,6 +4667,14 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 		GetPeaHeadOffset(aOffsetX, aOffsetY);
 		aOriginX = mX + aOffsetX + 24;
 		aOriginY = mY + aOffsetY - 33;
+	}
+	else if (mSeedType == SeedType::SEED_LUCA)
+	{
+		// From the face, at about eye level. Not lower: a projectile closer
+		// than 28 pixels above its shadow counts as hitting the ground
+		// (Projectile::CheckForHighGround), and would vanish at once.
+		aOriginX = mX + 38;
+		aOriginY = mY + 12;
 	}
 	else if (mSeedType == SeedType::SEED_LEFTPEATER)
 	{

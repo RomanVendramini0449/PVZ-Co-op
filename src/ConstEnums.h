@@ -107,6 +107,7 @@ enum AwardType : int32_t
 	AWARD_HELP_ZOMBIENOTE,
 	AWARD_ACHIEVEMENTONLY,
 	AWARD_PRECREDITS_ZOMBIENOTE,
+	AWARD_COOP_LUCA,  // PvZ Co-op: Luca, for beating Gargantuar Onslaught
 };
 enum BackgroundType : int32_t
 {
@@ -451,6 +452,9 @@ enum GameMode : int32_t
 	GAMEMODE_PUZZLE_I_ZOMBIE_ENDLESS,
 	GAMEMODE_UPSELL,
 	GAMEMODE_INTRO,
+	// PvZ Co-op bonus levels, reached from Level Select only.
+	GAMEMODE_COOP_ONSLAUGHT,  // Gargantuar Onslaught: unlocks Luca
+	GAMEMODE_COOP_SANDBOX,    // Dev Sandbox: every plant, endless sun
 	NUM_GAME_MODES
 };
 enum GameObjectType : int32_t
@@ -813,7 +817,8 @@ enum ProjectileType : int32_t
 	PROJECTILE_COBBIG = 11,
 	PROJECTILE_BUTTER = 12,
 	PROJECTILE_ZOMBIE_PEA = 13,
-	NUM_PROJECTILES = 14
+	PROJECTILE_CHEESE = 14,  // PvZ Co-op: Luca's
+	NUM_PROJECTILES = 15
 };
 enum ReanimationType : uint32_t {
 	REANIM_NONE = static_cast<uint32_t>(-1),
@@ -1083,6 +1088,10 @@ enum SeedType : int32_t
 	SEED_SPIKEROCK = 46,
 	SEED_COBCANNON = 47,
 	SEED_IMITATER = 48,
+	// PvZ Co-op: shoots cheese like a Peashooter and makes sun like a
+	// Sunflower. Unlocked by beating Gargantuar Onslaught. Placed here, inside
+	// the chooser's range, so every seed-chooser loop already covers it.
+	SEED_LUCA = 49,
 	SEED_EXPLODE_O_NUT,
 	SEED_GIANT_WALLNUT,
 	SEED_SPROUT,
@@ -1109,7 +1118,7 @@ enum SeedType : int32_t
 	SEED_ZOMBIE_DANCER,
 	SEED_ZOMBIE_GARGANTUAR,
 	SEED_ZOMBIE_IMP,
-	NUM_SEEDS_IN_CHOOSER = 49,
+	NUM_SEEDS_IN_CHOOSER = 50,
 	SEED_NONE = -1
 };
 enum ShieldType : int32_t
@@ -1152,6 +1161,10 @@ enum StoreItem : int32_t
 	STORE_ITEM_TREE_FOOD,
 	STORE_ITEM_FIRSTAID,
 	STORE_ITEM_PVZ,
+	// PvZ Co-op: not sold. Set when Gargantuar Onslaught is beaten; it lives
+	// in the purchases so it saves with the profile and reaches the other
+	// player along with the host's upgrades.
+	STORE_ITEM_UNLOCK_LUCA = 40,
 	STORE_ITEM_INVALID = -1
 };
 enum StorePages : int32_t

@@ -42,6 +42,10 @@ using namespace Sexy;
 constexpr const int MAX_GRID_SIZE_X = 9;
 constexpr const int MAX_GRID_SIZE_Y = 6;
 constexpr const int MAX_ZOMBIES_IN_WAVE = 50;
+// PvZ Co-op bonus levels (see GAMEMODE_COOP_ONSLAUGHT / _SANDBOX).
+constexpr const int ONSLAUGHT_WAVES = 20;  // a Gargantuar per lane each wave
+constexpr const int ONSLAUGHT_LANES = 5;
+constexpr const int UNLIMITED_SUN = 9990;  // the most the sun counter shows
 constexpr const int MAX_ZOMBIE_WAVES = 100;
 constexpr const int MAX_GRAVE_STONES = MAX_GRID_SIZE_X * MAX_GRID_SIZE_Y;
 constexpr const int MAX_POOL_GRID_SIZE = 10;
@@ -336,6 +340,8 @@ public:
 	bool					RowCanHaveZombies(int theRow);
 	void							ProcessDeleteQueue();
 	bool							ChooseSeedsOnCurrentLevel();
+	// The bonus levels: sun is topped back up every tick.
+	bool							HasUnlimitedSun();
 	int								GetNumSeedsInBank();
 	bool					StageIsNight();
 	bool					StageHasPool();

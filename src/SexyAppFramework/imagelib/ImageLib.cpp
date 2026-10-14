@@ -179,6 +179,92 @@ Image* GetPNGImage(const std::string& theFileName)
 	return anImage;
 }
 
+// The same decode as GetPNGImage, from a buffer instead of a file: for art
+// compiled into the executable (see CoopArt.h).
+namespace
+{
+	struct PNGMemoryReader
+	{
+		const unsigned char* mData;
+		size_t               mSize;
+		size_t               mPos;
+	};
+
+	void png_memory_read_data(png_structp png_ptr, png_bytep data, png_size_t length)
+	{
+		PNGMemoryReader* aReader = static_cast<PNGMemoryReader*>(png_get_io_ptr(png_ptr));
+		if (aReader->mPos + length > aReader->mSize)
+			png_error(png_ptr, "Read Error");
+		memcpy(data, aReader->mData + aReader->mPos, length);
+		aReader->mPos += length;
+	}
+}
+
+Image* ImageLib::GetPNGImageFromMemory(const unsigned char* theData, size_t theSize)
+{
+	if (theData == nullptr || theSize < 8 || png_sig_cmp(theData, 0, 8) != 0)
+		return nullptr;
+
+	png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+	if (png_ptr == nullptr)
+		return nullptr;
+
+	png_infop info_ptr = png_create_info_struct(png_ptr);
+	if (info_ptr == nullptr)
+	{
+		png_destroy_read_struct(&png_ptr, nullptr, nullptr);
+		return nullptr;
+	}
+
+	PNGMemoryReader aReader{ theData, theSize, 0 };
+	png_set_read_fn(png_ptr, &aReader, png_memory_read_data);
+
+	png_bytep* volatile row_pointers = nullptr;
+	uint32_t* volatile aBits = nullptr;
+
+	if (setjmp(png_jmpbuf(png_ptr)))
+	{
+		png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+		delete[] (png_bytep*)row_pointers;
+		delete[] (uint32_t*)aBits;
+		return nullptr;
+	}
+
+	png_uint_32 width, height;
+	png_read_info(png_ptr, info_ptr);
+	png_get_IHDR(png_ptr, info_ptr, &width, &height, nullptr, nullptr, nullptr, nullptr, nullptr);
+
+	png_set_expand(png_ptr);
+	if constexpr (std::endian::native == std::endian::big)
+	{
+		png_set_filler(png_ptr, 0xff, PNG_FILLER_BEFORE);
+	}
+	else
+	{
+		png_set_filler(png_ptr, 0xff, PNG_FILLER_AFTER);
+		png_set_bgr(png_ptr);
+	}
+	png_set_palette_to_rgb(png_ptr);
+	png_set_gray_to_rgb(png_ptr);
+
+	row_pointers = new png_bytep[height];
+	aBits = new uint32_t[width * height];
+	for (png_uint_32 i = 0; i < height; i++)
+	{
+		row_pointers[i] = (png_bytep)(aBits + i * width);
+	}
+	png_read_image(png_ptr, row_pointers);
+	png_read_end(png_ptr, info_ptr);
+	png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+	delete[] row_pointers;
+
+	Image* anImage = new Image();
+	anImage->mWidth = static_cast<int>(width);
+	anImage->mHeight = static_cast<int>(height);
+	anImage->mBits.reset(aBits);
+	return anImage;
+}
+
 Image* GetTGAImage(const std::string& theFileName)
 {
 	PFILE* aTGAFile = p_fopen(theFileName.c_str(), "rb");

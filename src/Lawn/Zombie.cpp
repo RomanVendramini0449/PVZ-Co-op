@@ -7251,6 +7251,15 @@ bool Zombie::TrySpawnLevelAward()
 			mBoard->AddCoin(aCenterX + i * 5, aCenterY, CoinType::COIN_SUN, CoinMotion::COIN_MOTION_COIN);
 		}
 	}
+	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
+	{
+		// What beating it wins: Luca's seed packet (Coin::GetFinalSeedPacketType).
+		aCoinType = CoinType::COIN_FINAL_SEED_PACKET;
+	}
+	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_SANDBOX)
+	{
+		aCoinType = CoinType::COIN_TROPHY;  // nothing to win; just a way out
+	}
 	else if (!mApp->IsAdventureMode())
 	{
 		if (mApp->HasBeatenChallenge(mApp->mGameMode))

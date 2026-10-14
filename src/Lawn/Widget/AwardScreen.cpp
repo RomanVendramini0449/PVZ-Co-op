@@ -272,9 +272,9 @@ void AwardScreen::DrawBottom(Graphics* g, std::string_view theTitle, std::string
 	PvzpDrawStringWrapped(g, theMessage, Rect(285, 360, 230, 90), Sexy::FONT_BRIANNETOD16, Color(40, 50, 90), DS_ALIGN_CENTER_VERTICAL_MIDDLE);
 }
 
-void AwardScreen::DrawAwardSeed(Graphics* g)
+void AwardScreen::DrawAwardSeed(Graphics* g, SeedType theSeedType)
 {
-	SeedType aSeedType = mApp->GetAwardSeedForLevel(mApp->mPlayerInfo->GetLevel() - 1);
+	SeedType aSeedType = theSeedType != SEED_NONE ? theSeedType : mApp->GetAwardSeedForLevel(mApp->mPlayerInfo->GetLevel() - 1);
 	std::string aAward = Plant::GetNameString(aSeedType, SEED_NONE);
 	std::string aMessage;
 	if (mApp->IsTrialStageLocked() && aSeedType >= SEED_SQUASH && aSeedType != SEED_TANGLEKELP)
@@ -311,6 +311,10 @@ void AwardScreen::Draw(Graphics* g)
 		g->DrawImage(Sexy::IMAGE_BACKGROUND1, -700, -300, 2800, 1200);
 		g->DrawImage(Sexy::IMAGE_ZOMBIE_NOTE, 80, 80);
 		g->DrawImage(Sexy::IMAGE_ZOMBIE_NOTE_HELP, 131, 132);
+	}
+	else if (mAwardType == AWARD_COOP_LUCA)
+	{
+		DrawAwardSeed(g, SEED_LUCA);
 	}
 	else if (mAwardType != AWARD_ACHIEVEMENTONLY)
 	{
@@ -506,7 +510,7 @@ void AwardScreen::StartButtonPressed()
 		mApp->KillAwardScreen();
 		mApp->ShowCreditScreen();
 	}
-	else if (mAwardType == AWARD_HELP_ZOMBIENOTE)
+	else if (mAwardType == AWARD_HELP_ZOMBIENOTE || mAwardType == AWARD_COOP_LUCA)
 	{
 		mApp->KillAwardScreen();
 		mApp->ShowGameSelector();

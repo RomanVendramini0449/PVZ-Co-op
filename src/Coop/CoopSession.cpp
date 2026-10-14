@@ -178,6 +178,7 @@ namespace
 		thePacker.U32(static_cast<uint32_t>(theSetup.mGameMode));
 		thePacker.U32(theSetup.mRngSeed);
 		thePacker.U8(static_cast<uint8_t>(theSetup.mDifficulty));
+		thePacker.U32(static_cast<uint32_t>(theSetup.mPrevBoardResult));
 		thePacker.U32(static_cast<uint32_t>(theSetup.mProfileLevel));
 		thePacker.U32(static_cast<uint32_t>(theSetup.mCoins));
 		thePacker.U32(theSetup.mFinishedAdventure);
@@ -192,6 +193,7 @@ namespace
 		theSetup.mGameMode = static_cast<int32_t>(theCursor.U32());
 		theSetup.mRngSeed = theCursor.U32();
 		theSetup.mDifficulty = static_cast<Difficulty>(theCursor.U8());
+		theSetup.mPrevBoardResult = static_cast<int32_t>(theCursor.U32());
 		theSetup.mProfileLevel = static_cast<int32_t>(theCursor.U32());
 		theSetup.mCoins = static_cast<int32_t>(theCursor.U32());
 		theSetup.mFinishedAdventure = theCursor.U32();

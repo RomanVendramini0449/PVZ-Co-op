@@ -788,6 +788,11 @@ Color Coin::GetColor()
 
 SeedType Coin::GetFinalSeedPacketType()
 {
+	if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
+	{
+		return SeedType::SEED_LUCA;
+	}
+
 	if (mApp->IsFirstTimeAdventureMode() && mBoard && mBoard->mLevel <= 50)
 	{
 		return mApp->GetAwardSeedForLevel(mBoard->mLevel);

@@ -56,6 +56,8 @@ extern bool gAutoLoadAlpha;
 extern bool gIgnoreJPEG2000Alpha;  // I've noticed alpha in jpeg2000's that shouldn't have alpha so this defaults to true
 
 Image* GetImage(const std::string& theFileName, bool lookForAlphaImage = true);
+// A PNG held in memory rather than in a file. nullptr if it does not decode.
+Image* GetPNGImageFromMemory(const unsigned char* theData, size_t theSize);
 
 }
 

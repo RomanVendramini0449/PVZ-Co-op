@@ -517,7 +517,7 @@ void GameOverDialog::ButtonDepress(int theId)
 		{
 			mApp->ShowChallengeScreen(ChallengePage::CHALLENGE_PAGE_PUZZLE);
 		}
-		else if (mApp->IsAdventureMode())
+		else if (mApp->IsAdventureMode() || mApp->IsCoopBonusLevel())
 		{
 			mApp->ShowGameSelector();
 		}

@@ -489,6 +489,8 @@ public:
 	int						GetCursor();
 	void					EnableCustomCursors(bool enabled);
 	virtual GLImage*		GetImage(const std::string& theFileName, bool commitBits = true);
+	// A PNG held in memory, e.g. art compiled into the executable. nullptr if it does not decode.
+	GLImage*				GetImageFromMemory(const unsigned char* theData, size_t theSize, const std::string& theName);
 	virtual SharedImageRef	SetSharedImage(const std::string& theFileName, const std::string& theVariant, GLImage* theImage, bool* isNew);
 	virtual SharedImageRef	GetSharedImage(const std::string& theFileName, const std::string& theVariant = "", bool* isNew = nullptr);
 

@@ -218,6 +218,29 @@ The handshake already carries `SessionParams::mStartLevel`, so the plumbing is
 there and this is a UI on top of it. Host-only, like every other
 outside-a-level decision (section 3), and locked once the level begins.
 
+Under the campaign grid sit two **bonus levels**, which are not part of the
+campaign and leave the saved progress alone:
+
+- **Gargantuar Onslaught** (`GAMEMODE_COOP_ONSLAUGHT`): a day lawn, sun held at
+  9990, 20 waves of one Gargantuar per lane -- 20 to a lane. Beating it the
+  first time awards **Luca** with the usual "you got a new plant" screen.
+- **Dev Sandbox** (`GAMEMODE_COOP_SANDBOX`): a pool lawn, every plant in the
+  chooser (upgrades and Luca included), sun held at 9990, no recharge, and a
+  long stream of mixed zombies to try things against.
+
+**Luca** is a Peashooter underneath -- its reanimation runs unseen, so it aims
+and fires exactly like one -- drawn with its own art (`assets/coop`, compiled
+into the executable). It fires cheese (30 damage to a pea's 20), makes sun on a
+Sunflower's clock with the Sunflower's glow, and costs 300. The unlock lives in
+`mPurchases[STORE_ITEM_UNLOCK_LUCA]`, so it saves with the profile and reaches
+the joining player along with the host's upgrades.
+
+### 10.3b Delete All Saves
+
+A button in the menu's top-right corner wipes every profile's progress, after a
+confirmation, and starts again as the same player. Settings are kept. The
+joining player does not get it: they are playing on the host's save.
+
 ### 10.4 Saving progress
 
 **Between levels (the important one).** Beating a level saves: which level is

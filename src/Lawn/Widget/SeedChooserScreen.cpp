@@ -295,12 +295,25 @@ bool SeedChooserScreen::Has7Rows()
 	return false;
 }
 
+// Luca has no place in the grid -- every row is spoken for -- so it gets an
+// add-on of its own beside the grid, like the Imitater's, sitting on top of
+// the Imitater's when both are owned.
+int SeedChooserScreen::LucaAddonY()
+{
+	return mApp->HasSeedType(SEED_IMITATER) ? 503 - 80 : 503;
+}
+
 void SeedChooserScreen::GetSeedPositionInChooser(int theIndex, int& x, int& y)
 {
 	if (theIndex == SEED_IMITATER)
 	{
 		x = mImitaterButton->mX;
 		y = mImitaterButton->mY;
+	}
+	else if (theIndex == SEED_LUCA)
+	{
+		x = 464;
+		y = LucaAddonY() + 12;
 	}
 	else
 	{
@@ -359,6 +372,16 @@ void SeedChooserScreen::Draw(Graphics* g)
 	if (mApp->HasSeedType(SEED_IMITATER))
 	{
 		g->DrawImage(Sexy::IMAGE_SEEDCHOOSER_IMITATERADDON, 459, 503);
+	}
+	if (mApp->HasSeedType(SEED_LUCA))
+	{
+		g->DrawImage(Sexy::IMAGE_SEEDCHOOSER_IMITATERADDON, 459, LucaAddonY());
+		if (mChosenSeeds[SEED_LUCA].mSeedState != SEED_IN_CHOOSER)
+		{
+			int x, y;
+			GetSeedPositionInChooser(SEED_LUCA, x, y);
+			DrawSeedPacket(g, x, y, SEED_LUCA, SEED_NONE, 0, 55, true, false);
+		}
 	}
 	// the localization key name is wrong
 	PvzpDrawString(g, "[CHOOSE_YOUR_PLANTS]", 229, 110, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);

@@ -24,6 +24,7 @@
 #include "Zombie.h"
 #include "Cutscene.h"
 #include "Projectile.h"
+#include "CoopArt.h"
 #include "../LawnApp.h"
 #include "../Resources.h"
 #include "../GameConstants.h"
@@ -48,7 +49,9 @@ constinit const ProjectileDefinition gProjectileDefinition[] = {
 	{ .mProjectileType = ProjectileType::PROJECTILE_KERNEL, .mImageRow = 0, .mDamage = 20 },
 	{ .mProjectileType = ProjectileType::PROJECTILE_COBBIG, .mImageRow = 0, .mDamage = 300 },
 	{ .mProjectileType = ProjectileType::PROJECTILE_BUTTER, .mImageRow = 0, .mDamage = 40 },
-	{ .mProjectileType = ProjectileType::PROJECTILE_ZOMBIE_PEA, .mImageRow = 0, .mDamage = 20 }
+	{ .mProjectileType = ProjectileType::PROJECTILE_ZOMBIE_PEA, .mImageRow = 0, .mDamage = 20 },
+	// PvZ Co-op: Luca's cheese hits half again as hard as a pea.
+	{ .mProjectileType = ProjectileType::PROJECTILE_CHEESE, .mImageRow = 0, .mDamage = 30 }
 };
 
 Projectile::Projectile()
@@ -121,6 +124,11 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 	}
 	case ProjectileType::PROJECTILE_FIREBALL:
 		PVZP_ASSERT(false);
+		break;
+	case ProjectileType::PROJECTILE_CHEESE:
+		// A steady tumble. Not drawn from the random generator: it is only a
+		// look, and the two co-op machines must draw the same numbers.
+		mRotationSpeed = 0.05f;
 		break;
 	case ProjectileType::PROJECTILE_COBBIG:
 		mWidth = IMAGE_REANIM_COBCANNON_COB->GetWidth();
@@ -296,7 +304,7 @@ void Projectile::CheckForCollision()
 		return;
 	}
 
-	if ((mProjectileType == ProjectileType::PROJECTILE_PEA || mProjectileType == ProjectileType::PROJECTILE_STAR) && mShadowY - mPosY > 90.0f)
+	if ((mProjectileType == ProjectileType::PROJECTILE_PEA || mProjectileType == ProjectileType::PROJECTILE_STAR || mProjectileType == ProjectileType::PROJECTILE_CHEESE) && mShadowY - mPosY > 90.0f)
 	{
 		return;
 	}
@@ -341,6 +349,7 @@ bool Projectile::CantHitHighGround()
 
 	return (
 		mProjectileType == ProjectileType::PROJECTILE_PEA ||
+		mProjectileType == ProjectileType::PROJECTILE_CHEESE ||
 		mProjectileType == ProjectileType::PROJECTILE_SNOWPEA ||
 		mProjectileType == ProjectileType::PROJECTILE_STAR ||
 		mProjectileType == ProjectileType::PROJECTILE_PUFF ||
@@ -353,6 +362,7 @@ void Projectile::CheckForHighGround()
 	float aShadowDelta = mShadowY - mPosY;
 
 	if (mProjectileType == ProjectileType::PROJECTILE_PEA ||
+		mProjectileType == ProjectileType::PROJECTILE_CHEESE ||
 		mProjectileType == ProjectileType::PROJECTILE_SNOWPEA ||
 		mProjectileType == ProjectileType::PROJECTILE_FIREBALL ||
 		mProjectileType == ProjectileType::PROJECTILE_SPIKE ||
@@ -869,6 +879,11 @@ void Projectile::DoImpact(Zombie* theZombie)
 		aSplatPosX -= 15.0f;
 		aEffect = ParticleEffect::PARTICLE_SNOWPEA_SPLAT;
 		break;
+	case ProjectileType::PROJECTILE_CHEESE:
+		// Butter's yellow splat, without the butter's stun.
+		aSplatPosX -= 15.0f;
+		aEffect = ParticleEffect::PARTICLE_BUTTER_SPLAT;
+		break;
 	case ProjectileType::PROJECTILE_FIREBALL:
 	{
 		if (IsSplashDamage(theZombie))
@@ -945,6 +960,7 @@ void Projectile::Update()
 
 	int aTime = 20;
 	if (mProjectileType == ProjectileType::PROJECTILE_PEA ||
+		mProjectileType == ProjectileType::PROJECTILE_CHEESE ||
 		mProjectileType == ProjectileType::PROJECTILE_SNOWPEA ||
 		mProjectileType == ProjectileType::PROJECTILE_CABBAGE ||
 		mProjectileType == ProjectileType::PROJECTILE_MELON ||
@@ -975,6 +991,13 @@ void Projectile::Update()
 void Projectile::Draw(Graphics* g)
 {
 	const ProjectileDefinition& aProjectileDef = GetProjectileDef();
+
+	if (mProjectileType == ProjectileType::PROJECTILE_CHEESE)
+	{
+		// Centred where a pea's centre would be, so it flies the same line.
+		CoopArt::DrawCheese(g, mPosX - mX + 16.0f, mPosY + mPosZ - mY + 14.0f, mRotation);
+		return;
+	}
 
 	Image* aImage = nullptr;
 	float aScale = 1.0f;
@@ -1105,6 +1128,11 @@ void Projectile::DrawShadow(Graphics* g)
 		aOffsetX += 3.0f;
 		break;
 
+	case ProjectileType::PROJECTILE_CHEESE:
+		aOffsetX += 5.0f;
+		aScale = 1.2f;
+		break;
+
 	case ProjectileType::PROJECTILE_SNOWPEA:
 		aOffsetX += -1.0f;
 		aScale = 1.3f;
@@ -1167,6 +1195,7 @@ void Projectile::Die()
 Rect Projectile::GetProjectileRect()
 {
 	if (mProjectileType == ProjectileType::PROJECTILE_PEA ||
+		mProjectileType == ProjectileType::PROJECTILE_CHEESE ||
 		mProjectileType == ProjectileType::PROJECTILE_SNOWPEA ||
 		mProjectileType == ProjectileType::PROJECTILE_ZOMBIE_PEA)
 	{

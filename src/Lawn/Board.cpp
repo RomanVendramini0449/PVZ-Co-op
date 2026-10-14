@@ -260,9 +260,11 @@ Board::Board(LawnApp* theApp)
 
 Board::~Board()
 {
-	// Leaving the level stops the lockstep; the connection itself stays up so
-	// the players can carry on to the next one.
-	Coop::Game::Get().EndLevel();
+	// The lockstep is NOT stopped here. A board is deleted a frame after it
+	// is killed (SafeDeleteWidget), and by then a retry has already built
+	// the next board and started its clock -- which this used to stop, so
+	// the retried level ran unsynchronised on both machines. LawnApp::
+	// KillBoard stops it, at the moment the board actually goes.
 }
 
 void BoardInitForPlayer()
@@ -630,6 +632,8 @@ void Board::PickZombieWaves()
 			mNumWaves = 0;
 		else if (aGameMode == GameMode::GAMEMODE_CHALLENGE_WHACK_A_ZOMBIE)
 			mNumWaves = 12;
+		else if (aGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
+			mNumWaves = ONSLAUGHT_WAVES;
 		else if (aGameMode == GameMode::GAMEMODE_CHALLENGE_WALLNUT_BOWLING || aGameMode == GameMode::GAMEMODE_CHALLENGE_AIR_RAID ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_GRAVE_DANGER || aGameMode == GameMode::GAMEMODE_CHALLENGE_HIGH_GRAVITY ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_PORTAL_COMBAT || aGameMode == GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS ||
@@ -655,6 +659,15 @@ void Board::PickZombieWaves()
 
 		bool aIsFlagWave = IsFlagWave(aWave);
 		bool aIsFinalWave = aWave == mNumWaves - 1;
+
+		// Gargantuar Onslaught: a Gargantuar for every lane, every wave --
+		// twenty to a lane over the level (see SpawnZombieWave).
+		if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
+		{
+			for (int aLane = 0; aLane < ONSLAUGHT_LANES; aLane++)
+				PutZombieInWave(ZombieType::ZOMBIE_GARGANTUAR, aWave, &aZombiePicker);
+			continue;
+		}
 
 		if (mApp->IsBungeeBlitzLevel() && aIsFlagWave)
 		{
@@ -930,6 +943,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_ICE:
 	case GameMode::GAMEMODE_CHALLENGE_SHOVEL:
 	case GameMode::GAMEMODE_CHALLENGE_SQUIRREL:
+	case GameMode::GAMEMODE_COOP_ONSLAUGHT:
 		mBackground = BackgroundType::BACKGROUND_1_DAY;
 		break;
 
@@ -974,6 +988,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS_2:
 	case GameMode::GAMEMODE_UPSELL:
 	case GameMode::GAMEMODE_INTRO:
+	case GameMode::GAMEMODE_COOP_SANDBOX:  // water, so every plant has somewhere to go
 		mBackground = BackgroundType::BACKGROUND_3_POOL;
 		break;
 
@@ -1380,6 +1395,10 @@ void Board::InitLevel()
 	{
 		mSunMoney = 5000;
 	}
+	else if (HasUnlimitedSun())
+	{
+		mSunMoney = UNLIMITED_SUN;
+	}
 	else if (mApp->IsIZombieLevel())
 	{
 		mSunMoney = 150;
@@ -1671,6 +1690,11 @@ void Board::InitLawnMowers()
 			aLawnMower->mVisible = false;
 		}
 	}
+}
+
+bool Board::HasUnlimitedSun()
+{
+	return mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT || mApp->mGameMode == GameMode::GAMEMODE_COOP_SANDBOX;
 }
 
 bool Board::ChooseSeedsOnCurrentLevel()
@@ -3128,6 +3152,19 @@ void Board::ApplyCoopCommand(const Coop::Command& theCommand)
 	if (aPlayer < 0 || aPlayer >= Coop::PLAYER_COUNT)
 		return;
 
+	// PVZ_COOP_TRACE: every input as it is applied, to line the two machines'
+	// logs up tick by tick when they part.
+	static const bool sTrace = getenv("PVZ_COOP_TRACE") != nullptr;
+	if (sTrace && theCommand.mType != Coop::CommandType::MouseMove)
+	{
+		printf("trace: epoch %u tick %u player %d cmd %d at %d,%d arg %d scene %d dave %d cursor %d\n",
+			Coop::Game::Get().GetLockstep().GetEpoch(), Coop::Game::Get().GetLockstep().GetCurrentTick(),
+			aPlayer, static_cast<int>(theCommand.mType), theCommand.mX, theCommand.mY, theCommand.mArg,
+			static_cast<int>(mApp->mGameScene), mApp->mCrazyDaveMessageIndex,
+			static_cast<int>(mCursorStorage[aPlayer] ? mCursorStorage[aPlayer]->mCursorType : -1));
+		fflush(stdout);
+	}
+
 	// Run this player's input against this player's cursor and seed bank.
 	const int aPreviousPlayer = mActivePlayer;
 	SetActivePlayer(aPlayer);
@@ -3171,6 +3208,11 @@ void Board::ApplyCoopCommand(const Coop::Command& theCommand)
 	case Coop::CommandType::DebugWin:
 		if (mApp->mGameScene == GameScenes::SCENE_PLAYING)
 			DebugWinLevel();
+		break;
+
+	case Coop::CommandType::DebugLose:
+		if (mApp->mGameScene == GameScenes::SCENE_PLAYING)
+			ZombiesWon(nullptr);
 		break;
 
 	case Coop::CommandType::ChooserPick:
@@ -3272,15 +3314,32 @@ void Board::DrawRemoteCursor(Graphics* g)
 	}
 
 	// Drawn with primitives rather than an image, so it needs no art asset
-	// and cannot go missing. A dark outline first, then the fill, keeps it
-	// readable over bright lawn and dark night levels alike.
-	g->SetColor(Color(0, 0, 0, 200));
-	for (int i = 0; i < 16; i++)
-		g->FillRect(aX - 1, aY - 1 + i, 3 + i / 2, 1);
+	// and cannot go missing. An arrow is not convex, so it is two convex
+	// pieces: the head and the tail. A dark outline first -- the same shape
+	// stamped around the pointer -- then the fill keeps it readable over
+	// bright lawn and dark night levels alike. Well over the size of a
+	// system pointer, so it is easy to find at a glance.
+	const Point aHead[3] = { Point(aX, aY), Point(aX, aY + 24), Point(aX + 17, aY + 17) };
+	const Point aTail[4] = { Point(aX + 5, aY + 16), Point(aX + 10, aY + 15), Point(aX + 14, aY + 25), Point(aX + 10, aY + 27) };
+	auto aStamp = [g](const Point* thePoints, int theCount, int theDX, int theDY)
+	{
+		Point aMoved[4];
+		for (int i = 0; i < theCount; i++)
+			aMoved[i] = Point(thePoints[i].mX + theDX, thePoints[i].mY + theDY);
+		g->PolyFill(aMoved, theCount, true);
+	};
+
+	g->SetColor(Color(0, 0, 0, 255));
+	static constexpr int OUTLINE[8][2] = { {-2, 0}, {2, 0}, {0, -2}, {0, 2}, {-2, -2}, {2, -2}, {-2, 2}, {2, 2} };
+	for (const auto& anOffset : OUTLINE)
+	{
+		aStamp(aHead, 3, anOffset[0], anOffset[1]);
+		aStamp(aTail, 4, anOffset[0], anOffset[1]);
+	}
 
 	g->SetColor(Color(80, 200, 255, 255));
-	for (int i = 0; i < 14; i++)
-		g->FillRect(aX, aY + i, 1 + i / 2, 1);
+	aStamp(aHead, 3, 0, 0);
+	aStamp(aTail, 4, 0, 0);
 }
 
 void Board::ApplyMouseMove(int x, int y)
@@ -5239,7 +5298,13 @@ void Board::SpawnZombieWave()
 			if (aZombieType == ZombieType::ZOMBIE_INVALID)
 				break;
 
-			if (aZombieType == ZombieType::ZOMBIE_BOBSLED && !CanAddBobSled())
+			if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
+			{
+				// One per lane, in lane order, rather than wherever the
+				// row picker would send them.
+				AddZombieInRow(aZombieType, i % ONSLAUGHT_LANES, mCurrentWave);
+			}
+			else if (aZombieType == ZombieType::ZOMBIE_BOBSLED && !CanAddBobSled())
 			{
 				for (int i = 0; i < MAX_ZOMBIE_FOLLOWERS; i++)
 				{
@@ -5623,6 +5688,7 @@ void Board::UpdateSunSpawning()
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN ||
 		mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND ||
+		HasUnlimitedSun() ||
 		mApp->IsIZombieLevel() ||
 		mApp->IsScaryPotterLevel() ||
 		mApp->IsSquirrelLevel() ||
@@ -6095,6 +6161,10 @@ void Board::UpdateGame()
 		return;
 
 	mMainCounter++;
+	// The bonus levels' "as much sun as you want": spent sun comes straight
+	// back. In the simulation, so both co-op machines agree on it.
+	if (HasUnlimitedSun())
+		mSunMoney = UNLIMITED_SUN;
 	UpdateSunSpawning();
 	UpdateZombieSpawning();
 	UpdateIce();
@@ -9169,6 +9239,10 @@ bool Board::HasConveyorBeltSeedBank()
 
 int Board::GetNumSeedsInBank()
 {
+	if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT || mApp->mGameMode == GameMode::GAMEMODE_COOP_SANDBOX)
+	{
+		return 10;
+	}
 	if (mApp->IsScaryPotterLevel())
 	{
 		return 1;

@@ -30,7 +30,7 @@ namespace Coop
 
 // Bumped on any wire-format change. Peers with different versions are rejected
 // at handshake rather than allowed to desync later.
-constexpr uint32_t PROTOCOL_VERSION = 6;
+constexpr uint32_t PROTOCOL_VERSION = 7;
 
 constexpr uint16_t DEFAULT_PORT = 1337;
 
@@ -136,6 +136,7 @@ enum class CommandType : uint8_t
 	Key = 8,          // a key that acts on the game: skip the intro, advance
 	                  // Crazy Dave, let go of what you hold. arg = KeyCode
 	DebugWin = 9,     // test script only: win the level, on both machines
+	DebugLose = 10,   // test script only: lose it -- "the zombies ate your brains"
 };
 
 struct Command
@@ -186,6 +187,11 @@ struct LevelSetup
 	// every level rather than only at handshake: the host can change it from
 	// the main menu between levels.
 	Difficulty mDifficulty = Difficulty::Normal;
+	// How the host's previous level ended (BoardResult). A level retried
+	// after a loss skips its intro -- Crazy Dave's talk included -- so both
+	// machines must know it was a retry, or one sits in the intro while the
+	// other plays.
+	int32_t  mPrevBoardResult = 0;
 
 	int32_t  mProfileLevel = 1;
 	int32_t  mCoins = 0;

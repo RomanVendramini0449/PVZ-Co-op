@@ -3580,6 +3580,20 @@ Sexy::GLImage* SexyAppBase::GetImage(const std::string& theFileName, bool commit
 	return anImage;
 }
 
+Sexy::GLImage* SexyAppBase::GetImageFromMemory(const unsigned char* theData, size_t theSize, const std::string& theName)
+{
+	std::unique_ptr<ImageLib::Image> aLoadedImage(ImageLib::GetPNGImageFromMemory(theData, theSize));
+
+	if (aLoadedImage == nullptr)
+		return nullptr;
+
+	GLImage* anImage = new GLImage(mGLInterface.get());
+	anImage->SetBits(aLoadedImage->GetBits(), aLoadedImage->GetWidth(), aLoadedImage->GetHeight(), true);
+	anImage->mFilePath = theName;
+
+	return anImage;
+}
+
 Sexy::GLImage* SexyAppBase::CreateCrossfadeImage(Sexy::Image* theImage1, const Rect& theRect1, Sexy::Image* theImage2, const Rect& theRect2, double theFadeFactor)
 {
 	MemoryImage* aMemoryImage1 = dynamic_cast<MemoryImage*>(theImage1);

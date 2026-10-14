@@ -225,6 +225,8 @@ public:
 	Zombie*                 FindTargetZombie(int theRow, PlantWeapon thePlantWeapon = PlantWeapon::WEAPON_PRIMARY);
 	void                    Die();
 	void                    UpdateProductionPlant();
+	void                    UpdateLucaSun();
+	void                    DrawLuca(Sexy::Graphics* g, float theOffsetX, float theOffsetY);
 	void                    UpdateShooter();
 	bool                    FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon = PlantWeapon::WEAPON_PRIMARY);
 	void                    LaunchThreepeater();

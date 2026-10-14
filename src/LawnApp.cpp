@@ -146,14 +146,7 @@ LawnApp::LawnApp()
 	mCommitDate = PVZP_COMMIT_DATE;
 	// The product name is the save and registry path, so it stays as it is --
 	// changing it would lose the player's existing profile.
-	std::string aTitleName = "PvZ Co-op";
-	if (Coop::Game::Get().IsConnected())
-	{
-		// Two windows side by side are otherwise indistinguishable, which
-		// matters a great deal when they behave differently on purpose.
-		aTitleName += Coop::Game::Get().IsHost() ? " - Host" : " - Joining";
-	}
-	mTitle = aTitleName;
+	mTitle = CoopWindowTitle();
 	mCustomCursorsEnabled = false;
 	mPlayerInfo = nullptr;
 	mLastLevelStats = std::make_unique<LevelStats>();
@@ -285,6 +278,12 @@ void LawnApp::KillBoard()
 			std::string aLegacyFileName = GetLegacySavedGameName(mGameMode, mPlayerInfo->mId);
 			EraseFile(aLegacyFileName);
 		}
+
+		// Leaving the level stops the lockstep; the connection itself stays
+		// up so the players can carry on to the next one. Now, while the board
+		// goes, not in its destructor: that runs a frame later, after a retry
+		// has started the next level's clock (see Board::~Board).
+		Coop::Game::Get().EndLevel();
 
 		mBoard->DisposeBoard();
 		mWidgetManager->RemoveWidget(mBoard);
@@ -529,6 +528,34 @@ void LawnApp::NewGame()
 static_assert(sizeof(PlayerInfo::mPurchases) / sizeof(uint32_t) == Coop::PURCHASE_COUNT,
 	"Coop::PURCHASE_COUNT must match PlayerInfo::mPurchases");
 
+// Two windows side by side are otherwise indistinguishable, which matters a
+// great deal when they behave differently on purpose. The title also says
+// whether the other player is actually there.
+std::string LawnApp::CoopWindowTitle() const
+{
+	const Coop::Session& aSession = Coop::Game::Get().GetSession();
+	if (!aSession.IsActive())
+		return "PvZ Co-op";
+
+	const bool aConnected = aSession.IsConnected();
+	if (aSession.IsHost())
+		return aConnected ? "PvZ Co-op - Host - 1 player connected" : "PvZ Co-op - Host - 0 players connected";
+	return aConnected ? "PvZ Co-op - Connected" : "PvZ Co-op - Not Connected";
+}
+
+void LawnApp::CoopRefreshWindowTitle()
+{
+	if (mWindow == nullptr)
+		return;
+
+	std::string aTitle = CoopWindowTitle();
+	if (aTitle == mTitle)
+		return;
+
+	mTitle = std::move(aTitle);
+	SDL_SetWindowTitle(static_cast<SDL_Window*>(mWindow), mTitle.c_str());
+}
+
 Coop::LevelSetup LawnApp::CoopMakeProfileSetup() const
 {
 	Coop::LevelSetup aSetup;
@@ -553,6 +580,8 @@ void LawnApp::CoopAnnounceLevel()
 	Coop::LevelSetup aSetup = CoopMakeProfileSetup();
 	aSetup.mLevel = static_cast<uint32_t>(mPlayerInfo->mLevel);
 	aSetup.mGameMode = static_cast<int32_t>(mGameMode);
+	// Not reset yet: InitLevel reads it as "how the last level went".
+	aSetup.mPrevBoardResult = static_cast<int32_t>(mBoardResult);
 
 	// Derived from the session seed and the level rather than drawn fresh, so
 	// a level replayed after a loss or a dropped connection comes back the
@@ -609,7 +638,10 @@ void LawnApp::CoopTearDownForFollow()
 	Coop::Game::Get().EndLevel();  // retire the previous level's clock
 	// Dialogs stay: settings or the almanac can sit over whatever comes next
 	// now that nothing pauses, and closing one from under its own nested
-	// loop risks a crash.
+	// loop risks a crash. Game Over is the exception: it belongs to the level
+	// being left, runs no loop of its own, and on this machine has no button
+	// to close it -- the host's Try Again or Main Menu is what closes it.
+	KillDialog(Dialogs::DIALOG_GAME_OVER);
 	KillStoreScreen();
 	KillCreditScreen();
 	KillAwardScreen();
@@ -633,7 +665,9 @@ void LawnApp::CoopFollowIntoLevel(const Coop::LevelSetup& theSetup)
 	CoopTearDownForFollow();
 
 	mGameMode = static_cast<GameMode>(theSetup.mGameMode);
-	mBoardResult = BoardResult::BOARDRESULT_NONE;
+	// The host's, not ours: a retry after a loss skips the intro on the host,
+	// and this machine must skip it too.
+	mBoardResult = static_cast<BoardResult>(theSetup.mPrevBoardResult);
 	NewGame();
 }
 
@@ -1034,19 +1068,21 @@ void LawnApp::EndLevel()
 	}
 
 	KillBoard();
+
+	// In co-op every retry goes through NewGame, whatever the mode: it is
+	// what announces the level, and a board built any other way is one the
+	// joining player is never told about -- they stay on Game Over while the
+	// host plays on alone.
+	if (aCoop.IsConnected())
+	{
+		NewGame();
+		mFirstTimeGameSelector = true;
+		return;
+	}
+
 	if (IsAdventureMode())
 	{
 		NewGame();
-
-		// Upstream then builds the level a second time, below, throwing the
-		// first one away. Harmless in single player; in co-op it would be a
-		// second level announcement, which the client would dutifully follow
-		// into a board the host has already discarded.
-		if (Coop::Game::Get().IsConnected())
-		{
-			mFirstTimeGameSelector = true;
-			return;
-		}
 	}
 
 	mFirstTimeGameSelector = true;
@@ -1423,6 +1459,34 @@ void LawnApp::FinishConfirmDeleteUserDialog(bool isYes)
 	{
 		mGameSelector->SyncProfile(true);
 	}
+}
+
+// Wipes every profile's progress -- the adventure, coins, upgrades,
+// trophies, the Zen Garden, Luca, any level saved part-way -- and starts again
+// as the same player, so the menu comes straight back instead of asking for a
+// name. Settings (volume, full screen) are not saves and are kept.
+void LawnApp::DeleteAllSaves()
+{
+	const std::string aName = mPlayerInfo ? mPlayerInfo->mName : std::string();
+	mPlayerInfo = nullptr;
+
+	std::vector<std::string> aNames;
+	for (const auto& anEntry : mProfileMgr->GetProfileMap())
+		aNames.push_back(anEntry.first);
+	for (const std::string& aProfileName : aNames)
+		mProfileMgr->DeleteProfile(aProfileName);  // its files go with it
+
+	if (!aName.empty())
+		mPlayerInfo = mProfileMgr->AddProfile(aName);
+	mProfileMgr->Save();
+	if (mPlayerInfo != nullptr)
+		WriteCurrentUserConfig();
+	else
+		DoCreateUserDialog();
+
+	mWidgetManager->MarkAllDirty();
+	if (mGameSelector != nullptr)
+		mGameSelector->SyncProfile(true);
 }
 
 void LawnApp::DoRenameUserDialog(const std::string& theName)
@@ -1859,6 +1923,17 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 			}
 		}
 	}
+	else if (mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
+	{
+		// What Gargantuar Onslaught is for. Kept in the purchases, so it saves
+		// with the profile and reaches the joining player with the rest.
+		aUnlockedNewChallenge = mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] == 0;
+		mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] = 1;
+	}
+	else if (mGameMode == GameMode::GAMEMODE_COOP_SANDBOX)
+	{
+		// Nothing to earn in the sandbox.
+	}
 	else
 	{
 		aUnlockedNewChallenge = !HasBeatenChallenge(mGameMode);
@@ -2007,6 +2082,30 @@ void LawnApp::CheckForGameEnd()
 			ShowChallengeScreen(ChallengePage::CHALLENGE_PAGE_PUZZLE);
 		}
 	}
+	else if (IsCoopBonusLevel())
+	{
+		// As for an adventure level: the client leaves with us, then follows
+		// us to the award or the menu.
+		Coop::Game& aCoop = Coop::Game::Get();
+		if (aCoop.IsConnected() && aCoop.IsHost())
+		{
+			aCoop.HostLeaveLevel();
+			aCoop.EndLevel();
+		}
+
+		KillBoard();
+
+		// Luca is awarded the first time Gargantuar Onslaught is beaten,
+		// the way a campaign level hands over its new plant.
+		if (mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT && aUnlockedNewChallenge)
+		{
+			ShowAwardScreen(AwardType::AWARD_COOP_LUCA, true);
+		}
+		else
+		{
+			ShowGameSelector();
+		}
+	}
 	else
 	{
 		KillBoard();
@@ -2095,6 +2194,9 @@ void LawnApp::UpdatePlayTimeStats()
 //     <seconds> snap <png path>   capture the next frame to that file
 //     <seconds> log <text>        a marker in stdout
 //     <seconds> win               win the current level (both machines)
+//     <seconds> lose              lose it: Game Over (both machines)
+//     <seconds> clickzombie       click the leftmost zombie on the lawn
+//     <seconds> tryagain          press Game Over's Try Again, if it is up
 //
 // Seconds count from when the game started.
 
@@ -2188,6 +2290,55 @@ void LawnApp::RunTestScript()
 			mWidgetManager->MouseDown(aStep.mX, aStep.mY, 1);
 			mWidgetManager->MouseUp(aStep.mX, aStep.mY, 1);
 		}
+		else if (aStep.mVerb == "clickzombie")
+		{
+			// Zombies turn up wherever the level's random draw puts them, so a
+			// fixed click position would mostly hit lawn.
+			Zombie* aTarget = nullptr;
+			if (mBoard)
+			{
+				for (Zombie* aZombie : mBoard->mZombies)
+				{
+					if (aZombie->mDead || aZombie->IsDeadOrDying() || aZombie->mPosX > 760.0f)
+						continue;
+					if (aTarget == nullptr || aZombie->mPosX < aTarget->mPosX)
+						aTarget = aZombie;
+				}
+			}
+			if (aTarget != nullptr)
+			{
+				const Rect aRect = aTarget->GetZombieRect();
+				const int aX = aRect.mX + aRect.mWidth / 2 + mBoard->mX;
+				const int aY = aRect.mY + aRect.mHeight / 2 + mBoard->mY;
+				printf("test script: clickzombie type %d at %d,%d health %d\n",
+					static_cast<int>(aTarget->mZombieType), aX, aY, aTarget->mBodyHealth);
+				fflush(stdout);
+				mWidgetManager->mMouseIn = true;
+				mWidgetManager->MouseMove(aX, aY);
+				mWidgetManager->MouseDown(aX, aY, 1);
+				mWidgetManager->MouseUp(aX, aY, 1);
+			}
+		}
+		else if (aStep.mVerb == "tryagain")
+		{
+			// Game Over's Try Again, as a click on it would press it.
+			if (Dialog* aGameOver = GetDialog(Dialogs::DIALOG_GAME_OVER))
+			{
+				printf("test script: tryagain at %u ms\n", SDL_GetTicks());
+				fflush(stdout);
+				aGameOver->ButtonDepress(Dialog::ID_FOOTER);
+			}
+		}
+		else if (aStep.mVerb == "gameovermenu")
+		{
+			// Game Over's Main Menu button (its id is 1).
+			if (Dialog* aGameOver = GetDialog(Dialogs::DIALOG_GAME_OVER))
+			{
+				printf("test script: gameovermenu at %u ms\n", SDL_GetTicks());
+				fflush(stdout);
+				aGameOver->ButtonDepress(1);
+			}
+		}
 		else if (aStep.mVerb == "move")
 		{
 			mWidgetManager->mMouseIn = true;
@@ -2213,6 +2364,14 @@ void LawnApp::RunTestScript()
 			else if (mBoard)
 				mBoard->DebugWinLevel();
 		}
+		else if (aStep.mVerb == "lose")
+		{
+			// Game Over on demand, through the lockstep like "win".
+			if (Coop::Game::Get().IsInGame())
+				Coop::Game::Get().GetLockstep().QueueLocalCommand(Coop::CommandType::DebugLose, 0, 0);
+			else if (mBoard && mGameScene == GameScenes::SCENE_PLAYING)
+				mBoard->ZombiesWon(nullptr);
+		}
 		else if (aStep.mVerb == "snap")
 		{
 			Sexy::RequestFrameDump(aStep.mText);
@@ -2233,6 +2392,7 @@ void LawnApp::UpdateFrames()
 	// and a disconnect is noticed promptly.
 	Coop::Game::Get().Update();
 	CoopUpdateFlow();
+	CoopRefreshWindowTitle();
 
 	if ((!mActive || mMinimized) && mBoard)
 	{
@@ -2290,7 +2450,7 @@ void LawnApp::UpdateFrames()
 		{
 			Coop::Game& aCoop = Coop::Game::Get();
 			if (aCoop.IsInGame() && aCoop.IsHost() && aCoop.GetLockstep().IsDesynced()
-				&& mBoard && IsAdventureMode() && !mCoopPendingEndLevel)
+				&& mBoard && (IsAdventureMode() || IsCoopBonusLevel()) && !mCoopPendingEndLevel)
 			{
 				printf("co-op: %s Restarting the level.\n", aCoop.GetLockstep().GetDesyncText().c_str());
 				fflush(stdout);
@@ -2373,6 +2533,15 @@ void LawnApp::LoadingThreadProc()
 	LoadProperties("properties/default.xml", false, false);
 	LoadProperties("properties/Layout.xml", false, false);
 	LoadProperties("properties/pvz-portable.xml", false, false);
+
+	// PvZ Co-op's own words. The game's strings come from the stock
+	// main.pak, which knows nothing of them.
+	mStringProperties.insert_or_assign("LUCA", "Luca");
+	mStringProperties.insert_or_assign("LUCA_TOOLTIP", "Shoots cheese and makes sun");
+	mStringProperties.insert_or_assign("LUCA_DESCRIPTION",
+		"Luca throws cheese at zombies and makes sun while he's at it.{SHORTLINE}"
+		"{KEYWORD}Damage:{STAT} heavy-ish{BR}{KEYWORD}Sun:{STAT} like a Sunflower{SHORTLINE}"
+		"Nobody is quite sure where the cheese comes from.");
 
 	if (mTitleScreen)
 	{
@@ -2727,6 +2896,11 @@ bool LawnApp::IsPuzzleMode()
 		(mGameMode >= GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_1 && mGameMode <= GameMode::GAMEMODE_PUZZLE_I_ZOMBIE_ENDLESS);
 }
 
+bool LawnApp::IsCoopBonusLevel()
+{
+	return mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT || mGameMode == GameMode::GAMEMODE_COOP_SANDBOX;
+}
+
 bool LawnApp::IsChallengeMode()
 {
 	return !IsAdventureMode() && !IsPuzzleMode() && !IsSurvivalMode();
@@ -3003,6 +3177,15 @@ int LawnApp::GetSeedsAvailable()
 
 bool LawnApp::HasSeedType(SeedType theSeedType)
 {
+	// The Dev Sandbox is for trying things out: every plant, upgrades and
+	// Luca included, whatever the profile has earned.
+	if (mBoard && mGameMode == GameMode::GAMEMODE_COOP_SANDBOX &&
+		theSeedType >= SeedType::SEED_PEASHOOTER && theSeedType < SeedType::NUM_SEEDS_IN_CHOOSER)
+		return true;
+
+	if (theSeedType == SeedType::SEED_LUCA)
+		return mPlayerInfo != nullptr && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] > 0;
+
 	if (IsTrialStageLocked() && theSeedType >= SeedType::SEED_JALAPENO)
 		return false;
 
@@ -3249,6 +3432,12 @@ void LawnApp::CrazyDaveLeave()
 
 void LawnApp::CrazyDaveTalkIndex(int theMessageIndex)
 {
+	static const bool sTrace = getenv("PVZ_COOP_TRACE") != nullptr;
+	if (sTrace)
+	{
+		printf("trace: dave line %d (tick %u)\n", theMessageIndex, Coop::Game::Get().GetLockstep().GetCurrentTick());
+		fflush(stdout);
+	}
 	mCrazyDaveMessageIndex = theMessageIndex;
 	std::string aMessageText = GetCrazyDaveText(theMessageIndex);
 	CrazyDaveTalkMessage(aMessageText);
