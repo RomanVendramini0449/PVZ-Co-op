@@ -95,8 +95,9 @@ per-player cooldowns and per-player conveyor belts at once (SPEC §5).
 - Split cursor / held-plant / shovel state per player.
 - Route `Board::MouseDown/MouseMove/MouseUp` through the command layer, tagged
   with player index.
-- Draw the remote cursor, including what it is holding, with the
-  show/hide rules from SPEC §7.
+- Draw the remote cursor, including what it is holding, with the show/hide
+  rules from SPEC §7, outside the sorted render list so it sits above all
+  game content and UI.
 
 **Done when:** both players plant on a shared lawn, from a shared sun pool, on
 independent cooldowns. *First genuinely playable co-op build.*

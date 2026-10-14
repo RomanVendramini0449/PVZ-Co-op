@@ -115,6 +115,36 @@ Visibility rules:
 The remote cursor also shows what the other player is currently holding (a seed
 packet, the shovel) so you can see what they are about to do.
 
+### Draw order: on top of everything
+
+The remote cursor is drawn **above all game content and all UI** -- never
+behind a plant, a zombie, the seed bank, the progress meter or a falling sun.
+It is the one thing on screen that must never be occluded, because its whole
+job is telling you where your friend is about to act.
+
+Mechanically this is already a solved problem in the engine. Board draws most
+things into a render list sorted by `MakeRenderOrder(layer, gridY, offset)`,
+but the **local** cursor is deliberately drawn afterwards, outside that sorted
+pass, near the end of `Board::Draw`. The remote cursor goes in the same place.
+It does not join the sorted list at all, so nothing can sort above it.
+
+If it ever does need a sort key instead, the layer enum runs up through
+`RENDER_LAYER_UI_TOP` (700000), `RENDER_LAYER_ABOVE_UI` (800000) and
+`RENDER_LAYER_SCREEN_FADE` (900000), so there is plenty of headroom.
+
+It tracks the other player's pointer continuously, not just on click, via the
+`MouseMove` command -- so you can watch them line a shot up, hesitate, and
+change their mind, not just see where they landed.
+
+> **One deliberate exception:** your *own* cursor draws above theirs. If the
+> two overlap, you should never lose track of your own.
+
+**Latency note, so it is not a surprise:** the remote cursor is as old as the
+input delay, around 30 ms on a LAN. It shows where they were a few ticks ago,
+not where they are this instant. Drawing it ahead of its commands would mean
+it could point somewhere their click never landed, which is worse than being
+slightly behind.
+
 ---
 
 ## 8. Difficulty
