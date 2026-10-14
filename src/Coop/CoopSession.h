@@ -136,7 +136,7 @@ public:
 	// discarded on the way -- they belong to a level both machines have left.
 	// Newer ones stay queued, because the peer can enter the next level a
 	// moment before we do and its first batches must survive until we arrive.
-	bool SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands, uint32_t theEpoch = 0);
+	bool SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands, uint32_t theEpoch = 0, uint8_t theSenderHeadroom = 0);
 	bool PopCommandBatch(CommandBatch& theBatchOut, uint32_t theEpoch = 0);
 
 	// Simulation checksums, compared to catch a desync early.

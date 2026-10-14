@@ -69,9 +69,19 @@ public:
 	// eagerly made the delay oscillate -- drop, stall, raise, drop -- which is
 	// a hitch every few seconds.
 	static constexpr uint32_t SMOOTH_TICKS_BEFORE_LOWER = 1000;
-	// ...and only if the peer's input has been arriving at least this many
+	// ...and only if OUR input has been reaching the peer at least this many
 	// ticks ahead of need the whole time, so there is slack to give back.
+	// That is the peer's measurement, not ours: our delay is what protects
+	// the peer, so only the peer can say whether it has more than it needs.
+	// (Judging by our own slack on THEIR input kept one machine stuck at a
+	// high delay for good after a single hiccup.)
 	static constexpr uint32_t HEADROOM_BEFORE_LOWER = 2;
+	// The most headroom worth measuring and reporting.
+	static constexpr uint32_t HEADROOM_REPORT_CAP = 8;
+	// Several short stalls close together mean the link is slower than the
+	// delay assumes, even though no single one lasted long.
+	static constexpr uint32_t FREQUENT_STALLS = 4;
+	static constexpr uint32_t FREQUENT_STALLS_WINDOW_MS = 2000;
 
 private:
 	Session*    mSession = nullptr;
@@ -110,7 +120,15 @@ private:
 	uint32_t    mStallEvents = 0;      // distinct times we had to wait
 	uint64_t    mTotalStallMs = 0;     // how long we waited in total
 	uint32_t    mSmoothTicks = 0;      // consecutive ticks with no waiting
-	uint32_t    mMinHeadroom = 0;      // least slack seen across those ticks
+	// One raise per stall, however long it lasts: a single long wait is the
+	// other machine loading something, not a slow link, and used to ratchet
+	// the delay up a step every 120 ms of it.
+	bool        mRaisedThisStall = false;
+	std::vector<std::chrono::steady_clock::time_point> mRecentStalls;
+	// Our slack on the peer's input, last measured: reported to the peer.
+	uint32_t    mOwnHeadroom = 0;
+	// The least slack the peer reported on OUR input across the smooth run.
+	uint32_t    mPeerMinHeadroom = UINT32_MAX;
 
 	uint32_t    CurrentStallMs() const;
 

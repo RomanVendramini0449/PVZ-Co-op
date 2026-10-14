@@ -161,6 +161,11 @@ struct CommandBatch
 	// be sent again.
 	uint32_t             mEpoch = 0;
 	uint32_t             mTick = 0;
+	// How many ticks ahead of need the sender already had the RECEIVER's
+	// input, when it sent this. The receiver's input delay is what buys that
+	// slack, so this is how the receiver knows whether it can give some
+	// back (see Lockstep::BeginTick).
+	uint8_t              mSenderHeadroom = 0;
 	std::vector<Command> mCommands;
 };
 

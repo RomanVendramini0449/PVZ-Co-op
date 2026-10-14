@@ -43,14 +43,19 @@ constexpr const int MAX_GRID_SIZE_X = 9;
 constexpr const int MAX_GRID_SIZE_Y = 6;
 constexpr const int MAX_ZOMBIES_IN_WAVE = 50;
 // PvZ Co-op bonus levels (see GAMEMODE_COOP_ONSLAUGHT / _SANDBOX).
-// Gargantuar Onslaught: time to set up, then two waves 30 seconds apart, each
-// three Gargantuars lined up in every lane -- 30 in all, and no more.
+// Gargantuar Onslaught: time to set up, then two waves -- two Gargantuars
+// lined up in every lane, then three -- 25 in all, and no more. The second
+// wave waits for the first to be finished, so it meets whatever the first
+// left standing (lawn mowers included) instead of being mown down with it.
 constexpr const int ONSLAUGHT_WAVES = 2;
 constexpr const int ONSLAUGHT_LANES = 5;
-constexpr const int ONSLAUGHT_PER_LANE = 3;
-constexpr const int ONSLAUGHT_LINE_SPACING = 75;   // pixels between the three in a lane
-constexpr const int ONSLAUGHT_SETUP_TICKS = 4500;  // 45 s before the first wave
-constexpr const int ONSLAUGHT_WAVE_TICKS = 3000;   // 30 s between waves
+constexpr const int ONSLAUGHT_FIRST_PER_LANE = 2;
+constexpr const int ONSLAUGHT_LAST_PER_LANE = 3;
+constexpr const int ONSLAUGHT_PRIZE_COINS = 1000;      // $10,000 (coins count in tens)
+constexpr const int ONSLAUGHT_LINE_SPACING = 75;       // pixels between a lane's Gargantuars
+constexpr const int ONSLAUGHT_SETUP_TICKS = 3000;      // 30 s before the first wave
+constexpr const int ONSLAUGHT_AFTER_WAVE_TICKS = 1000; // 10 s after a wave is gone
+constexpr const int ONSLAUGHT_WAVE_MAX_TICKS = 12000;  // or 2 min, whichever is first
 constexpr const int UNLIMITED_SUN = 9990;  // the most the sun counter shows
 constexpr const int MAX_ZOMBIE_WAVES = 100;
 constexpr const int MAX_GRAVE_STONES = MAX_GRID_SIZE_X * MAX_GRID_SIZE_Y;

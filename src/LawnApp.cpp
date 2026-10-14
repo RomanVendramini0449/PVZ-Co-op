@@ -1929,6 +1929,8 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		// with the profile and reaches the joining player with the rest.
 		aUnlockedNewChallenge = mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] == 0;
 		mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] = 1;
+		// And $10,000, every time.
+		mPlayerInfo->AddCoins(ONSLAUGHT_PRIZE_COINS);
 	}
 	else if (mGameMode == GameMode::GAMEMODE_COOP_SANDBOX)
 	{
@@ -2096,10 +2098,11 @@ void LawnApp::CheckForGameEnd()
 		KillBoard();
 
 		// Luca is awarded the first time Gargantuar Onslaught is beaten,
-		// the way a campaign level hands over its new plant.
-		if (mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT && aUnlockedNewChallenge)
+		// the way a campaign level hands over its new plant; the prize money
+		// comes with it, and on its own every time after.
+		if (mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
 		{
-			ShowAwardScreen(AwardType::AWARD_COOP_LUCA, true);
+			ShowAwardScreen(aUnlockedNewChallenge ? AwardType::AWARD_COOP_LUCA : AwardType::AWARD_COOP_ONSLAUGHT_PRIZE, true);
 		}
 		else
 		{

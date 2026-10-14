@@ -7253,8 +7253,9 @@ bool Zombie::TrySpawnLevelAward()
 	}
 	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
 	{
-		// What beating it wins: Luca's seed packet (Coin::GetFinalSeedPacketType).
-		aCoinType = CoinType::COIN_FINAL_SEED_PACKET;
+		// What beating it wins: Luca's seed packet (Coin::GetFinalSeedPacketType)
+		// the first time, the prize money every time after.
+		aCoinType = mApp->HasSeedType(SeedType::SEED_LUCA) ? CoinType::COIN_AWARD_MONEY_BAG : CoinType::COIN_FINAL_SEED_PACKET;
 	}
 	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_SANDBOX)
 	{

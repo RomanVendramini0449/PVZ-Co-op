@@ -1413,7 +1413,7 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 		g->SetFont(Sexy::FONT_BRIANNETOD12);
 		g->SetColor(Color(220, 210, 180));
 		const char* aNote = aOnslaught
-			? (aHasLuca ? "2 waves of Gargantuars, endless sun. Luca: unlocked" : "2 waves of Gargantuars, endless sun. Win: Luca")
+			? (aHasLuca ? "25 Gargantuars, 2 waves. Win: $10,000" : "25 Gargantuars, 2 waves. Win: Luca + $10,000")
 			: "Every plant, endless sun, no recharge";
 		g->DrawString(aNote, aButton.mX + 12, kBonusY + 34);
 	}

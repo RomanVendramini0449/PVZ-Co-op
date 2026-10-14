@@ -457,6 +457,7 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 		CommandBatch aBatch;
 		aBatch.mEpoch = aCursor.U32();
 		aBatch.mTick = aCursor.U32();
+		aBatch.mSenderHeadroom = aCursor.U8();
 		const uint32_t aCount = aCursor.U32();
 		if (!aCursor.mOk || aCount > 256)
 			return false;
@@ -588,7 +589,7 @@ bool Session::SendReady()
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 }
 
-bool Session::SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands, uint32_t theEpoch)
+bool Session::SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands, uint32_t theEpoch, uint8_t theSenderHeadroom)
 {
 	if (!IsConnected())
 		return false;
@@ -597,6 +598,7 @@ bool Session::SendCommandBatch(uint32_t theTick, const std::vector<Command>& the
 	aPacker.U8(static_cast<uint8_t>(MsgType::Commands));
 	aPacker.U32(theEpoch);
 	aPacker.U32(theTick);
+	aPacker.U8(theSenderHeadroom);
 	aPacker.U32(static_cast<uint32_t>(theCommands.size()));
 	for (const Command& aCommand : theCommands)
 	{

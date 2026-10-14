@@ -74,7 +74,10 @@ void Lockstep::Reset()
 	mStallEvents = 0;
 	mTotalStallMs = 0;
 	mSmoothTicks = 0;
-	mMinHeadroom = 0;
+	mRaisedThisStall = false;
+	mRecentStalls.clear();
+	mOwnHeadroom = 0;
+	mPeerMinHeadroom = UINT32_MAX;
 	mLocalChecksums.clear();
 	mDesynced = false;
 	mDesyncText.clear();
@@ -125,6 +128,7 @@ void Lockstep::DrainSession()
 		// header is what the sender committed to.
 		for (Command& aCommand : aBatch.mCommands)
 			aCommand.mTick = aBatch.mTick;
+		mPeerMinHeadroom = std::min<uint32_t>(mPeerMinHeadroom, aBatch.mSenderHeadroom);
 		mRemoteByTick[aBatch.mTick] = std::move(aBatch.mCommands);
 	}
 
@@ -198,7 +202,8 @@ bool Lockstep::BeginTick()
 			}
 
 			const std::vector<Command>& aPayload = aIsInputTick ? mPendingLocal : kEmpty;
-			aSendOk = mSession->SendCommandBatch(mNextSendTick, aPayload, mEpoch);
+			aSendOk = mSession->SendCommandBatch(mNextSendTick, aPayload, mEpoch,
+				static_cast<uint8_t>(std::min(mOwnHeadroom, HEADROOM_REPORT_CAP)));
 			if (!aSendOk)
 				break;
 
@@ -229,26 +234,43 @@ bool Lockstep::BeginTick()
 		{
 			mStalling = true;
 			mStallBegan = aNow;
-			mLastDelayRaise = aNow;
+			mRaisedThisStall = false;
 			++mStallEvents;
+
+			// Short stalls coming thick and fast: the link is slower than the
+			// delay assumes, though no single wait lasts long. One step, then
+			// count afresh.
+			mRecentStalls.push_back(aNow);
+			mRecentStalls.erase(std::remove_if(mRecentStalls.begin(), mRecentStalls.end(),
+				[aNow](const std::chrono::steady_clock::time_point& theWhen)
+				{
+					return std::chrono::duration_cast<std::chrono::milliseconds>(aNow - theWhen).count()
+						> static_cast<long long>(FREQUENT_STALLS_WINDOW_MS);
+				}), mRecentStalls.end());
+			if (mRecentStalls.size() >= FREQUENT_STALLS && mInputDelay < MAX_INPUT_DELAY)
+			{
+				++mInputDelay;
+				mLastDelayRaise = aNow;
+				mRecentStalls.clear();
+			}
 		}
 		mSmoothTicks = 0;
+		mPeerMinHeadroom = UINT32_MAX;
 
-		// A sustained stall means the link is slower than our delay assumes.
-		// Raising it costs a little input lag and buys back smoothness, and
-		// is safe to do unilaterally: every command carries the tick it runs
-		// on, so the peer applies it at the same tick regardless.
+		// A stall that goes on means the link is slower than our delay
+		// assumes. Raising it costs a little input lag and buys back
+		// smoothness, and is safe to do unilaterally: every command carries
+		// the tick it runs on, so the peer applies it at the same tick
+		// regardless.
 		//
-		// Paced by elapsed time, not by how often this function is called.
-		// The caller polls in a tight loop, so counting calls raised the
-		// delay dozens of steps during a single hiccup and pinned it at the
-		// ceiling for the rest of the session.
-		const auto aSinceRaise = std::chrono::duration_cast<std::chrono::milliseconds>(
-			aNow - mLastDelayRaise).count();
-		if (aSinceRaise >= static_cast<long long>(STALL_MS_BEFORE_RAISE)
-			&& mInputDelay < MAX_INPUT_DELAY)
+		// Once per stall, in real time. Counting polls raised it dozens of
+		// steps per hiccup; pacing it every 120 ms still turned one 1.5 s
+		// load on the other machine into a delay of 16 -- 160 ms of lag --
+		// that then never came back down.
+		if (!mRaisedThisStall && CurrentStallMs() >= STALL_MS_BEFORE_RAISE && mInputDelay < MAX_INPUT_DELAY)
 		{
 			++mInputDelay;
+			mRaisedThisStall = true;
 			mLastDelayRaise = aNow;
 		}
 		return false;
@@ -263,25 +285,25 @@ bool Lockstep::BeginTick()
 	}
 
 	// How far ahead of need the peer's input is arriving: the ticks after
-	// this one that are already here. That is the slack a lower delay would
-	// spend.
+	// this one that are already here. That is the slack the PEER's delay
+	// buys us, so it goes back to the peer with our next batch.
 	uint32_t aHeadroom = 0;
-	while (aHeadroom < HEADROOM_BEFORE_LOWER && mRemoteByTick.count(mCurrentTick + aHeadroom + 1) != 0)
+	while (aHeadroom < HEADROOM_REPORT_CAP && mRemoteByTick.count(mCurrentTick + aHeadroom + 1) != 0)
 		++aHeadroom;
-	if (mSmoothTicks == 0 || aHeadroom < mMinHeadroom)
-		mMinHeadroom = aHeadroom;
+	mOwnHeadroom = aHeadroom;
 
 	// Give the delay back once the link has behaved for a while, so one bad
 	// moment does not cost input lag for the rest of the session -- but only
-	// if there was slack the whole time. Lowering it is safe: mNextSendTick
-	// only ever advances, so we simply coast without sending until
-	// currentTick + delay catches up with it again.
+	// if the peer had slack on our input the whole time. Lowering it is safe:
+	// mNextSendTick only ever advances, so we simply coast without sending
+	// until currentTick + delay catches up with it again.
 	++mSmoothTicks;
 	if (mSmoothTicks >= SMOOTH_TICKS_BEFORE_LOWER)
 	{
-		if (mMinHeadroom >= HEADROOM_BEFORE_LOWER && mInputDelay > MIN_INPUT_DELAY)
+		if (mPeerMinHeadroom != UINT32_MAX && mPeerMinHeadroom >= HEADROOM_BEFORE_LOWER && mInputDelay > MIN_INPUT_DELAY)
 			--mInputDelay;
 		mSmoothTicks = 0;
+		mPeerMinHeadroom = UINT32_MAX;
 	}
 
 	// Both players' input for this tick: ours and theirs.

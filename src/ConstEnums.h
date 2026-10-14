@@ -108,6 +108,7 @@ enum AwardType : int32_t
 	AWARD_ACHIEVEMENTONLY,
 	AWARD_PRECREDITS_ZOMBIENOTE,
 	AWARD_COOP_LUCA,  // PvZ Co-op: Luca, for beating Gargantuar Onslaught
+	AWARD_COOP_ONSLAUGHT_PRIZE,  // PvZ Co-op: its prize money, every win after
 };
 enum BackgroundType : int32_t
 {

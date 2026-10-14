@@ -272,6 +272,12 @@ void AwardScreen::DrawBottom(Graphics* g, std::string_view theTitle, std::string
 	PvzpDrawStringWrapped(g, theMessage, Rect(285, 360, 230, 90), Sexy::FONT_BRIANNETOD16, Color(40, 50, 90), DS_ALIGN_CENTER_VERTICAL_MIDDLE);
 }
 
+// Gargantuar Onslaught pays $10,000 on top of whatever else it awards.
+void AwardScreen::DrawCoopPrizeLine(Graphics* g)
+{
+	PvzpDrawString(g, "+ $10,000 prize money!", BOARD_WIDTH / 2, 478, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);
+}
+
 void AwardScreen::DrawAwardSeed(Graphics* g, SeedType theSeedType)
 {
 	SeedType aSeedType = theSeedType != SEED_NONE ? theSeedType : mApp->GetAwardSeedForLevel(mApp->mPlayerInfo->GetLevel() - 1);
@@ -315,6 +321,12 @@ void AwardScreen::Draw(Graphics* g)
 	else if (mAwardType == AWARD_COOP_LUCA)
 	{
 		DrawAwardSeed(g, SEED_LUCA);
+		DrawCoopPrizeLine(g);
+	}
+	else if (mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE)
+	{
+		DrawBottom(g, "Challenge Complete!", "$10,000", "Prize money for beating Gargantuar Onslaught. Spend it at Crazy Dave's!");
+		g->DrawImage(Sexy::IMAGE_MONEYBAG_HI_RES, BOARD_WIDTH / 2 - Sexy::IMAGE_MONEYBAG_HI_RES->mWidth / 2, 150);
 	}
 	else if (mAwardType != AWARD_ACHIEVEMENTONLY)
 	{
@@ -510,7 +522,7 @@ void AwardScreen::StartButtonPressed()
 		mApp->KillAwardScreen();
 		mApp->ShowCreditScreen();
 	}
-	else if (mAwardType == AWARD_HELP_ZOMBIENOTE || mAwardType == AWARD_COOP_LUCA)
+	else if (mAwardType == AWARD_HELP_ZOMBIENOTE || mAwardType == AWARD_COOP_LUCA || mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE)
 	{
 		mApp->KillAwardScreen();
 		mApp->ShowGameSelector();

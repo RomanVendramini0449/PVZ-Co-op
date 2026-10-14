@@ -660,11 +660,12 @@ void Board::PickZombieWaves()
 		bool aIsFlagWave = IsFlagWave(aWave);
 		bool aIsFinalWave = aWave == mNumWaves - 1;
 
-		// Gargantuar Onslaught: three Gargantuars for every lane, every wave
-		// (SpawnZombieWave lines them up).
+		// Gargantuar Onslaught: two Gargantuars for every lane, then three
+		// in the last wave (SpawnZombieWave lines them up).
 		if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
 		{
-			for (int i = 0; i < ONSLAUGHT_LANES * ONSLAUGHT_PER_LANE; i++)
+			const int aPerLane = aIsFinalWave ? ONSLAUGHT_LAST_PER_LANE : ONSLAUGHT_FIRST_PER_LANE;
+			for (int i = 0; i < ONSLAUGHT_LANES * aPerLane; i++)
 				PutZombieInWave(ZombieType::ZOMBIE_GARGANTUAR, aWave, &aZombiePicker);
 			continue;
 		}
@@ -5846,7 +5847,9 @@ void Board::UpdateZombieSpawning()
 
 	if (mZombieCountDown > 200 && mZombieCountDownStart - mZombieCountDown > 400 && TotalZombiesHealthInWave(mCurrentWave - 1) <= mZombieHealthToNextWave)
 	{
-		mZombieCountDown = 200;
+		// Gargantuar Onslaught gives a moment to rebuild once a wave is gone.
+		const int aAfterWave = mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT ? ONSLAUGHT_AFTER_WAVE_TICKS : 200;
+		mZombieCountDown = std::min(mZombieCountDown, aAfterWave);
 	}
 	if (mZombieCountDown == 5)
 	{
@@ -5871,10 +5874,10 @@ void Board::UpdateZombieSpawning()
 		}
 		else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
 		{
-			// On a fixed beat: killing a wave quickly earns breathing room
-			// rather than the next wave sooner.
-			mZombieHealthToNextWave = -1;
-			mZombieCountDown = ONSLAUGHT_WAVE_TICKS;
+			// The next wave waits until this one is entirely gone -- see
+			// the check above -- with a long cap so it can never stall.
+			mZombieHealthToNextWave = 0;
+			mZombieCountDown = ONSLAUGHT_WAVE_MAX_TICKS;
 		}
 		else if (IsFlagWave(mCurrentWave) && !(mApp->IsWallnutBowlingLevel() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND))
 		{
