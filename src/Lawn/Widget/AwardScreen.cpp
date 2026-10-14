@@ -325,7 +325,7 @@ void AwardScreen::Draw(Graphics* g)
 	}
 	else if (mAwardType == AWARD_COOP_ROMAN_BEATEN)
 	{
-		DrawBottom(g, "Roman Defeated!", "Luca vs. Roman", "Luca and his cheese win the day. Roman will be back... probably.");
+		DrawBottom(g, "Roman Defeated!", "Luca vs. Roman", "Luca has kept Roman at bay... for now.");
 		g->DrawImage(Sexy::IMAGE_TROPHY_HI_RES, BOARD_WIDTH / 2 - Sexy::IMAGE_TROPHY_HI_RES->mWidth / 2, 137);
 	}
 	else if (mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE)
