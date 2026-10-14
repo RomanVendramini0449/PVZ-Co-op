@@ -366,12 +366,12 @@ int RunLockstepSelfTest()
 
 		if (!aHostQueued && aHostStep.GetCurrentTick() == HOST_INPUT_TICK)
 		{
-			aHostStep.QueueLocalCommand(CommandType::PlantAt, 3, 2, 1);
+			aHostStep.QueueLocalCommand(CommandType::MouseDown, 3, 2, 1);
 			aHostQueued = true;
 		}
 		if (!aClientQueued && aClientStep.GetCurrentTick() == CLIENT_INPUT_TICK)
 		{
-			aClientStep.QueueLocalCommand(CommandType::Shovel, 7, 4, 0);
+			aClientStep.QueueLocalCommand(CommandType::MouseUp, 7, 4, 0);
 			aClientQueued = true;
 		}
 
@@ -599,7 +599,7 @@ int RunNetTest()
 		}
 
 		if ((aStep.GetCurrentTick() % 50) == 0)
-			aStep.QueueLocalCommand(CommandType::PlantAt,
+			aStep.QueueLocalCommand(CommandType::MouseDown,
 				static_cast<int16_t>(aStep.GetCurrentTick() % 9),
 				static_cast<int16_t>(aStep.GetCurrentTick() % 5), 1);
 

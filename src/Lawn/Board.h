@@ -153,6 +153,10 @@ public:
 	// 1 in single player, 2 in co-op. Guards the per-player loops so a
 	// single-player game behaves exactly as it did before.
 	int									mCoopPlayerCount;
+	// Where each player's pointer is, for drawing the other one's cursor.
+	int									mCoopCursorX[Coop::PLAYER_COUNT];
+	int									mCoopCursorY[Coop::PLAYER_COUNT];
+	bool								mCoopCursorVisible[Coop::PLAYER_COUNT];
 	std::unique_ptr<MessageWidget>		mAdvice;
 	std::unique_ptr<GameButton>			mMenuButton;
 	std::unique_ptr<GameButton>			mStoreButton;
@@ -298,6 +302,17 @@ public:
 	void							MouseDrag(int x, int y) override;
 	void							MouseDown(int x, int y, int theClickCount) override;
 	void							MouseUp(int x, int y, int theClickCount) override;
+	// The real input logic. In single player the Mouse* handlers above call
+	// straight through; in co-op they queue a command instead and these run
+	// later, on the agreed tick, with the sending player active.
+	void							ApplyMouseMove(int x, int y);
+	void							ApplyMouseDown(int x, int y, int theClickCount);
+	void							ApplyMouseUp(int x, int y, int theClickCount);
+	void							ApplyCoopCommand(const Coop::Command& theCommand);
+	// Fingerprints gameplay state so the two machines can prove they agree.
+	// Gameplay only -- never particles or anything else merely drawn.
+	uint32_t						ComputeCoopChecksum();
+	void							DrawRemoteCursor(Graphics* g);
 	void							KeyChar(char theChar) override;
 	void							KeyUp(KeyCode) override {}
 	void							KeyDown(KeyCode theKey) override;

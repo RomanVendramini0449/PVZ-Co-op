@@ -30,7 +30,7 @@ namespace Coop
 
 // Bumped on any wire-format change. Peers with different versions are rejected
 // at handshake rather than allowed to desync later.
-constexpr uint32_t PROTOCOL_VERSION = 2;
+constexpr uint32_t PROTOCOL_VERSION = 3;
 
 constexpr uint16_t DEFAULT_PORT = 1337;
 
@@ -89,18 +89,28 @@ constexpr int PLAYER_COUNT = 2;
 // What one player did on one tick. Deliberately small and fixed-size: this is
 // the only gameplay data that crosses the wire, so the whole of co-op rides on
 // these being applied identically on both machines.
+//
+// These are raw pointer events rather than semantic actions ("plant a
+// peashooter at 3,4"), which is worth explaining because the semantic version
+// is the obvious design.
+//
+// Board already turns a click into the right action, and that logic reads the
+// active player's cursor and seed bank through Board::mCursorObject and
+// Board::mSeedBank. Since those are now per-player views that
+// SetActivePlayer() swings, replaying a raw click with the sender's player
+// active runs that same logic against the right player's state. So a single
+// code path covers planting, the shovel, collecting sun, Cob Cannon fire,
+// conveyor levels and everything else, with no duplicated hit-testing to keep
+// in sync with upstream -- and nothing to forget when a new interaction is
+// added.
 enum class CommandType : uint8_t
 {
-	None = 0,          // nothing happened this tick; still sent, to advance the peer
-	MouseMove = 1,     // cursor position, for drawing the remote player's cursor
-	SelectSeed = 2,    // pick up a seed packet (arg = packet index)
-	PlantAt = 3,       // place the held plant at (x, y)
-	Shovel = 4,        // dig up whatever is at (x, y)
-	CollectItem = 5,   // click a sun or coin (arg = item id)
-	CobCannonFire = 6, // aim a primed Cob Cannon at (x, y)
-	CancelHeld = 7,    // right-click / put the held plant back
-	EnterMenu = 8,     // left the board; hide this player's remote cursor
-	LeaveMenu = 9,     // back on the board; show it again
+	None = 0,       // nothing happened this tick; still sent, to advance the peer
+	MouseMove = 1,  // pointer moved: drives this player's cursor
+	MouseDown = 2,  // arg = click count (negative is a right click, as upstream)
+	MouseUp = 3,    // arg = click count
+	EnterMenu = 4,  // left the board; hide this player's cursor
+	LeaveMenu = 5,  // back on the board; show it again
 };
 
 struct Command

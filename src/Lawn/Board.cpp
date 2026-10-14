@@ -25,6 +25,7 @@
 #include <format>
 #include "ZenGarden.h"
 #include "BoardInclude.h"
+#include "../Coop/CoopGame.h"
 #include "LawnCommon.h"
 #include "System/Music.h"
 #include "System/SaveGame.h"
@@ -96,6 +97,12 @@ Board::Board(LawnApp* theApp)
 		mSeedBankStorage[aPlayer] = std::make_unique<SeedBank>();
 	}
 	mCoopPlayerCount = 1;
+	for (int aPlayer = 0; aPlayer < Coop::PLAYER_COUNT; aPlayer++)
+	{
+		mCoopCursorX[aPlayer] = 0;
+		mCoopCursorY[aPlayer] = 0;
+		mCoopCursorVisible[aPlayer] = false;
+	}
 	SetActivePlayer(0);
 	mCutScene = std::make_unique<CutScene>();
 	mSpecialGraveStoneX = -1;
@@ -3005,7 +3012,168 @@ void Board::UpdateCursor(const HitResult* theHitResult)
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Co-op input routing
+// ---------------------------------------------------------------------------
+//
+// In co-op nothing is applied the moment it is clicked. Input is stamped with
+// a tick a little way ahead, sent to the other machine, and applied by BOTH
+// machines on that same tick. That is what keeps the two games identical, and
+// it is why your own click takes effect a few ticks after you make it.
+
 void Board::MouseMove(int x, int y)
+{
+	if (Coop::Game::Get().IsInGame())
+	{
+		Coop::Game::Get().GetLockstep().QueueLocalCommand(
+			Coop::CommandType::MouseMove,
+			static_cast<int16_t>(x), static_cast<int16_t>(y));
+		return;
+	}
+	ApplyMouseMove(x, y);
+}
+
+void Board::MouseDown(int x, int y, int theClickCount)
+{
+	if (Coop::Game::Get().IsInGame())
+	{
+		Coop::Game::Get().GetLockstep().QueueLocalCommand(
+			Coop::CommandType::MouseDown,
+			static_cast<int16_t>(x), static_cast<int16_t>(y),
+			static_cast<int16_t>(theClickCount));
+		return;
+	}
+	ApplyMouseDown(x, y, theClickCount);
+}
+
+void Board::MouseUp(int x, int y, int theClickCount)
+{
+	if (Coop::Game::Get().IsInGame())
+	{
+		Coop::Game::Get().GetLockstep().QueueLocalCommand(
+			Coop::CommandType::MouseUp,
+			static_cast<int16_t>(x), static_cast<int16_t>(y),
+			static_cast<int16_t>(theClickCount));
+		return;
+	}
+	ApplyMouseUp(x, y, theClickCount);
+}
+
+void Board::ApplyCoopCommand(const Coop::Command& theCommand)
+{
+	const int aPlayer = static_cast<int>(theCommand.mPlayer);
+	if (aPlayer < 0 || aPlayer >= Coop::PLAYER_COUNT)
+		return;
+
+	// Run this player's input against this player's cursor and seed bank.
+	const int aPreviousPlayer = mActivePlayer;
+	SetActivePlayer(aPlayer);
+
+	switch (theCommand.mType)
+	{
+	case Coop::CommandType::MouseMove:
+		mCoopCursorX[aPlayer] = theCommand.mX;
+		mCoopCursorY[aPlayer] = theCommand.mY;
+		mCoopCursorVisible[aPlayer] = true;
+		ApplyMouseMove(theCommand.mX, theCommand.mY);
+		break;
+
+	case Coop::CommandType::MouseDown:
+		mCoopCursorX[aPlayer] = theCommand.mX;
+		mCoopCursorY[aPlayer] = theCommand.mY;
+		mCoopCursorVisible[aPlayer] = true;
+		ApplyMouseDown(theCommand.mX, theCommand.mY, theCommand.mArg);
+		break;
+
+	case Coop::CommandType::MouseUp:
+		ApplyMouseUp(theCommand.mX, theCommand.mY, theCommand.mArg);
+		break;
+
+	case Coop::CommandType::EnterMenu:
+		mCoopCursorVisible[aPlayer] = false;
+		break;
+
+	case Coop::CommandType::LeaveMenu:
+		mCoopCursorVisible[aPlayer] = true;
+		break;
+
+	case Coop::CommandType::None:
+	default:
+		break;
+	}
+
+	SetActivePlayer(aPreviousPlayer);
+}
+
+uint32_t Board::ComputeCoopChecksum()
+{
+	Coop::ChecksumBuilder aBuilder;
+
+	// Shared board state first: the things both players can see going wrong.
+	aBuilder.Add(mSunMoney);
+	aBuilder.Add(mMainCounter);
+
+	for (Zombie* aZombie : mZombies)
+	{
+		if (aZombie->mDead)
+			continue;
+		aBuilder.Add(static_cast<int32_t>(aZombie->mZombieType));
+		aBuilder.Add(aZombie->mBodyHealth);
+		// Quantised: a last-bit float difference cannot change play, and
+		// reporting it as a desync would cry wolf.
+		aBuilder.AddQuantised(aZombie->mPosX);
+		aBuilder.AddQuantised(aZombie->mPosY);
+	}
+
+	for (Plant* aPlant : mPlants)
+	{
+		if (aPlant->mDead)
+			continue;
+		aBuilder.Add(static_cast<int32_t>(aPlant->mSeedType));
+		aBuilder.Add(aPlant->mPlantHealth);
+		aBuilder.Add(aPlant->mX);
+		aBuilder.Add(aPlant->mY);
+	}
+
+	// Per-player state too: independent cooldowns are a thing that can drift
+	// apart on its own, so they are worth covering.
+	for (int aPlayer = 0; aPlayer < mCoopPlayerCount; aPlayer++)
+	{
+		SeedBank* aSeedBank = mSeedBankStorage[aPlayer].get();
+		if (aSeedBank == nullptr)
+			continue;
+		for (int i = 0; i < aSeedBank->mNumPackets; i++)
+			aBuilder.Add(aSeedBank->mSeedPackets[i].mRefreshCounter);
+	}
+
+	return aBuilder.Get();
+}
+
+void Board::DrawRemoteCursor(Graphics* g)
+{
+	if (!Coop::Game::Get().IsInGame())
+		return;
+
+	const int aPlayer = Coop::Game::Get().GetRemotePlayerIndex();
+	if (aPlayer < 0 || aPlayer >= Coop::PLAYER_COUNT || !mCoopCursorVisible[aPlayer])
+		return;
+
+	const int aX = mCoopCursorX[aPlayer];
+	const int aY = mCoopCursorY[aPlayer];
+
+	// Drawn with primitives rather than an image, so it needs no art asset
+	// and cannot go missing. A dark outline first, then the fill, keeps it
+	// readable over bright lawn and dark night levels alike.
+	g->SetColor(Color(0, 0, 0, 200));
+	for (int i = 0; i < 16; i++)
+		g->FillRect(aX - 1, aY - 1 + i, 3 + i / 2, 1);
+
+	g->SetColor(Color(80, 200, 255, 255));
+	for (int i = 0; i < 14; i++)
+		g->FillRect(aX, aY + i, 1 + i / 2, 1);
+}
+
+void Board::ApplyMouseMove(int x, int y)
 {
 	Widget::MouseMove(x, y);
 	mChallenge->MouseMove(x, y);
@@ -4365,7 +4533,7 @@ void Board::PickUpTool(GameObjectType theObjectType)
 	mCursorObject->mType = SeedType::SEED_NONE;
 }
 
-void Board::MouseDown(int x, int y, int theClickCount)
+void Board::ApplyMouseDown(int x, int y, int theClickCount)
 {
 	UpdateMousePosition();
 	Widget::MouseDown(x, y, theClickCount);
@@ -4583,7 +4751,7 @@ bool Board::CanInteractWithBoardButtons()
 	return mApp->mGameMode == GameMode::GAMEMODE_UPSELL || mApp->mCrazyDaveState == CrazyDaveState::CRAZY_DAVE_OFF;
 }
 
-void Board::MouseUp(int x, int y, int theClickCount)
+void Board::ApplyMouseUp(int x, int y, int theClickCount)
 {
 	Widget::MouseUp(x, y, theClickCount);
 	if (mIgnoreMouseUp)
@@ -5011,6 +5179,11 @@ void Board::UpdateGameObjects()
 		}
 	}
 	SetActivePlayer(aPreviousPlayer);
+
+	// Tick done. The checksum rides along every so often so a divergence
+	// is reported rather than silently compounding.
+	if (Coop::Game::Get().IsInGame())
+		Coop::Game::Get().GetLockstep().EndTick(ComputeCoopChecksum());
 }
 
 void Board::SetActivePlayer(int thePlayer)
@@ -5730,6 +5903,21 @@ void Board::UpdateGame()
 void Board::Update()
 {
 	PvzpHesitationBracket aHesitation("Board::Update");
+
+	// Board::Update IS the simulation tick, so this is where lockstep belongs.
+	// If the other machine's input for this tick has not arrived, we simply do
+	// not advance: drawing carries on, so the game stays responsive, but no
+	// game state moves. Advancing without their input is exactly how the two
+	// games would drift apart.
+	if (Coop::Game::Get().IsInGame())
+	{
+		Coop::Lockstep& aLockstep = Coop::Game::Get().GetLockstep();
+		if (!aLockstep.BeginTick())
+			return;
+
+		for (const Coop::Command& aCommand : aLockstep.GetTickCommands())
+			ApplyCoopCommand(aCommand);
+	}
 
 	Widget::Update();
 	MarkDirty();
@@ -7460,6 +7648,11 @@ void Board::DrawUITop(Graphics* g)
 	{
 		mAdvice->Draw(g);
 	}
+
+	// Above every game object and the board UI, but below your own cursor:
+	// if the two overlap you must never lose track of your own. Drawn here,
+	// outside the sorted render list, so nothing can sort on top of it.
+	DrawRemoteCursor(g);
 
 	if (mTimeStopCounter == 0 && mCursorObject->BeginDraw(g))
 	{

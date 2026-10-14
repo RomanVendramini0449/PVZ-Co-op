@@ -798,7 +798,7 @@ int RunSelfTest()
 	Command aPlant;
 	aPlant.mTick = 42;
 	aPlant.mPlayer = PlayerId::Client;
-	aPlant.mType = CommandType::PlantAt;
+	aPlant.mType = CommandType::MouseDown;
 	aPlant.mX = 5;
 	aPlant.mY = 3;
 	aPlant.mArg = 2;

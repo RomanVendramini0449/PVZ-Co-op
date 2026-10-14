@@ -9,6 +9,12 @@ name: Co-op build
 on:
   push:
     branches: [ "claude/fervent-bohr-3njwft", "main" ]
+    # Documentation-only pushes must not cancel a build someone is waiting
+    # on: concurrency below cancels in-progress runs, and a quick docs commit
+    # was enough to kill the artifact build it raced.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
   workflow_dispatch:
 
