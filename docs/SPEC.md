@@ -222,9 +222,9 @@ Under the campaign grid sit two **bonus levels**, which are not part of the
 campaign and leave the saved progress alone:
 
 - **Gargantuar Onslaught** (`GAMEMODE_COOP_ONSLAUGHT`): a day lawn, sun held at
-  9990, 45 seconds to set up, then 7 waves 30 seconds apart, each three
-  Gargantuars lined up in every lane -- 21 to a lane. Beating it the first
-  time awards **Luca** with the usual "you got a new plant" screen.
+  9990, 45 seconds to set up, then two waves 30 seconds apart, each three
+  Gargantuars lined up in every lane -- 30 in all. Beating it the first time
+  awards **Luca** with the usual "you got a new plant" screen.
 - **Dev Sandbox** (`GAMEMODE_COOP_SANDBOX`): a pool lawn, every plant in the
   chooser (upgrades and Luca included), sun held at 9990, no recharge, and a
   long stream of mixed zombies to try things against.

@@ -2319,6 +2319,26 @@ void LawnApp::RunTestScript()
 				mWidgetManager->MouseUp(aX, aY, 1);
 			}
 		}
+		else if (aStep.mVerb == "countzombies")
+		{
+			// How many zombies are alive, and how many are Gargantuars.
+			int aTotal = 0;
+			int aGargantuars = 0;
+			if (mBoard)
+			{
+				for (Zombie* aZombie : mBoard->mZombies)
+				{
+					if (aZombie->mDead || aZombie->IsDeadOrDying())
+						continue;
+					aTotal++;
+					if (aZombie->mZombieType == ZombieType::ZOMBIE_GARGANTUAR)
+						aGargantuars++;
+				}
+			}
+			printf("test script: zombies %d, gargantuars %d, wave %d of %d\n", aTotal, aGargantuars,
+				mBoard ? mBoard->mCurrentWave : -1, mBoard ? mBoard->mNumWaves : -1);
+			fflush(stdout);
+		}
 		else if (aStep.mVerb == "tryagain")
 		{
 			// Game Over's Try Again, as a click on it would press it.
