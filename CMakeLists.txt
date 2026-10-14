@@ -49,6 +49,7 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
 	src/Lawn/*.cpp
 	src/Lawn/Widget/*.cpp
 	src/Lawn/System/*.cpp
+	src/Coop/*.cpp
 )
 
 option(LOW_MEMORY "Enable low memory mode" OFF)

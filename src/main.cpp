@@ -22,7 +22,10 @@
 #include "LawnApp.h"
 #include "Resources.h"
 #include "PvzpLib/PvzpStringFile.h"
+#include "Coop/CoopSession.h"
+#include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <vector>
 using namespace Sexy;
 
@@ -91,6 +94,17 @@ int main(int argc, char** argv)
 #ifdef _WIN32
 	BuildUtf8ArgsFromWin32(argc, argv);
 #endif
+
+	// Co-op flags are consumed before the game starts so that --coop-selftest
+	// can run the transport check without loading any game assets.
+	std::string aCoopError;
+	if (!Coop::ParseLaunchOptions(argc, argv, aCoopError))
+	{
+		fprintf(stderr, "co-op: %s\n", aCoopError.c_str());
+		return 1;
+	}
+	if (Coop::GetLaunchOptions().mSelfTest)
+		return Coop::RunSelfTest();
 
 	PvzpStringListSetColors(gLawnStringFormats, gLawnStringFormatCount);
 	gExtractResourcesByName = Sexy::ExtractResourcesByName;
