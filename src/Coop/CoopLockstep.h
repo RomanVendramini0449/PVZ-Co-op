@@ -75,8 +75,10 @@ private:
 	// Both players' input for the tick currently being simulated.
 	std::vector<Command> mTickCommands;
 
-	// Highest tick we have already sent input for, so a delay change can never
-	// schedule into a tick the peer has already been told about.
+	// The next tick we owe the peer a batch for. The peer blocks until it has
+	// a batch for every tick in order, so this only ever advances by one and
+	// never skips: see the send loop in BeginTick().
+	uint32_t    mNextSendTick = 0;
 	uint32_t    mLastSentTick = 0;
 	bool        mHasSentAny = false;
 	// Exactly one batch goes out per simulated tick. Sending once per

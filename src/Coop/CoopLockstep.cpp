@@ -46,6 +46,10 @@ void Lockstep::Begin(Session* theSession, const SessionParams& theParams, Player
 	for (uint32_t aTick = 0; aTick < mInputDelay; ++aTick)
 		mRemoteByTick[aTick] = {};
 
+	// Matching the prefill: the first batch we owe the peer is for tick
+	// mInputDelay, since it already treats everything before that as settled.
+	mNextSendTick = mInputDelay;
+
 	mRunning = true;
 }
 
@@ -59,6 +63,7 @@ void Lockstep::Reset()
 	mRemoteByTick.clear();
 	mLocalByTick.clear();
 	mTickCommands.clear();
+	mNextSendTick = 0;
 	mLastSentTick = 0;
 	mHasSentAny = false;
 	mSentForCurrentTick = false;
@@ -141,26 +146,55 @@ bool Lockstep::BeginTick()
 	// for the peer to keep moving and eventually unblock it.
 	if (!mSentForCurrentTick)
 	{
-		uint32_t aTargetTick = mCurrentTick + mInputDelay;
-		if (mHasSentAny && aTargetTick <= mLastSentTick)
-			aTargetTick = mLastSentTick + 1;  // never re-send a tick already committed
+		// Send every tick up to currentTick + delay, in order, with no holes.
+		//
+		// The holes matter enormously. The peer cannot run tick N until it
+		// has our batch for N, so a single skipped tick blocks it forever.
+		// Raising the delay mid-stall used to do exactly that: the target
+		// jumped from lastSent+1 to currentTick+newDelay, skipping everything
+		// between. The peer then stalled on the first missing tick, raised
+		// *its* delay, skipped ticks of its own, and both sides deadlocked
+		// permanently. It never showed up over loopback, because without a
+		// stall the delay never rises.
+		//
+		// So catching up emits the intervening ticks as empty batches rather
+		// than jumping over them. Local input rides the last one, which is
+		// the tick the input delay actually refers to.
+		const uint32_t aDesiredTick = mCurrentTick + mInputDelay;
+		bool aSendOk = true;
 
-		for (Command& aCommand : mPendingLocal)
-			aCommand.mTick = aTargetTick;
-
-		if (mSession->SendCommandBatch(aTargetTick, mPendingLocal))
+		while (aSendOk && mNextSendTick <= aDesiredTick)
 		{
+			const bool aIsInputTick = (mNextSendTick == aDesiredTick);
+			static const std::vector<Command> kEmpty;
+
+			if (aIsInputTick)
+			{
+				for (Command& aCommand : mPendingLocal)
+					aCommand.mTick = mNextSendTick;
+			}
+
+			const std::vector<Command>& aPayload = aIsInputTick ? mPendingLocal : kEmpty;
+			aSendOk = mSession->SendCommandBatch(mNextSendTick, aPayload);
+			if (!aSendOk)
+				break;
+
 			// Schedule our own input for the same tick we just told the peer
 			// to run it on. Applying it locally any earlier would put this
-			// machine a few ticks ahead of the other and desync the game.
-			if (!mPendingLocal.empty())
-				mLocalByTick[aTargetTick] = mPendingLocal;
+			// machine ahead of the other and desync the game.
+			if (aIsInputTick && !mPendingLocal.empty())
+			{
+				mLocalByTick[mNextSendTick] = mPendingLocal;
+				mPendingLocal.clear();
+			}
 
-			mPendingLocal.clear();
-			mLastSentTick = aTargetTick;
+			mLastSentTick = mNextSendTick;
 			mHasSentAny = true;
-			mSentForCurrentTick = true;
+			++mNextSendTick;
 		}
+
+		if (aSendOk)
+			mSentForCurrentTick = true;
 	}
 
 	// We can only simulate a tick once the peer's input for it has landed.
@@ -419,6 +453,79 @@ int RunLockstepSelfTest()
 		aHostStep.GetTotalStallTicks(), aClientStep.GetTotalStallTicks(),
 		aHostStep.GetInputDelay(), aClientStep.GetInputDelay());
 
+	// Now the case that loopback never produces on its own: a real stall.
+	// Freezing one side forces the other to wait, raise its input delay, and
+	// then catch up. That path used to deadlock both machines permanently,
+	// and it only ever appeared over a link with real latency, so it is
+	// reproduced deliberately here.
+	{
+		constexpr uint32_t STALL_TARGET = TARGET_TICKS + 200;
+		const uint32_t aDelayBefore = aHostStep.GetInputDelay();
+
+		// Host keeps running while the client is frozen: no pumping, so its
+		// batches stop arriving and the host starts waiting.
+		for (int aIteration = 0; aIteration < 4000; ++aIteration)
+		{
+			aHostSession.Update();
+			if (aHostStep.BeginTick())
+			{
+				aHostSim.ApplyTick(aHostStep.GetCurrentTick(), aHostStep.GetTickCommands());
+				aHostStep.EndTick(aHostSim.Checksum());
+			}
+			if (aHostStep.GetInputDelay() > aDelayBefore && aHostStep.GetStallTicks() > 100)
+				break;
+		}
+
+		if (aHostStep.GetTotalStallTicks() == 0)
+		{
+			printf("lockstep selftest: FAIL expected the host to stall while the client was frozen\n");
+			return 1;
+		}
+		printf("lockstep selftest: host stalled %u ticks, delay %u -> %u\n",
+			aHostStep.GetTotalStallTicks(), aDelayBefore, aHostStep.GetInputDelay());
+
+		// Unfreeze. Both must now catch up and finish in step. Before the fix
+		// this hung forever: the raised delay had skipped tick numbers, and
+		// the peer blocks on the first batch it never receives.
+		for (int aIteration = 0; aIteration < 400000; ++aIteration)
+		{
+			if (aHostStep.GetCurrentTick() >= STALL_TARGET
+				&& aClientStep.GetCurrentTick() >= STALL_TARGET)
+				break;
+
+			aHostSession.Update();
+			aClientSession.Update();
+
+			if (aHostStep.GetCurrentTick() < STALL_TARGET && aHostStep.BeginTick())
+			{
+				aHostSim.ApplyTick(aHostStep.GetCurrentTick(), aHostStep.GetTickCommands());
+				aHostStep.EndTick(aHostSim.Checksum());
+			}
+			if (aClientStep.GetCurrentTick() < STALL_TARGET && aClientStep.BeginTick())
+			{
+				aClientSim.ApplyTick(aClientStep.GetCurrentTick(), aClientStep.GetTickCommands());
+				aClientStep.EndTick(aClientSim.Checksum());
+			}
+			if (aHostStep.IsDesynced() || aClientStep.IsDesynced())
+				break;
+		}
+
+		if (aHostStep.GetCurrentTick() < STALL_TARGET || aClientStep.GetCurrentTick() < STALL_TARGET)
+		{
+			printf("lockstep selftest: FAIL deadlocked after a stall (host %u, client %u of %u)\n",
+				aHostStep.GetCurrentTick(), aClientStep.GetCurrentTick(), STALL_TARGET);
+			return 1;
+		}
+		if (aHostSim.mState != aClientSim.mState)
+		{
+			printf("lockstep selftest: FAIL diverged across a stall (%u vs %u)\n",
+				aHostSim.mState, aClientSim.mState);
+			return 1;
+		}
+		printf("lockstep selftest: recovered from the stall, states still agree (0x%08X)\n",
+			aHostSim.mState);
+	}
+
 	// Now prove the detector actually fires: corrupt one side's state and keep
 	// running. A desync detector that never reports is worse than none.
 	aClientSim.mState ^= 0x5A5A5A5Au;
@@ -629,9 +736,14 @@ int RunNetTest()
 		}
 		else if (aStep.ShouldShowWaiting())
 		{
-			LogPrintf("coop nettest: waiting for the other player (%u ticks)...\n",
-				aStep.GetStallTicks());
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			// Throttled: this is called every spin of a stall, and one line
+			// each buried the useful output under hundreds of near-identical
+			// ones. Console writes are slow enough on Windows to make the
+			// stall worse, too.
+			if ((aStep.GetStallTicks() % 100) == 0)
+				LogPrintf("coop nettest: waiting for the other player (%u ticks, delay %u)...\n",
+					aStep.GetStallTicks(), aStep.GetInputDelay());
+			std::this_thread::sleep_for(std::chrono::milliseconds(5));
 		}
 
 		if (std::chrono::steady_clock::now() > aStart + std::chrono::seconds(90))
