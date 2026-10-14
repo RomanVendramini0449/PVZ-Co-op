@@ -262,6 +262,28 @@ your game is untouched.
 
 ## 5. Play together
 
+### The easy way: the launcher
+
+Double-click **`PVZ-Coop-Launcher.bat`**. A small window opens:
+
+- It finds your Plants vs. Zombies folder by itself; `Browse` if it guesses
+  wrong. It tells you whether it can see `main.pak`.
+- Pick **Host a game** or **Join a game**.
+- Hosting shows **your own address**, so you can read it straight out to the
+  other player, and lets you pick the difficulty.
+- Joining just needs their address typed in. The port is filled in for you.
+- Press **Start**. The game launches with the right settings.
+
+Your choices are remembered for next time, in `coop-launcher-settings.txt`
+next to the launcher.
+
+The launcher is a plain text script you can open and read. The `.bat` runs it
+with `-ExecutionPolicy Bypass`, which applies to that single run and changes
+no Windows setting; it is needed only because PowerShell refuses to run script
+files by default.
+
+### The manual way: command line
+
 **Host:**
 
 ```sh

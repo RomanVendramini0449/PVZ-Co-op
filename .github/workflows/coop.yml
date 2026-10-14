@@ -99,9 +99,10 @@ jobs:
           mkdir -p dist
           cp build/pvz-portable.exe dist/
           strip dist/pvz-portable.exe
-          # Double-clickable launchers, so running the tests needs no
-          # command line at all.
+          # Double-clickable launchers, so neither playing nor running the
+          # tests needs a command line at all.
           cp tools/windows/*.bat dist/
+          cp tools/windows/*.ps1 dist/
 
       - name: Verify the netcode in the Windows build
         shell: msys2 {0}
