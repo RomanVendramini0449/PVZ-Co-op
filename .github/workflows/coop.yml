@@ -1,0 +1,104 @@
+# Builds and tests the co-op mod on every push to the development branch.
+#
+# The Windows job exists so nobody has to install a toolchain to play: it
+# produces a single static .exe, downloadable from the run's Artifacts
+# section. It also means both players can use the identical binary, which
+# the co-op handshake requires.
+name: Co-op build
+
+on:
+  push:
+    branches: [ "claude/fervent-bohr-3njwft", "main" ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-linux:
+    name: Test netcode (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build libjpeg-dev libopenmpt-dev \
+            libpng-dev libsdl2-dev
+
+      - name: Build
+        run: |
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      # Needs no game assets, so the netcode is verified on every push.
+      - name: Run co-op self-tests
+        run: ./build/pvz-portable --coop-selftest
+
+      # Two real processes over a real socket, which is what the players do.
+      # Both must finish on the same simulation state.
+      - name: Two-process lockstep test
+        run: |
+          ./build/pvz-portable --coop-nettest --host --port 35200 > host.log 2>&1 &
+          sleep 2
+          ./build/pvz-portable --coop-nettest --join 127.0.0.1:35200 > client.log 2>&1
+          sleep 3
+          echo "----- host -----";   cat host.log
+          echo "----- client -----"; cat client.log
+
+          grep -q "coop nettest: PASS" host.log   || { echo "host did not pass";   exit 1; }
+          grep -q "coop nettest: PASS" client.log || { echo "client did not pass"; exit 1; }
+
+          HOST_STATE=$(grep -o 'final state 0x[0-9A-F]*' host.log)
+          CLIENT_STATE=$(grep -o 'final state 0x[0-9A-F]*' client.log)
+          echo "host:   $HOST_STATE"
+          echo "client: $CLIENT_STATE"
+          if [ "$HOST_STATE" != "$CLIENT_STATE" ]; then
+            echo "DESYNC: the two processes ended on different states"
+            exit 1
+          fi
+          echo "Both processes agree on the final simulation state."
+
+  build-windows:
+    name: Build Windows .exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-libjpeg-turbo
+            mingw-w64-ucrt-x86_64-libopenmpt
+            mingw-w64-ucrt-x86_64-libpng
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-SDL2
+
+      # BUILD_STATIC so the result is one self-contained .exe with no DLLs
+      # to copy around. CONSOLE=ON keeps a console window, which is how the
+      # --coop-selftest and --coop-nettest output gets read.
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DCONSOLE=ON -DBUILD_STATIC=ON
+          cmake --build build
+          mkdir -p dist
+          cp build/pvz-portable.exe dist/
+          strip dist/pvz-portable.exe
+
+      - name: Verify the netcode in the Windows build
+        shell: msys2 {0}
+        run: ./dist/pvz-portable.exe --coop-selftest
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pvz-coop-windows
+          path: dist/

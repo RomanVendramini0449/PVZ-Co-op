@@ -29,8 +29,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
-typedef int socklen_t;
-#define COOP_INVALID_SOCKET  INVALID_SOCKET
+#define COOP_INVALID_SOCKET  static_cast<intptr_t>(INVALID_SOCKET)
 #define COOP_LAST_ERROR      WSAGetLastError()
 #define COOP_WOULD_BLOCK     WSAEWOULDBLOCK
 #define COOP_IN_PROGRESS     WSAEWOULDBLOCK
@@ -59,6 +58,20 @@ namespace Coop
 
 namespace
 {
+	// A SOCKET on 64-bit Windows is a 64-bit UINT_PTR; casting it to int
+	// would silently corrupt the handle. POSIX file descriptors really are
+	// int. This keeps every call site at the platform's own width.
+#ifdef _WIN32
+	using NativeSocket = SOCKET;
+#else
+	using NativeSocket = int;
+#endif
+
+	inline NativeSocket Native(intptr_t theHandle)
+	{
+		return static_cast<NativeSocket>(theHandle);
+	}
+
 	int gStartupCount = 0;
 
 	bool IsWouldBlock(int theError)
@@ -76,12 +89,12 @@ namespace
 	{
 #ifdef _WIN32
 		u_long aMode = 1;
-		return ioctlsocket(static_cast<SOCKET>(theHandle), FIONBIO, &aMode) == 0;
+		return ioctlsocket(Native(theHandle), FIONBIO, &aMode) == 0;
 #else
-		int aFlags = fcntl(static_cast<int>(theHandle), F_GETFL, 0);
+		int aFlags = fcntl(Native(theHandle), F_GETFL, 0);
 		if (aFlags < 0)
 			return false;
-		return fcntl(static_cast<int>(theHandle), F_SETFL, aFlags | O_NONBLOCK) == 0;
+		return fcntl(Native(theHandle), F_SETFL, aFlags | O_NONBLOCK) == 0;
 #endif
 	}
 }
@@ -120,7 +133,7 @@ void Socket::SetError(const std::string& theWhat)
 bool Socket::ApplyCommonOptions()
 {
 	int aFlag = 1;
-	setsockopt(static_cast<int>(mHandle), IPPROTO_TCP, TCP_NODELAY,
+	setsockopt(Native(mHandle), IPPROTO_TCP, TCP_NODELAY,
 		reinterpret_cast<const char*>(&aFlag), sizeof(aFlag));
 	return SetNonBlocking(mHandle);
 }
@@ -138,7 +151,7 @@ bool Socket::Listen(uint16_t thePort)
 	// Without SO_REUSEADDR, re-hosting within TIME_WAIT fails with "address
 	// already in use" for a minute or two, which looks like a broken game.
 	int aReuse = 1;
-	setsockopt(static_cast<int>(mHandle), SOL_SOCKET, SO_REUSEADDR,
+	setsockopt(Native(mHandle), SOL_SOCKET, SO_REUSEADDR,
 		reinterpret_cast<const char*>(&aReuse), sizeof(aReuse));
 
 	sockaddr_in aAddr{};
@@ -146,12 +159,12 @@ bool Socket::Listen(uint16_t thePort)
 	aAddr.sin_addr.s_addr = INADDR_ANY;
 	aAddr.sin_port = htons(thePort);
 
-	if (bind(static_cast<int>(mHandle), reinterpret_cast<sockaddr*>(&aAddr), sizeof(aAddr)) != 0)
+	if (bind(Native(mHandle), reinterpret_cast<sockaddr*>(&aAddr), sizeof(aAddr)) != 0)
 	{
 		SetError("could not bind port " + std::to_string(thePort));
 		return false;
 	}
-	if (::listen(static_cast<int>(mHandle), 1) != 0)
+	if (::listen(Native(mHandle), 1) != 0)
 	{
 		SetError("could not listen on port " + std::to_string(thePort));
 		return false;
@@ -174,7 +187,7 @@ bool Socket::Accept(Socket& theClient)
 	sockaddr_in aAddr{};
 	socklen_t aLen = sizeof(aAddr);
 	intptr_t aAccepted = static_cast<intptr_t>(
-		accept(static_cast<int>(mHandle), reinterpret_cast<sockaddr*>(&aAddr), &aLen));
+		accept(Native(mHandle), reinterpret_cast<sockaddr*>(&aAddr), &aLen));
 
 	if (aAccepted == COOP_INVALID_SOCKET)
 		return false;  // nobody waiting; not an error
@@ -218,7 +231,7 @@ bool Socket::Connect(const std::string& theHost, uint16_t thePort)
 		return false;
 	}
 
-	const int aRet = ::connect(static_cast<int>(mHandle), aResult->ai_addr,
+	const int aRet = ::connect(Native(mHandle), aResult->ai_addr,
 		static_cast<socklen_t>(aResult->ai_addrlen));
 	freeaddrinfo(aResult);
 
@@ -244,18 +257,23 @@ void Socket::PollConnect()
 
 	fd_set aWriteSet;
 	FD_ZERO(&aWriteSet);
-	FD_SET(static_cast<int>(mHandle), &aWriteSet);
+	FD_SET(Native(mHandle), &aWriteSet);
 
 	// Zero timeout: this is called from the game loop and must not block.
 	timeval aTimeout{};
-	const int aReady = select(static_cast<int>(mHandle) + 1, nullptr, &aWriteSet, nullptr, &aTimeout);
+#ifdef _WIN32
+	const int aNfds = 0;  // ignored by Winsock
+#else
+	const int aNfds = static_cast<int>(mHandle) + 1;
+#endif
+	const int aReady = select(aNfds, nullptr, &aWriteSet, nullptr, &aTimeout);
 	if (aReady <= 0)
 		return;  // still pending
 
 	// Writability alone does not mean success; ask for the real result.
 	int aSockError = 0;
 	socklen_t aLen = sizeof(aSockError);
-	if (getsockopt(static_cast<int>(mHandle), SOL_SOCKET, SO_ERROR,
+	if (getsockopt(Native(mHandle), SOL_SOCKET, SO_ERROR,
 			reinterpret_cast<char*>(&aSockError), &aLen) != 0 || aSockError != 0)
 	{
 		mError = "connection refused or unreachable";
@@ -278,7 +296,7 @@ bool Socket::Send(const void* theData, size_t theLen, size_t& theSentOut)
 	const int aFlags = 0;
 #endif
 
-	const auto aSent = send(static_cast<int>(mHandle),
+	const auto aSent = send(Native(mHandle),
 		static_cast<const char*>(theData), static_cast<int>(theLen), aFlags);
 	if (aSent < 0)
 	{
@@ -298,7 +316,7 @@ bool Socket::Receive(void* theBuffer, size_t theLen, size_t& theReadOut)
 	if (mStatus != Status::Connected)
 		return false;
 
-	const auto aRead = recv(static_cast<int>(mHandle),
+	const auto aRead = recv(Native(mHandle),
 		static_cast<char*>(theBuffer), static_cast<int>(theLen), 0);
 	if (aRead == 0)
 	{
