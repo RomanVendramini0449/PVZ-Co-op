@@ -26,6 +26,7 @@
 #include "CoopSocket.h"
 
 #include <deque>
+#include <utility>
 #include <string>
 #include <vector>
 
@@ -66,7 +67,8 @@ private:
 	// reassembled here; a frame can arrive split or glued to the next one.
 	std::vector<char>   mInbound;
 	std::vector<char>   mOutbound;
-	std::deque<Command> mPendingCommands;
+	std::deque<CommandBatch> mPendingBatches;
+	std::deque<std::pair<uint32_t, uint32_t>> mPendingChecksums;  // tick, checksum
 
 	uint64_t      mLocalBuildHash = 0;
 	uint64_t      mLocalAssetHash = 0;
@@ -107,10 +109,13 @@ public:
 	const SessionParams& GetParams() const { return mParams; }
 	const std::string&   GetStatusText() const { return mStatusText; }
 
-	// Phase 2 input exchange.
-	bool SendCommands(const std::vector<Command>& theCommands);
-	bool PopCommand(Command& theCommandOut);
-	size_t GetPendingCommandCount() const { return mPendingCommands.size(); }
+	// Per-tick input exchange. Sent every tick, empty or not (see CommandBatch).
+	bool SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands);
+	bool PopCommandBatch(CommandBatch& theBatchOut);
+
+	// Simulation checksums, compared to catch a desync early.
+	bool SendChecksum(uint32_t theTick, uint32_t theChecksum);
+	bool PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut);
 };
 
 // Parsed from the command line, consumed when the title screen comes up so

@@ -20,11 +20,13 @@
  */
 
 #include "CoopSession.h"
+#include "CoopLockstep.h"
 
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
 #include <chrono>
+#include <utility>
 #include <thread>
 
 #ifdef _WIN32
@@ -210,7 +212,8 @@ bool Session::StartHost(uint16_t thePort, Difficulty theDifficulty, uint32_t the
 	mSentHello = false;
 	mInbound.clear();
 	mOutbound.clear();
-	mPendingCommands.clear();
+	mPendingBatches.clear();
+	mPendingChecksums.clear();
 
 	mLocalBuildHash = HashOwnExecutable();
 	mLocalAssetHash = HashGameAssets();
@@ -239,7 +242,8 @@ bool Session::StartJoin(const std::string& theHost, uint16_t thePort)
 	mSentHello = false;
 	mInbound.clear();
 	mOutbound.clear();
-	mPendingCommands.clear();
+	mPendingBatches.clear();
+	mPendingChecksums.clear();
 
 	mLocalBuildHash = HashOwnExecutable();
 	mLocalAssetHash = HashGameAssets();
@@ -411,9 +415,12 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 
 	case MsgType::Commands:
 	{
+		CommandBatch aBatch;
+		aBatch.mTick = aCursor.U32();
 		const uint32_t aCount = aCursor.U32();
 		if (!aCursor.mOk || aCount > 256)
 			return false;
+		aBatch.mCommands.reserve(aCount);
 		for (uint32_t i = 0; i < aCount; ++i)
 		{
 			Command aCommand;
@@ -425,14 +432,21 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 			aCommand.mArg = aCursor.I16();
 			if (!aCursor.mOk)
 				return false;
-			mPendingCommands.push_back(aCommand);
+			aBatch.mCommands.push_back(aCommand);
 		}
+		mPendingBatches.push_back(std::move(aBatch));
 		return true;
 	}
 
 	case MsgType::Checksum:
-		// Phase 2 compares these to catch a desync. Accepted and ignored for now.
+	{
+		const uint32_t aTick = aCursor.U32();
+		const uint32_t aChecksum = aCursor.U32();
+		if (!aCursor.mOk)
+			return false;
+		mPendingChecksums.emplace_back(aTick, aChecksum);
 		return true;
+	}
 
 	case MsgType::Bye:
 		mPeer.Close();
@@ -482,13 +496,14 @@ bool Session::SendReady()
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 }
 
-bool Session::SendCommands(const std::vector<Command>& theCommands)
+bool Session::SendCommandBatch(uint32_t theTick, const std::vector<Command>& theCommands)
 {
 	if (!IsConnected())
 		return false;
 
 	Packer aPacker;
 	aPacker.U8(static_cast<uint8_t>(MsgType::Commands));
+	aPacker.U32(theTick);
 	aPacker.U32(static_cast<uint32_t>(theCommands.size()));
 	for (const Command& aCommand : theCommands)
 	{
@@ -502,12 +517,34 @@ bool Session::SendCommands(const std::vector<Command>& theCommands)
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 }
 
-bool Session::PopCommand(Command& theCommandOut)
+bool Session::PopCommandBatch(CommandBatch& theBatchOut)
 {
-	if (mPendingCommands.empty())
+	if (mPendingBatches.empty())
 		return false;
-	theCommandOut = mPendingCommands.front();
-	mPendingCommands.pop_front();
+	theBatchOut = std::move(mPendingBatches.front());
+	mPendingBatches.pop_front();
+	return true;
+}
+
+bool Session::SendChecksum(uint32_t theTick, uint32_t theChecksum)
+{
+	if (!IsConnected())
+		return false;
+
+	Packer aPacker;
+	aPacker.U8(static_cast<uint8_t>(MsgType::Checksum));
+	aPacker.U32(theTick);
+	aPacker.U32(theChecksum);
+	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
+}
+
+bool Session::PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut)
+{
+	if (mPendingChecksums.empty())
+		return false;
+	theTickOut = mPendingChecksums.front().first;
+	theChecksumOut = mPendingChecksums.front().second;
+	mPendingChecksums.pop_front();
 	return true;
 }
 
@@ -758,19 +795,19 @@ int RunSelfTest()
 	aPlant.mArg = 2;
 	aOutgoing.push_back(aPlant);
 
-	if (!aClient.SendCommands(aOutgoing))
+	if (!aClient.SendCommandBatch(aPlant.mTick, aOutgoing))
 	{
 		printf("coop selftest: FAIL could not send commands\n");
 		return 1;
 	}
 
-	Command aReceived;
+	CommandBatch aReceivedBatch;
 	bool aGotIt = false;
 	for (int i = 0; i < 2000 && !aGotIt; ++i)
 	{
 		aHost.Update();
 		aClient.Update();
-		aGotIt = aHost.PopCommand(aReceived);
+		aGotIt = aHost.PopCommandBatch(aReceivedBatch);
 		if (!aGotIt)
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
@@ -780,6 +817,12 @@ int RunSelfTest()
 		printf("coop selftest: FAIL command did not arrive\n");
 		return 1;
 	}
+	if (aReceivedBatch.mTick != aPlant.mTick || aReceivedBatch.mCommands.size() != 1)
+	{
+		printf("coop selftest: FAIL batch header round-tripped incorrectly\n");
+		return 1;
+	}
+	const Command& aReceived = aReceivedBatch.mCommands[0];
 	if (aReceived.mTick != aPlant.mTick || aReceived.mPlayer != aPlant.mPlayer
 		|| aReceived.mType != aPlant.mType || aReceived.mX != aPlant.mX
 		|| aReceived.mY != aPlant.mY || aReceived.mArg != aPlant.mArg)
@@ -789,12 +832,37 @@ int RunSelfTest()
 	}
 	printf("coop selftest: command round-trip OK\n");
 
+	// Checksums ride the same connection and are what catches a desync.
+	if (!aHost.SendChecksum(100, 0xABCDEF01u))
+	{
+		printf("coop selftest: FAIL could not send checksum\n");
+		return 1;
+	}
+	uint32_t aSumTick = 0, aSumValue = 0;
+	bool aGotSum = false;
+	for (int i = 0; i < 2000 && !aGotSum; ++i)
+	{
+		aHost.Update();
+		aClient.Update();
+		aGotSum = aClient.PopChecksum(aSumTick, aSumValue);
+		if (!aGotSum)
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	if (!aGotSum || aSumTick != 100 || aSumValue != 0xABCDEF01u)
+	{
+		printf("coop selftest: FAIL checksum round-trip\n");
+		return 1;
+	}
+	printf("coop selftest: checksum round-trip OK\n");
+
 	aClient.Disconnect("selftest done");
 	aHost.Disconnect("selftest done");
-	Socket::Cleanup();
 
-	printf("coop selftest: PASS\n");
-	return 0;
+	printf("coop selftest: PASS\n\n");
+
+	const int aLockstepResult = RunLockstepSelfTest();
+	Socket::Cleanup();
+	return aLockstepResult;
 #endif
 }
 

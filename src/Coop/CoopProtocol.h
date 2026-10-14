@@ -23,13 +23,14 @@
 #define __COOPPROTOCOL_H__
 
 #include <cstdint>
+#include <vector>
 
 namespace Coop
 {
 
 // Bumped on any wire-format change. Peers with different versions are rejected
 // at handshake rather than allowed to desync later.
-constexpr uint32_t PROTOCOL_VERSION = 1;
+constexpr uint32_t PROTOCOL_VERSION = 2;
 
 constexpr uint16_t DEFAULT_PORT = 1337;
 
@@ -53,7 +54,7 @@ enum class MsgType : uint8_t
 	Welcome = 2,      // host -> client: accepted, here are the session parameters
 	Reject = 3,       // host -> client: refused, with a reason
 	Ready = 4,        // client -> host: parameters applied, ready to simulate
-	Commands = 5,     // both ways: per-tick input (Phase 2)
+	Commands = 5,     // both ways: one tick's input, even when empty
 	Checksum = 6,     // both ways: simulation checksum for desync detection
 	Bye = 7,          // either way: clean disconnect
 };
@@ -110,6 +111,15 @@ struct Command
 	int16_t     mX = 0;
 	int16_t     mY = 0;
 	int16_t     mArg = 0;     // packet index / item id / unused
+};
+
+// One tick's input from one player. Sent EVERY tick, empty or not: an empty
+// batch is what tells the peer "tick N is settled, you may advance". Without
+// it, a player sitting still would stall the other's simulation forever.
+struct CommandBatch
+{
+	uint32_t             mTick = 0;
+	std::vector<Command> mCommands;
 };
 
 // Everything that must match on both machines before tick 0. Mismatch here is
