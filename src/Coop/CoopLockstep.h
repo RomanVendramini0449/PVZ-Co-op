@@ -139,6 +139,9 @@ public:
 	uint64_t GetTotalStallMs() const { return mTotalStallMs; }
 	uint32_t CurrentStallMsPublic() const { return CurrentStallMs(); }
 
+	// Flag a divergence the checksums would not catch -- one found by a
+	// consistency check elsewhere, before it has had a chance to spread.
+	void               ReportDesync(const std::string& theReason);
 	bool               IsDesynced() const { return mDesynced; }
 	const std::string& GetDesyncText() const { return mDesyncText; }
 };

@@ -69,6 +69,11 @@ private:
 	std::vector<char>   mOutbound;
 	std::deque<CommandBatch> mPendingBatches;
 	std::deque<std::pair<uint32_t, uint32_t>> mPendingChecksums;  // tick, checksum
+	// Host-driven campaign flow (SPEC.md section 3). Queued rather than
+	// applied on arrival: the client acts on these from the game loop, where
+	// building a board is safe.
+	std::deque<LevelSetup>   mPendingLevels;
+	bool                     mPendingLeaveLevel = false;
 
 	uint64_t      mLocalBuildHash = 0;
 	uint64_t      mLocalAssetHash = 0;
@@ -116,6 +121,13 @@ public:
 	// Simulation checksums, compared to catch a desync early.
 	bool SendChecksum(uint32_t theTick, uint32_t theChecksum);
 	bool PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut);
+
+	// Host-driven campaign flow. Only the host sends these; only the client
+	// has anything to pop.
+	bool SendEnterLevel(const LevelSetup& theSetup);
+	bool PopEnterLevel(LevelSetup& theSetupOut);
+	bool SendLeaveLevel();
+	bool PopLeaveLevel();
 };
 
 // Parsed from the command line, consumed when the title screen comes up so

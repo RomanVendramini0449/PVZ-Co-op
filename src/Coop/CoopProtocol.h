@@ -30,7 +30,7 @@ namespace Coop
 
 // Bumped on any wire-format change. Peers with different versions are rejected
 // at handshake rather than allowed to desync later.
-constexpr uint32_t PROTOCOL_VERSION = 3;
+constexpr uint32_t PROTOCOL_VERSION = 4;
 
 constexpr uint16_t DEFAULT_PORT = 1337;
 
@@ -57,6 +57,8 @@ enum class MsgType : uint8_t
 	Commands = 5,     // both ways: one tick's input, even when empty
 	Checksum = 6,     // both ways: simulation checksum for desync detection
 	Bye = 7,          // either way: clean disconnect
+	EnterLevel = 8,   // host -> client: build this level, with the host's profile
+	LeaveLevel = 9,   // host -> client: level over, follow me out
 };
 
 enum class RejectReason : uint8_t
@@ -111,6 +113,11 @@ enum class CommandType : uint8_t
 	MouseUp = 3,    // arg = click count
 	EnterMenu = 4,  // left the board; hide this player's cursor
 	LeaveMenu = 5,  // back on the board; show it again
+	// The seed chooser is shared (SPEC.md section 4), so it rides the same
+	// scheduler as the board: either player's pick is applied on an agreed
+	// tick on both machines, which keeps the one chosen line-up identical.
+	ChooserPick = 6,  // clicked a seed packet on the chooser
+	StartPlaying = 7, // host pressed "Let's Rock!"; arg = chosen-seed digest
 };
 
 struct Command
@@ -130,6 +137,31 @@ struct CommandBatch
 {
 	uint32_t             mTick = 0;
 	std::vector<Command> mCommands;
+};
+
+// How many store items a profile carries. Must match PlayerInfo::mPurchases.
+constexpr int PURCHASE_COUNT = 80;
+
+// What the client needs in order to build the same level as the host.
+//
+// The second half of this is the host's profile, and it is worth saying why it
+// travels. The simulation reads the local profile in a lot of places that look
+// innocent -- how many seed slots the bank has, which seeds exist at all,
+// whether the roof gets lawn mowers, how much sun a level opens with. Two
+// players are never at the same point in their own campaigns, so those reads
+// would answer differently on each machine and the two lawns would not even
+// start the same shape. The client therefore borrows the host's profile for
+// the session (SPEC.md section 10.4) and never writes it to disk.
+struct LevelSetup
+{
+	uint32_t mLevel = 1;        // campaign level being started
+	int32_t  mGameMode = 0;     // GameMode enum
+	uint32_t mRngSeed = 0;      // reseeds the global MTRand on both sides
+
+	int32_t  mProfileLevel = 1;
+	int32_t  mCoins = 0;
+	uint32_t mFinishedAdventure = 0;
+	uint32_t mPurchases[PURCHASE_COUNT] = {};
 };
 
 // Everything that must match on both machines before tick 0. Mismatch here is

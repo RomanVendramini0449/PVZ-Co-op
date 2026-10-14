@@ -43,6 +43,32 @@ void Game::BeginLevel()
 	mInGame = true;
 }
 
+void Game::SetLevelSetup(const LevelSetup& theSetup)
+{
+	mLevelSetup = theSetup;
+	mHasLevelSetup = true;
+}
+
+void Game::HostEnterLevel(const LevelSetup& theSetup)
+{
+	SetLevelSetup(theSetup);
+	mSession.SendEnterLevel(theSetup);
+}
+
+void Game::HostLeaveLevel()
+{
+	mHasLevelSetup = false;
+	mSession.SendLeaveLevel();
+}
+
+bool Game::PopEnterLevel(LevelSetup& theSetupOut)
+{
+	if (!mSession.PopEnterLevel(theSetupOut))
+		return false;
+	SetLevelSetup(theSetupOut);
+	return true;
+}
+
 void Game::EndLevel()
 {
 	mInGame = false;

@@ -115,6 +115,16 @@ public:
 	bool                    FlyProtectionCurrentlyPlanted();
 	bool                    CheckSeedUpgrade(SeedType theSeedTypeTo, SeedType theSeedTypeFrom);
 	void                    OnStartButton();
+
+	// ---- co-op (docs/SPEC.md section 4) --------------------------------
+	// Sentinel in a ChooserPick command's argument, standing in for the
+	// Random button rather than a seed type.
+	static constexpr int16_t CoopChooserRandom = -1;
+	void                    ApplySeedPick(SeedType theSeedType);
+	// Called from the command stream on both machines.
+	void                    ApplyCoopPick(int theArg);
+	void                    ApplyCoopStart();
+	int                     CoopChosenSeedDigest();
 	void                    PickRandomSeeds();
 	virtual void            ButtonDepress(int theId);
 	SeedType                SeedHitTest(int x, int y);

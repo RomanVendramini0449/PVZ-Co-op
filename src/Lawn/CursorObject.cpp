@@ -54,7 +54,12 @@ void CursorObject::Update()
 		return;
 	}
 
-	if (!mApp->mWidgetManager->mMouseIn)
+	// Each player has their own cursor object, and Board::UpdateGame ticks
+	// them with that player active -- so this asks the board where THIS
+	// player's pointer is rather than reading the local mouse directly. In
+	// single player the two are the same thing.
+	const int aPlayer = mBoard->GetActivePlayer();
+	if (!mBoard->IsPlayerPointerPresent(aPlayer))
 	{
 		mVisible = false;
 		return;
@@ -66,9 +71,13 @@ void CursorObject::Update()
 		aCursorReanim->Update();
 	}
 
+	int aMouseX = 0;
+	int aMouseY = 0;
+	mBoard->GetPlayerMouse(aPlayer, aMouseX, aMouseY);
+
 	mVisible = true;
-	mX = mApp->mWidgetManager->mLastMouseX - 25;
-	mY = mApp->mWidgetManager->mLastMouseY - 35;
+	mX = aMouseX - 25;
+	mY = aMouseY - 35;
 }
 
 void CursorObject::Die()
@@ -244,8 +253,9 @@ void CursorPreview::Update()
 	}
 
 	SeedType aSeedType = mBoard->GetSeedTypeInCursor();
-	int aMouseX = mApp->mWidgetManager->mLastMouseX;
-	int aMouseY = mApp->mWidgetManager->mLastMouseY;
+	int aMouseX = 0;
+	int aMouseY = 0;
+	mBoard->GetPlayerMouse(mBoard->GetActivePlayer(), aMouseX, aMouseY);
 	mGridX = mBoard->PlantingPixelToGridX(aMouseX, aMouseY, aSeedType);
 	mGridY = mBoard->PlantingPixelToGridY(aMouseX, aMouseY, aSeedType);
 	if (mGridX >= 0 && mGridX < MAX_GRID_SIZE_X && mGridY >= 0 && mGridY <= MAX_GRID_SIZE_Y)

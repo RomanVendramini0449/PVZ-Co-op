@@ -87,6 +87,15 @@ uint32_t Lockstep::CurrentStallMs() const
 			std::chrono::steady_clock::now() - mStallBegan).count());
 }
 
+void Lockstep::ReportDesync(const std::string& theReason)
+{
+	if (mDesynced)
+		return;  // the first cause is the useful one
+
+	mDesynced = true;
+	mDesyncText = theReason;
+}
+
 void Lockstep::QueueLocalCommand(CommandType theType, int16_t theX, int16_t theY, int16_t theArg)
 {
 	if (!mRunning)

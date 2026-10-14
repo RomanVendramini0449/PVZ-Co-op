@@ -43,6 +43,7 @@ class Reanimation;
 class ReanimatorCache;
 class ProfileMgr;
 class PlayerInfo;
+namespace Coop { struct LevelSetup; }
 class Music;
 class TitleScreen;
 class ChallengeScreen;
@@ -100,6 +101,9 @@ public:
 	std::unique_ptr<ReanimatorCache>	mReanimatorCache;
 	std::unique_ptr<ProfileMgr>		mProfileMgr;
 	PlayerInfo*						mPlayerInfo;
+	// The client's own campaign progress, parked while it borrows the host's.
+	std::unique_ptr<PlayerInfo>		mCoopOwnProfile;
+	bool							mCoopWaitingForHost = false;
 	std::unique_ptr<LevelStats>		mLastLevelStats;
 	std::atomic<bool>					mCloseRequest;
 	uint32_t						mAppCounter;
@@ -185,6 +189,22 @@ public:
 	void							KillAwardScreen();
 	void							ShowSeedChooserScreen();
 	void							KillSeedChooserScreen();
+
+	// ---- co-op campaign flow (docs/SPEC.md section 3) -------------------
+	// Outside a level the host drives and the client follows, so the two
+	// machines are in the same level with the same line-up rather than two
+	// unrelated games sharing a socket.
+	void							CoopUpdateFlow();
+	// Host: describe the level we are entering so the client can build it.
+	void							CoopAnnounceLevel();
+	// Client: build the level the host announced.
+	void							CoopFollowIntoLevel(const Coop::LevelSetup& theSetup);
+	// Client: borrow the host's campaign progress for the session. Never
+	// written to disk -- the joining player's own profile is left alone.
+	void							CoopBorrowHostProfile(const Coop::LevelSetup& theSetup);
+	void							CoopReturnOwnProfile();
+	bool							CoopIsWaitingForHost() const { return mCoopWaitingForHost; }
+	void							CoopSetWaitingForHost(bool theWaiting) { mCoopWaitingForHost = theWaiting; }
 	void							DoHighScoreDialog();
 	void							DoBackToMain();
 	void							DoConfirmBackToMain();

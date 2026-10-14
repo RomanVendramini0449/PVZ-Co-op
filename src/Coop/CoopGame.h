@@ -42,6 +42,12 @@ private:
 	Lockstep mLockstep;
 	bool     mInGame = false;
 
+	// The level both machines are currently building or playing. On the host
+	// this is filled in as it enters a level; on the client it arrives over
+	// the wire.
+	LevelSetup mLevelSetup;
+	bool       mHasLevelSetup = false;
+
 public:
 	static Game& Get();
 
@@ -57,8 +63,28 @@ public:
 	int GetLocalPlayerIndex() const { return static_cast<int>(GetLocalPlayer()); }
 	int GetRemotePlayerIndex() const { return static_cast<int>(GetRemotePlayer()); }
 
+	bool IsHost() const { return mSession.IsHost(); }
+	// True on the machine that follows: it does not drive the campaign.
+	bool IsFollower() const { return mSession.IsConnected() && !mSession.IsHost(); }
+
 	Difficulty GetDifficulty() const { return mSession.GetParams().mDifficulty; }
 	bool IsHardMode() const { return GetDifficulty() == Difficulty::Hard; }
+
+	// Host-driven campaign flow (SPEC.md section 3).
+	//
+	// The host announces each level it enters; the client builds the same one
+	// instead of navigating its own menus. Without this the two machines are
+	// simply two unrelated games that happen to share a socket.
+	void HostEnterLevel(const LevelSetup& theSetup);
+	void HostLeaveLevel();
+	// Client side: true once, when the host has announced a new level.
+	bool PopEnterLevel(LevelSetup& theSetupOut);
+	bool PopLeaveLevel() { return mSession.PopLeaveLevel(); }
+
+	bool              HasLevelSetup() const { return mHasLevelSetup; }
+	const LevelSetup& GetLevelSetup() const { return mLevelSetup; }
+	void              SetLevelSetup(const LevelSetup& theSetup);
+	void              ClearLevelSetup() { mHasLevelSetup = false; }
 
 	// Called when a lockstepped level starts and ends.
 	void BeginLevel();

@@ -453,9 +453,19 @@ public:
 	// objects. Commands from the lockstep queue are applied with their own
 	// player active, so each lands on the right cursor and seed bank.
 	void				SetActivePlayer(int thePlayer);
+	// Hands every player the active player's seed line-up. Cooldowns diverge
+	// from there, which is the point (SPEC.md section 5).
+	void				CoopMirrorSeedBank();
 	int					GetActivePlayer() const { return mActivePlayer; }
 	void				SetCoopPlayerCount(int theCount);
 	int					GetCoopPlayerCount() const { return mCoopPlayerCount; }
+	// Where a given player's pointer is. Your own comes from the mouse on this
+	// machine; the other player's comes from their command stream, because
+	// there is no second mouse here to read. Without this split, both players'
+	// cursor objects tracked whichever mouse happened to be local, so the
+	// remote cursor sat on top of your own and showed what YOU were holding.
+	void				GetPlayerMouse(int thePlayer, int& theX, int& theY) const;
+	bool				IsPlayerPointerPresent(int thePlayer) const;
 	CursorObject*		GetCursorObject(int thePlayer) { return mCursorStorage[thePlayer].get(); }
 	CursorPreview*		GetCursorPreview(int thePlayer) { return mCursorPreviewStorage[thePlayer].get(); }
 	SeedBank*			GetSeedBank(int thePlayer) { return mSeedBankStorage[thePlayer].get(); }

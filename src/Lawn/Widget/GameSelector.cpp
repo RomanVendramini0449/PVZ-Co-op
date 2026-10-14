@@ -26,6 +26,7 @@
 #include "ZombatarWidget.h"
 #include "../ZenGarden.h"
 #include "GameSelector.h"
+#include "../../Coop/CoopGame.h"
 #include "../../LawnApp.h"
 #include "AlmanacDialog.h"
 #include "../../Resources.h"
@@ -373,6 +374,12 @@ GameSelector::GameSelector(LawnApp* theApp)
 	mSurvivalButton->SetDisabled(true);
 	mZenGardenButton->SetDisabled(true);
 	mZombatarButton->SetDisabled(true);
+
+	// On the joining machine the host drives the campaign (SPEC.md section 3).
+	// Letting the client press Adventure here is what produced two players in
+	// two different levels wondering why nothing was shared.
+	if (Coop::Game::Get().IsFollower())
+		mAdventureButton->SetDisabled(true);
 }
 
 GameSelector::~GameSelector()
@@ -601,6 +608,18 @@ void GameSelector::Draw(Graphics* g)
 		aOffsetMatrix.Translate(170.5f - static_cast<int>(aStringWidth * 0.5f) + mX, 102.5f + mY);
 		PvzpDrawStringMatrix(g, Sexy::FONT_BRIANNETOD16, aOverlayMatrix * aOffsetMatrix, aWelcomeStr, Color(255, 245, 200));
 
+	}
+
+	// The joining player lands here between levels while the host works
+	// through the award screen and Crazy Dave. Say so, or an idle menu looks
+	// like the session has died.
+	if (Coop::Game::Get().IsFollower())
+	{
+		const std::string aWaitStr = "Waiting for the host to start the next level...";
+		const float aWidth = Sexy::FONT_BRIANNETOD16->StringWidth(aWaitStr);
+		g->SetFont(Sexy::FONT_BRIANNETOD16);
+		g->SetColor(Color(255, 245, 200));
+		g->DrawString(aWaitStr, static_cast<int>((mWidth - aWidth) * 0.5f), mHeight - 24);
 	}
 }
 
@@ -1207,6 +1226,14 @@ void GameSelector::ButtonDepress(int theId)
 	switch (theId)
 	{
 	case GameSelector::GameSelector_Adventure:
+		if (Coop::Game::Get().IsFollower())
+		{
+			// Say why, rather than just not responding.
+			mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[MODE_LOCKED]",
+				"The host starts the game.\n\nYou will join the level\nautomatically.",
+				"[DIALOG_BUTTON_OK]", "", Dialog::BUTTONS_FOOTER);
+			break;
+		}
 		ClickedAdventure();
 		break;
 	case GameSelector::GameSelector_Minigame:

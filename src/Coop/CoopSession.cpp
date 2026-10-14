@@ -448,6 +448,35 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 		return true;
 	}
 
+	case MsgType::EnterLevel:
+	{
+		if (mIsHost)
+			return false;  // only the client follows
+
+		LevelSetup aSetup;
+		aSetup.mLevel = aCursor.U32();
+		aSetup.mGameMode = static_cast<int32_t>(aCursor.U32());
+		aSetup.mRngSeed = aCursor.U32();
+		aSetup.mProfileLevel = static_cast<int32_t>(aCursor.U32());
+		aSetup.mCoins = static_cast<int32_t>(aCursor.U32());
+		aSetup.mFinishedAdventure = aCursor.U32();
+		for (int i = 0; i < PURCHASE_COUNT; i++)
+			aSetup.mPurchases[i] = aCursor.U32();
+		if (!aCursor.mOk)
+			return false;
+
+		mPendingLevels.push_back(aSetup);
+		return true;
+	}
+
+	case MsgType::LeaveLevel:
+	{
+		if (mIsHost)
+			return false;
+		mPendingLeaveLevel = true;
+		return true;
+	}
+
 	case MsgType::Bye:
 		mPeer.Close();
 		mState = State::Disconnected;
@@ -545,6 +574,51 @@ bool Session::PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut)
 	theTickOut = mPendingChecksums.front().first;
 	theChecksumOut = mPendingChecksums.front().second;
 	mPendingChecksums.pop_front();
+	return true;
+}
+
+bool Session::SendEnterLevel(const LevelSetup& theSetup)
+{
+	if (!IsConnected() || !mIsHost)
+		return false;
+
+	Packer aPacker;
+	aPacker.U8(static_cast<uint8_t>(MsgType::EnterLevel));
+	aPacker.U32(theSetup.mLevel);
+	aPacker.U32(static_cast<uint32_t>(theSetup.mGameMode));
+	aPacker.U32(theSetup.mRngSeed);
+	aPacker.U32(static_cast<uint32_t>(theSetup.mProfileLevel));
+	aPacker.U32(static_cast<uint32_t>(theSetup.mCoins));
+	aPacker.U32(theSetup.mFinishedAdventure);
+	for (int i = 0; i < PURCHASE_COUNT; i++)
+		aPacker.U32(theSetup.mPurchases[i]);
+	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
+}
+
+bool Session::PopEnterLevel(LevelSetup& theSetupOut)
+{
+	if (mPendingLevels.empty())
+		return false;
+	theSetupOut = mPendingLevels.front();
+	mPendingLevels.pop_front();
+	return true;
+}
+
+bool Session::SendLeaveLevel()
+{
+	if (!IsConnected() || !mIsHost)
+		return false;
+
+	Packer aPacker;
+	aPacker.U8(static_cast<uint8_t>(MsgType::LeaveLevel));
+	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
+}
+
+bool Session::PopLeaveLevel()
+{
+	if (!mPendingLeaveLevel)
+		return false;
+	mPendingLeaveLevel = false;
 	return true;
 }
 

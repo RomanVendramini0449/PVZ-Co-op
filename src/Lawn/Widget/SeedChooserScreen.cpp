@@ -33,6 +33,7 @@
 #include "../../Lawn/Plant.h"
 #include "../ToolTipWidget.h"
 #include "SeedChooserScreen.h"
+#include "../../Coop/CoopGame.h"
 #include "../../GameConstants.h"
 #include "../System/PlayerInfo.h"
 #include "misc/Debug.h"
@@ -694,6 +695,22 @@ void SeedChooserScreen::OnStartButton()
 		!CheckSeedUpgrade(SEED_CATTAIL, SEED_LILYPAD))
 		return;
 
+	if (Coop::Game::Get().IsInGame())
+	{
+		// The host presses Let's Rock (SPEC.md section 4). Scheduling it as a
+		// command rather than closing here is what makes both machines leave
+		// the chooser on the same tick -- close it locally and this machine
+		// starts the level some ticks ahead of the other one, and the two
+		// simulations never line up again.
+		if (!Coop::Game::Get().IsHost())
+			return;
+
+		Coop::Game::Get().GetLockstep().QueueLocalCommand(
+			Coop::CommandType::StartPlaying, 0, 0,
+			static_cast<int16_t>(CoopChosenSeedDigest()));
+		return;
+	}
+
 	CloseSeedChooser();
 }
 
@@ -759,7 +776,15 @@ void SeedChooserScreen::ButtonDepress(int theId)
 		if (theId == SeedChooserScreen::SeedChooserScreen_Start)
 			OnStartButton();
 		else if (theId == SeedChooserScreen::SeedChooserScreen_Random)
-			PickRandomSeeds();
+		{
+			if (Coop::Game::Get().IsInGame())
+			{
+				if (Coop::Game::Get().IsHost())
+					Coop::Game::Get().GetLockstep().QueueLocalCommand(
+						Coop::CommandType::ChooserPick, 0, 0, CoopChooserRandom);
+			}
+			else PickRandomSeeds();
+		}
 	}
 }
 
@@ -1050,20 +1075,22 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 					mApp->DoBackToMain();
 				}
 			}
+			else if (Coop::Game::Get().IsInGame())
+			{
+				// Both players pick into one shared line-up (SPEC.md
+				// section 4), so a pick is scheduled like any other input
+				// and applied on the agreed tick on both machines.
+				//
+				// What travels is the seed type, not the click position: the
+				// packets are mid-animation at slightly different offsets on
+				// the two screens, so replaying a hit test there could resolve
+				// to a different packet. The type cannot.
+				Coop::Game::Get().GetLockstep().QueueLocalCommand(
+					Coop::CommandType::ChooserPick, 0, 0, static_cast<int16_t>(aSeedType));
+			}
 			else
 			{
-				ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
-				if (aChosenSeed.mSeedState == SEED_IN_BANK)
-				{
-					if (aChosenSeed.mCrazyDavePicked)
-					{
-						mApp->PlaySample(Sexy::SOUND_BUZZER);
-						mToolTip->FlashWarning();
-					}
-					else ClickedSeedInBank(aChosenSeed);
-				}
-				else if (aChosenSeed.mSeedState == SEED_IN_CHOOSER)
-					ClickedSeedInChooser(aChosenSeed);
+				ApplySeedPick(aSeedType);
 			}
 		}
 	}
@@ -1085,6 +1112,75 @@ bool SeedChooserScreen::PickedPlantType(SeedType theSeedType)
 	return false;
 }
 
+// One player's pick, applied. In co-op this runs from the command stream on
+// both machines; in single player it runs straight from the click.
+void SeedChooserScreen::ApplySeedPick(SeedType theSeedType)
+{
+	if (theSeedType < SEED_PEASHOOTER || theSeedType >= NUM_SEEDS_IN_CHOOSER)
+		return;
+
+	ChosenSeed& aChosenSeed = mChosenSeeds[theSeedType];
+	if (aChosenSeed.mSeedState == SEED_IN_BANK)
+	{
+		if (aChosenSeed.mCrazyDavePicked)
+		{
+			mApp->PlaySample(Sexy::SOUND_BUZZER);
+			mToolTip->FlashWarning();
+		}
+		else ClickedSeedInBank(aChosenSeed);
+	}
+	else if (aChosenSeed.mSeedState == SEED_IN_CHOOSER)
+		ClickedSeedInChooser(aChosenSeed);
+}
+
+void SeedChooserScreen::ApplyCoopPick(int theArg)
+{
+	// Settle any packets still flying first, so both machines resolve the
+	// pick against the same laid-out chooser.
+	if (mSeedsInFlight > 0)
+	{
+		for (int i = 0; i < NUM_SEEDS_IN_CHOOSER; i++)
+			LandFlyingSeed(mChosenSeeds[i]);
+	}
+
+	if (theArg == CoopChooserRandom)
+	{
+		// Rand() here draws from the gameplay generator, so this has to run on
+		// both machines, on the same tick, or their random states part ways.
+		PickRandomSeeds();
+		return;
+	}
+
+	const SeedType aSeedType = static_cast<SeedType>(theArg);
+	if (aSeedType < SEED_PEASHOOTER || aSeedType >= NUM_SEEDS_IN_CHOOSER)
+		return;
+	if (!mApp->HasSeedType(aSeedType) || SeedNotAllowedToPick(aSeedType))
+		return;
+
+	ApplySeedPick(aSeedType);
+}
+
+void SeedChooserScreen::ApplyCoopStart()
+{
+	CloseSeedChooser();
+}
+
+// A cheap fingerprint of the chosen line-up, carried on the start command. If
+// the two choosers somehow drifted apart, this says so at the one moment it is
+// still cheap to say -- before the level starts -- rather than leaving it to
+// surface later as a mysterious desync.
+int SeedChooserScreen::CoopChosenSeedDigest()
+{
+	uint32_t aDigest = 2166136261u;
+	for (int anIndex = 0; anIndex < mBoard->mSeedBank->mNumPackets; anIndex++)
+	{
+		const SeedType aSeedType = FindSeedInBank(anIndex);
+		aDigest = (aDigest ^ static_cast<uint32_t>(aSeedType)) * 16777619u;
+		aDigest = (aDigest ^ static_cast<uint32_t>(mChosenSeeds[aSeedType < 0 ? 0 : aSeedType].mImitaterType)) * 16777619u;
+	}
+	return static_cast<int>(aDigest & 0x7FFF);
+}
+
 void SeedChooserScreen::CloseSeedChooser()
 {
 	DBG_ASSERT(mBoard->mSeedBank->mNumPackets == mBoard->GetNumSeedsInBank());
@@ -1102,6 +1198,12 @@ void SeedChooserScreen::CloseSeedChooser()
 			aSeedPacket.mActive = false;
 		}
 	}
+
+	// The loop above filled the active player's bank. In co-op the chosen
+	// line-up is shared, so both players start from this same bank -- without
+	// this the joining player walked into the level with an empty hotbar.
+	mBoard->CoopMirrorSeedBank();
+
 	mBoard->mCutScene->EndSeedChooser();
 }
 

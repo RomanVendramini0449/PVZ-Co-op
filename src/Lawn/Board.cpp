@@ -103,7 +103,18 @@ Board::Board(LawnApp* theApp)
 		mCoopCursorY[aPlayer] = 0;
 		mCoopCursorVisible[aPlayer] = false;
 	}
-	SetActivePlayer(0);
+	// In co-op the board is two-player from construction, and the player it
+	// rests on is the local one: that is the seed bank and cursor this machine
+	// draws and this machine's mouse drives.
+	if (Coop::Game::Get().IsConnected())
+	{
+		SetCoopPlayerCount(Coop::PLAYER_COUNT);
+		SetActivePlayer(Coop::Game::Get().GetLocalPlayerIndex());
+	}
+	else
+	{
+		SetActivePlayer(0);
+	}
 	mCutScene = std::make_unique<CutScene>();
 	mSpecialGraveStoneX = -1;
 	mSpecialGraveStoneY = -1;
@@ -1539,6 +1550,36 @@ void Board::InitLevel()
 		mFogOffset = 1065 - LeftFogColumn() * 80;
 	}
 	mChallenge->InitLevel();
+
+	// Everything above wrote into the active player's bank only, which on the
+	// joining machine left the other bank a freshly constructed one with no
+	// packets in it at all -- the blank, unusable hotbar. Give every player
+	// the same starting bank; the cooldowns inside it drift apart on their own
+	// as each player plants (SPEC.md section 5).
+	CoopMirrorSeedBank();
+}
+
+// Copies the active player's seed bank over every other player's. The line-up
+// is shared, so the copy is the point; what must NOT be shared afterwards is
+// the per-packet cooldown, and since each player then ticks their own bank,
+// that happens by itself.
+void Board::CoopMirrorSeedBank()
+{
+	if (mCoopPlayerCount <= 1)
+		return;
+
+	const SeedBank* aSource = mSeedBankStorage[mActivePlayer].get();
+	if (aSource == nullptr)
+		return;
+
+	for (int aPlayer = 0; aPlayer < mCoopPlayerCount; aPlayer++)
+	{
+		if (aPlayer == mActivePlayer)
+			continue;
+		SeedBank* aTarget = mSeedBankStorage[aPlayer].get();
+		if (aTarget != nullptr)
+			*aTarget = *aSource;
+	}
 }
 
 Reanimation* Board::CreateRakeReanim(float theRakeX, float theRakeY, int theRenderOrder)
@@ -1644,20 +1685,10 @@ bool Board::ChooseSeedsOnCurrentLevel()
 
 void Board::StartLevel()
 {
-	// Both machines must enter the level from the same random state, or the
-	// first zombie wave alone would put them in different games. The shared
-	// seed was agreed during the handshake.
-	if (Coop::Game::Get().IsConnected())
-	{
-		const uint32_t aSeed = Coop::Game::Get().GetSession().GetParams().mRngSeed;
-		Sexy::SRand(aSeed);
-		mApp->mAppRandSeed = static_cast<int>(aSeed);
-		mBoardRandSeed = static_cast<int>(aSeed);
-
-		SetCoopPlayerCount(Coop::PLAYER_COUNT);
-		SetActivePlayer(Coop::Game::Get().GetLocalPlayerIndex());
-		Coop::Game::Get().BeginLevel();
-	}
+	// The reseed and the lockstep clock now happen in LawnApp::NewGame, before
+	// the board is even constructed: the constructor and InitLevel both draw
+	// from the global generator, so doing it here was already too late, and
+	// the shared seed chooser needs the clock running before this point.
 
 	mCoinBankFadeCount = 0;
 	mApp->mLastLevelStats->Reset();
@@ -3117,6 +3148,29 @@ void Board::ApplyCoopCommand(const Coop::Command& theCommand)
 		mCoopCursorVisible[aPlayer] = true;
 		break;
 
+	case Coop::CommandType::ChooserPick:
+		if (mApp->mSeedChooserScreen)
+			mApp->mSeedChooserScreen->ApplyCoopPick(theCommand.mArg);
+		break;
+
+	case Coop::CommandType::StartPlaying:
+		if (mApp->mSeedChooserScreen)
+		{
+			// Both machines ran their own chooser from the same picks, so the
+			// line-ups should be identical. Check before committing: a
+			// mismatch caught here is one line of text, the same mismatch
+			// found later is an unexplainable game.
+			const int aLocalDigest = mApp->mSeedChooserScreen->CoopChosenSeedDigest();
+			if (aLocalDigest != theCommand.mArg)
+			{
+				Coop::Game::Get().GetLockstep().ReportDesync(
+					"the two players ended up with different seed line-ups");
+				break;
+			}
+			mApp->mSeedChooserScreen->ApplyCoopStart();
+		}
+		break;
+
 	case Coop::CommandType::None:
 	default:
 		break;
@@ -3180,6 +3234,17 @@ void Board::DrawRemoteCursor(Graphics* g)
 
 	const int aX = mCoopCursorX[aPlayer];
 	const int aY = mCoopCursorY[aPlayer];
+
+	// What they are carrying -- a seed packet, the shovel -- drawn first, so
+	// the pointer itself sits on top of it. This is their own cursor object,
+	// updated from their command stream, which is what makes it show their
+	// plant rather than a copy of ours (SPEC.md section 7).
+	CursorObject* aRemoteCursor = mCursorStorage[aPlayer].get();
+	if (aRemoteCursor != nullptr && mTimeStopCounter == 0 && aRemoteCursor->BeginDraw(g))
+	{
+		aRemoteCursor->Draw(g);
+		aRemoteCursor->EndDraw(g);
+	}
 
 	// Drawn with primitives rather than an image, so it needs no art asset
 	// and cannot go missing. A dark outline first, then the fill, keeps it
@@ -5206,6 +5271,34 @@ void Board::UpdateGameObjects()
 		Coop::Game::Get().GetLockstep().EndTick(ComputeCoopChecksum());
 }
 
+void Board::GetPlayerMouse(int thePlayer, int& theX, int& theY) const
+{
+	if (Coop::Game::Get().IsInGame() && thePlayer != Coop::Game::Get().GetLocalPlayerIndex()
+		&& thePlayer >= 0 && thePlayer < Coop::PLAYER_COUNT)
+	{
+		theX = mCoopCursorX[thePlayer];
+		theY = mCoopCursorY[thePlayer];
+		return;
+	}
+
+	theX = mApp->mWidgetManager->mLastMouseX;
+	theY = mApp->mWidgetManager->mLastMouseY;
+}
+
+bool Board::IsPlayerPointerPresent(int thePlayer) const
+{
+	if (Coop::Game::Get().IsInGame() && thePlayer != Coop::Game::Get().GetLocalPlayerIndex()
+		&& thePlayer >= 0 && thePlayer < Coop::PLAYER_COUNT)
+	{
+		// The other player's pointer is wherever their last command put it.
+		// It must not depend on whether OUR window has the mouse: them having
+		// their hand on their own mouse is the whole question.
+		return mCoopCursorVisible[thePlayer];
+	}
+
+	return mApp->mWidgetManager->mMouseIn;
+}
+
 void Board::SetActivePlayer(int thePlayer)
 {
 	if (thePlayer < 0 || thePlayer >= Coop::PLAYER_COUNT)
@@ -5939,7 +6032,14 @@ void Board::Update()
 	{
 		Coop::Lockstep& aLockstep = Coop::Game::Get().GetLockstep();
 		if (!aLockstep.BeginTick())
+		{
+			// Stalled: no game state may move. Keep asking for a redraw
+			// anyway, or the window simply stops being painted and the
+			// player sees a black screen rather than a paused lawn -- which
+			// is what a level transition on the other machine looked like.
+			MarkDirty();
 			return;
+		}
 
 		for (const Coop::Command& aCommand : aLockstep.GetTickCommands())
 			ApplyCoopCommand(aCommand);
@@ -6532,6 +6632,19 @@ void Board::DrawGameObjects(Graphics* g)
 		AddUIRenderItem(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_STORM, MakeRenderOrder(RenderLayer::RENDER_LAYER_FOG, 0, 3));
 	}
 	AddGameObjectRenderItemCursorPreview(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_CURSOR_PREVIEW, mCursorPreview);
+
+	// The other player's planting preview goes in alongside your own, so you
+	// can see the square they are about to commit to before they click it --
+	// which is most of what stops two people planting over each other.
+	if (Coop::Game::Get().IsInGame())
+	{
+		const int aRemote = Coop::Game::Get().GetRemotePlayerIndex();
+		if (aRemote >= 0 && aRemote < Coop::PLAYER_COUNT && mCursorPreviewStorage[aRemote])
+		{
+			AddGameObjectRenderItemCursorPreview(aRenderList, aRenderItemCount,
+				RenderObjectType::RENDER_ITEM_CURSOR_PREVIEW, mCursorPreviewStorage[aRemote].get());
+		}
+	}
 
 	std::sort(aRenderList, aRenderList + aRenderItemCount, RenderItemSortFunc);
 

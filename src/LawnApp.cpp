@@ -313,7 +313,11 @@ void LawnApp::LostFocus()
 
 void LawnApp::WriteToRegistry()
 {
-	if (mPlayerInfo)
+	// While the client is borrowing the host's campaign, mPlayerInfo is not
+	// its own progress, so writing it out would overwrite the joining
+	// player's save with the host's (SPEC.md section 10.4 -- their profile is
+	// never touched).
+	if (mPlayerInfo && !mCoopOwnProfile)
 	{
 		RegistryWriteString("CurUser", mPlayerInfo->mName);
 		mPlayerInfo->SaveDetails();
@@ -329,7 +333,8 @@ void LawnApp::ReadFromRegistry()
 
 bool LawnApp::WriteCurrentUserConfig()
 {
-	if (mPlayerInfo)
+	// Same reason as WriteToRegistry: borrowed progress does not get saved.
+	if (mPlayerInfo && !mCoopOwnProfile)
 		mPlayerInfo->SaveDetails();
 
 	return true;
@@ -344,6 +349,15 @@ void LawnApp::PreNewGame(GameMode theGameMode, bool theLookForSavedGame)
 	//}
 
 	mGameMode = theGameMode;
+
+	// Co-op has no mid-level save yet: the format stores one player's seed
+	// bank and cursor, not two (SPEC.md section 10.4). Resuming one would put
+	// the host in a half-finished board the client knows nothing about, so a
+	// co-op session always starts the level fresh -- which is cheap, because
+	// a level restarts deterministically from its seed.
+	if (Coop::Game::Get().IsConnected())
+		theLookForSavedGame = false;
+
 	if (theLookForSavedGame && TryLoadGame())
 		return;
 
@@ -426,13 +440,160 @@ void LawnApp::NewGame()
 {
 	mFirstTimeGameSelector = false;
 
+	// Every route into a level funnels through here, which makes it the one
+	// place co-op has to agree on: the host says which level this is, and the
+	// client has already been told.
+	CoopAnnounceLevel();
+
+	Coop::Game& aCoop = Coop::Game::Get();
+	const bool aCoopLevel = aCoop.IsConnected() && aCoop.HasLevelSetup();
+	if (aCoopLevel)
+	{
+		// Both machines must build the board from the same random state. The
+		// Board constructor and InitLevel below both draw from the global
+		// generator, so the reseed has to come first -- after them is too
+		// late and the two lawns are already different shapes.
+		const uint32_t aSeed = aCoop.GetLevelSetup().mRngSeed;
+		Sexy::SRand(aSeed);
+		mAppRandSeed = static_cast<int>(aSeed);
+	}
+
 	MakeNewBoard();
+
+	// The lockstep clock starts here rather than at StartLevel, because the
+	// seed chooser is shared (SPEC.md section 4) and has to run on the same
+	// scheduler as the board for both players' picks to land identically.
+	if (aCoopLevel)
+		aCoop.BeginLevel();
+
 	mBoard->InitLevel();
 	mBoardResult = BoardResult::BOARDRESULT_NONE;
 	mGameScene = GameScenes::SCENE_LEVEL_INTRO;
 
 	ShowSeedChooserScreen();
 	mBoard->mCutScene->StartLevelIntro();
+}
+
+// ---------------------------------------------------------------------------
+// Co-op campaign flow (docs/SPEC.md section 3)
+// ---------------------------------------------------------------------------
+//
+// Outside a level the host drives and the client follows. Before this existed
+// each player navigated their own menus and called into their own level, so
+// the two machines were two unrelated games that happened to share a socket --
+// which is exactly what it looked like on screen.
+
+static_assert(sizeof(PlayerInfo::mPurchases) / sizeof(uint32_t) == Coop::PURCHASE_COUNT,
+	"Coop::PURCHASE_COUNT must match PlayerInfo::mPurchases");
+
+void LawnApp::CoopAnnounceLevel()
+{
+	Coop::Game& aCoop = Coop::Game::Get();
+	if (!aCoop.IsConnected() || !aCoop.IsHost() || mPlayerInfo == nullptr)
+		return;
+
+	Coop::LevelSetup aSetup;
+	aSetup.mLevel = static_cast<uint32_t>(mPlayerInfo->mLevel);
+	aSetup.mGameMode = static_cast<int32_t>(mGameMode);
+
+	// Derived from the session seed and the level rather than drawn fresh, so
+	// a level replayed after a loss or a dropped connection comes back the
+	// same (SPEC.md section 10.4) while different levels still get different
+	// waves. Mixing in the level matters: without it every level in the
+	// campaign would run the same random sequence.
+	aSetup.mRngSeed = aCoop.GetSession().GetParams().mRngSeed
+		^ (static_cast<uint32_t>(mPlayerInfo->mLevel) * 2654435761u);
+
+	aSetup.mProfileLevel = mPlayerInfo->mLevel;
+	aSetup.mCoins = mPlayerInfo->mCoins;
+	aSetup.mFinishedAdventure = mPlayerInfo->mFinishedAdventure;
+	for (int i = 0; i < Coop::PURCHASE_COUNT; i++)
+		aSetup.mPurchases[i] = mPlayerInfo->mPurchases[i];
+
+	aCoop.HostEnterLevel(aSetup);
+}
+
+void LawnApp::CoopBorrowHostProfile(const Coop::LevelSetup& theSetup)
+{
+	if (mPlayerInfo == nullptr)
+		return;
+
+	// Keep the client's own campaign aside the first time, so it can be handed
+	// back intact when the session ends. It is never saved while borrowed.
+	if (!mCoopOwnProfile)
+	{
+		mCoopOwnProfile = std::make_unique<PlayerInfo>();
+		*mCoopOwnProfile = *mPlayerInfo;
+	}
+
+	mPlayerInfo->mLevel = theSetup.mProfileLevel;
+	mPlayerInfo->mCoins = theSetup.mCoins;
+	mPlayerInfo->mFinishedAdventure = theSetup.mFinishedAdventure;
+	for (int i = 0; i < Coop::PURCHASE_COUNT; i++)
+		mPlayerInfo->mPurchases[i] = theSetup.mPurchases[i];
+}
+
+void LawnApp::CoopReturnOwnProfile()
+{
+	if (!mCoopOwnProfile || mPlayerInfo == nullptr)
+		return;
+
+	*mPlayerInfo = *mCoopOwnProfile;
+	mCoopOwnProfile.reset();
+}
+
+void LawnApp::CoopFollowIntoLevel(const Coop::LevelSetup& theSetup)
+{
+	// The host's progress decides the shape of the level -- how many seed
+	// slots, which seeds exist, whether the roof has mowers -- so it has to be
+	// in place before anything reads it.
+	CoopBorrowHostProfile(theSetup);
+	mCoopWaitingForHost = false;
+
+	Coop::Game::Get().EndLevel();  // retire the previous level's clock
+	KillSeedChooserScreen();
+	KillAwardScreen();
+	KillGameSelector();
+	KillBoard();
+
+	mGameMode = static_cast<GameMode>(theSetup.mGameMode);
+	mBoardResult = BoardResult::BOARDRESULT_NONE;
+	NewGame();
+}
+
+void LawnApp::CoopUpdateFlow()
+{
+	Coop::Game& aCoop = Coop::Game::Get();
+
+	if (!aCoop.IsConnected())
+	{
+		// Session over. Give the client its own campaign back before it can
+		// save anything, so a co-op run never overwrites its progress.
+		CoopReturnOwnProfile();
+		mCoopWaitingForHost = false;
+		return;
+	}
+
+	if (aCoop.IsHost())
+		return;
+
+	// Order matters: the host may send "level over" and "here is the next
+	// one" in quick succession, and they have to be applied in that order or
+	// the client tears down the level it has just been told to build.
+	if (aCoop.PopLeaveLevel())
+	{
+		aCoop.EndLevel();
+		aCoop.ClearLevelSetup();
+		KillSeedChooserScreen();
+		KillAwardScreen();
+		KillBoard();
+		ShowGameSelector();
+		mCoopWaitingForHost = true;
+	}
+
+	Coop::LevelSetup aSetup;
+	if (aCoop.PopEnterLevel(aSetup))
+		CoopFollowIntoLevel(aSetup);
 }
 
 void LawnApp::ShowGameSelector()
@@ -569,6 +730,16 @@ void LawnApp::EndLevel()
 	if (IsAdventureMode())
 	{
 		NewGame();
+
+		// Upstream then builds the level a second time, below, throwing the
+		// first one away. Harmless in single player; in co-op it would be a
+		// second level announcement, which the client would dutifully follow
+		// into a board the host has already discarded.
+		if (Coop::Game::Get().IsConnected())
+		{
+			mFirstTimeGameSelector = true;
+			return;
+		}
 	}
 
 	mFirstTimeGameSelector = true;
@@ -583,6 +754,16 @@ void LawnApp::EndLevel()
 
 void LawnApp::DoBackToMain()
 {
+	// The host leaving a level takes the client with it, or the client sits
+	// in a level that no longer exists on the other machine, stalling forever
+	// on input that is never coming.
+	Coop::Game& aCoop = Coop::Game::Get();
+	if (aCoop.IsConnected() && aCoop.IsHost())
+	{
+		aCoop.HostLeaveLevel();
+		aCoop.EndLevel();
+	}
+
 	mMusic->StopAllMusic();
 	mSoundSystem->CancelPausedFoley();
 	WriteCurrentUserConfig();
@@ -1404,6 +1585,20 @@ void LawnApp::CheckForGameEnd()
 	if (IsAdventureMode())
 	{
 		int aLevel = mBoard->mLevel;
+
+		// Take the client out of the level before the host tears it down.
+		// Everything below -- the award screen, Crazy Dave handing over a new
+		// seed packet -- is host-only and can take a while, during which the
+		// host stops ticking the simulation entirely. A client left in the
+		// level just stalls there waiting for input that is never coming,
+		// which is what turned a level transition into a black screen.
+		Coop::Game& aCoop = Coop::Game::Get();
+		if (aCoop.IsConnected() && aCoop.IsHost())
+		{
+			aCoop.HostLeaveLevel();
+			aCoop.EndLevel();
+		}
+
 		KillBoard();
 
 		if (IsFirstTimeAdventureMode() && aLevel < 50)
@@ -1554,6 +1749,7 @@ void LawnApp::UpdateFrames()
 	// Drives the connection even outside a level, so the handshake finishes
 	// and a disconnect is noticed promptly.
 	Coop::Game::Get().Update();
+	CoopUpdateFlow();
 
 	if ((!mActive || mMinimized) && mBoard)
 	{
