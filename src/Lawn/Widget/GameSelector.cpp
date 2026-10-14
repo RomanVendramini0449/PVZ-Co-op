@@ -1214,11 +1214,14 @@ namespace
 	constexpr int kBonusH = 40;
 	constexpr int kBonusOnslaught = 1001;
 	constexpr int kBonusSandbox = 1002;
-	struct BonusButton { int mCode; int mX; int mWidth; };
+	constexpr int kBonusRoman = 1003;   // locked until Luca is
+	struct BonusButton { int mCode; int mX; int mY; int mWidth; };
 	constexpr BonusButton kBonusButtons[] = {
-		{ kBonusOnslaught, kLevelSelectX, 300 },
-		{ kBonusSandbox,   kLevelSelectX + 312, 248 },
+		{ kBonusOnslaught, kLevelSelectX,       kBonusY,                    300 },
+		{ kBonusSandbox,   kLevelSelectX + 312, kBonusY,                    248 },
+		{ kBonusRoman,     kLevelSelectX,       kBonusY + kBonusH + 8,      300 },
 	};
+	constexpr int kBonusBottom = kBonusY + 2 * kBonusH + 8;
 }
 
 namespace
@@ -1294,6 +1297,8 @@ void GameSelector::CoopLevelSelectClicked(int x, int y)
 		CoopStartBonusLevel(GameMode::GAMEMODE_COOP_ONSLAUGHT);
 	else if (aLevel == kBonusSandbox)
 		CoopStartBonusLevel(GameMode::GAMEMODE_COOP_SANDBOX);
+	else if (aLevel == kBonusRoman)
+		CoopStartBonusLevel(GameMode::GAMEMODE_COOP_ROMAN);
 	else if (aLevel > 0)
 		CoopStartLevel(aLevel);
 }
@@ -1341,10 +1346,15 @@ bool GameSelector::CoopLevelSelectEnabled() const
 
 int GameSelector::CoopLevelSelectHitTest(int x, int y) const
 {
+	const bool aHasLuca = mApp->mPlayerInfo && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] > 0;
 	for (const BonusButton& aButton : kBonusButtons)
 	{
-		if (x >= aButton.mX && x < aButton.mX + aButton.mWidth && y >= kBonusY && y < kBonusY + kBonusH)
+		if (x >= aButton.mX && x < aButton.mX + aButton.mWidth && y >= aButton.mY && y < aButton.mY + kBonusH)
+		{
+			if (aButton.mCode == kBonusRoman && !aHasLuca)
+				return 0;  // still locked
 			return aButton.mCode;
+		}
 	}
 
 	const int aCol = (x - kLevelSelectX) / kLevelCellW;
@@ -1402,26 +1412,48 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 	const bool aHasLuca = mApp->mPlayerInfo && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] > 0;
 	for (const BonusButton& aButton : kBonusButtons)
 	{
-		const bool aOnslaught = aButton.mCode == kBonusOnslaught;
-		g->SetColor(aOnslaught ? Color(110, 45, 30, 235) : Color(35, 55, 100, 235));
-		g->FillRect(aButton.mX + 2, kBonusY + 2, aButton.mWidth - 4, kBonusH - 4);
+		const char* aTitle = "";
+		const char* aNote = "";
+		Color aFill;
+		if (aButton.mCode == kBonusOnslaught)
+		{
+			aTitle = "Gargantuar Onslaught";
+			aNote = aHasLuca ? "25 Gargantuars, 2 waves. Win: $10,000" : "25 Gargantuars, 2 waves. Win: Luca + $10,000";
+			aFill = Color(110, 45, 30, 235);
+		}
+		else if (aButton.mCode == kBonusSandbox)
+		{
+			aTitle = "Dev Sandbox";
+			aNote = "Every plant, endless sun, no recharge";
+			aFill = Color(35, 55, 100, 235);
+		}
+		else if (aHasLuca)
+		{
+			aTitle = "Luca vs. Roman";
+			aNote = "Boss fight. Luca, Jalapenos and Ice-shrooms";
+			aFill = Color(40, 30, 110, 235);
+		}
+		else
+		{
+			aTitle = "???";
+			aNote = "Beat Gargantuar Onslaught to unlock";
+			aFill = Color(50, 50, 50, 235);
+		}
 
+		g->SetColor(aFill);
+		g->FillRect(aButton.mX + 2, aButton.mY + 2, aButton.mWidth - 4, kBonusH - 4);
 		g->SetFont(Sexy::FONT_BRIANNETOD16);
 		g->SetColor(Color(255, 245, 200));
-		g->DrawString(aOnslaught ? "Gargantuar Onslaught" : "Dev Sandbox", aButton.mX + 12, kBonusY + 20);
-
+		g->DrawString(aTitle, aButton.mX + 12, aButton.mY + 20);
 		g->SetFont(Sexy::FONT_BRIANNETOD12);
 		g->SetColor(Color(220, 210, 180));
-		const char* aNote = aOnslaught
-			? (aHasLuca ? "25 Gargantuars, 2 waves. Win: $10,000" : "25 Gargantuars, 2 waves. Win: Luca + $10,000")
-			: "Every plant, endless sun, no recharge";
-		g->DrawString(aNote, aButton.mX + 12, kBonusY + 34);
+		g->DrawString(aNote, aButton.mX + 12, aButton.mY + 34);
 	}
 
 	g->SetFont(Sexy::FONT_BRIANNETOD12);
 	g->SetColor(Color(200, 200, 190));
 	g->DrawString("Click anywhere else to cancel.",
-		kLevelSelectX, kBonusY + kBonusH + 22);
+		kLevelSelectX, kBonusBottom + 22);
 }
 
 // The bonus levels need no campaign progress, so unlike CoopStartLevel this

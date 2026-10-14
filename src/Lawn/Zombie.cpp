@@ -26,6 +26,7 @@
 #include "Board.h"
 #include "../ConstEnums.h"
 #include "Zombie.h"
+#include "CoopArt.h"
 #include "../Coop/CoopGame.h"
 #include "Cutscene.h"
 #include "GridItem.h"
@@ -685,6 +686,12 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 		break;
 
 	case ZombieType::ZOMBIE_BOSS:
+		if (mApp->IsCoopRomanLevel())
+		{
+			InitCoopRoman();
+			aRenderLayer = RenderLayer::RENDER_LAYER_TOP;
+			break;
+		}
 		mPosX = 0.0f;
 		mPosY = 0.0f;
 		mZombieRect = Rect(700, 80, 90, 430);
@@ -4646,6 +4653,12 @@ void Zombie::UpdatePlaying()
 		}
 	}
 
+	if (IsCoopRoman())
+	{
+		UpdateCoopRoman();
+		return;
+	}
+
 	if (mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE)
 	{
 		UpdateZombieRiseFromGrave();
@@ -7154,7 +7167,7 @@ bool Zombie::TrySpawnLevelAward()
 		return false;
 	}
 
-	if (mApp->IsFinalBossLevel())
+	if (mApp->IsBossFightLevel())
 	{
 		if (mZombieType != ZombieType::ZOMBIE_BOSS)
 		{
@@ -7257,9 +7270,9 @@ bool Zombie::TrySpawnLevelAward()
 		// the first time, the prize money every time after.
 		aCoinType = mApp->HasSeedType(SeedType::SEED_LUCA) ? CoinType::COIN_AWARD_MONEY_BAG : CoinType::COIN_FINAL_SEED_PACKET;
 	}
-	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_SANDBOX)
+	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_SANDBOX || mApp->mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
 	{
-		aCoinType = CoinType::COIN_TROPHY;  // nothing to win; just a way out
+		aCoinType = CoinType::COIN_TROPHY;  // the way out of the level
 	}
 	else if (!mApp->IsAdventureMode())
 	{
@@ -7936,6 +7949,15 @@ void Zombie::TakeBodyDamage(int theDamage, unsigned int theDamageFlags)
 			}
 		}
 	}
+	else if (IsCoopRoman())
+	{
+		// Roman goes out with a sequence of his own, not the usual death.
+		if (mBodyHealth <= 0)
+		{
+			mBodyHealth = 1;
+			CoopRomanStartDeath();
+		}
+	}
 	else if (mZombieType == ZombieType::ZOMBIE_BOSS)
 	{
 		if (!TestBit(theDamageFlags, static_cast<int>(DamageFlags::DAMAGE_DOESNT_CAUSE_FLASH)))
@@ -8073,6 +8095,7 @@ bool Zombie::CanBeChilled()
 
 	return
 		mZombieType != ZombieType::ZOMBIE_BOSS ||
+		IsCoopRoman() ||
 		mZombiePhase == ZombiePhase::PHASE_BOSS_HEAD_IDLE_BEFORE_SPIT ||
 		mZombiePhase == ZombiePhase::PHASE_BOSS_HEAD_IDLE_AFTER_SPIT ||
 		mZombiePhase == ZombiePhase::PHASE_BOSS_HEAD_SPIT;
@@ -8130,7 +8153,14 @@ bool Zombie::EffectedByDamage(unsigned int theDamageRangeFlags)
 		return false;  // cannot be hit while being airdropped
 	}
 
-	if (mZombieType == ZombieType::ZOMBIE_BOSS)
+	if (IsCoopRoman())
+	{
+		// Roman can be hit whenever he is there to hit -- except while going
+		// out, which is no time to be counting damage.
+		if (mCoopBossState == 6)  // ROMAN_STATE_DYING
+			return false;
+	}
+	else if (mZombieType == ZombieType::ZOMBIE_BOSS)
 	{
 		Reanimation* aBodyReanim = mApp->ReanimationGet(mBodyReanimID);
 		if (mZombiePhase == ZombiePhase::PHASE_BOSS_HEAD_ENTER && aBodyReanim->mAnimTime < 0.5f)
@@ -8320,6 +8350,9 @@ bool Zombie::ZombieTypeCanGoOnHighGround(ZombieType theZombieType)
 
 Rect Zombie::GetZombieRect()
 {
+	if (IsCoopRoman())
+		return GetCoopRomanRect();
+
 	Rect aZombieRect = mZombieRect;
 	if (IsWalkingBackwards())
 	{
@@ -10548,6 +10581,15 @@ void Zombie::BossSetupReanim()
 
 void Zombie::DrawBossPart(Graphics* g, BossPart theBossPart)
 {
+	if (IsCoopRoman())
+	{
+		if (theBossPart == BossPart::BOSS_PART_MAIN)
+			DrawCoopRoman(g);
+		else if (theBossPart == BossPart::BOSS_PART_FIREBALL)
+			DrawBossFireBall(g);
+		return;
+	}
+
 	ZombieDrawPosition aDrawPos;
 	GetDrawPos(aDrawPos);
 
@@ -10726,4 +10768,312 @@ void Zombie::SetupWaterTrack(const char* theTrackName)
 	aTrackInstance->mIgnoreExtraAdditiveColor = true;
 	aTrackInstance->mIgnoreColorOverride = true;
 	aTrackInstance->mIgnoreClipRect = true;
+}
+
+// ---------------------------------------------------------------------------
+// PvZ Co-op: Roman, the boss of "Luca vs. Roman"
+// ---------------------------------------------------------------------------
+//
+// Dr. Zomboss's zombie type underneath -- which brings his health bar, his fire
+// and ice balls, and the Jalapeno and Ice-shroom answers to them -- with a
+// behaviour and a look of his own: a 3x3 block over the last three columns
+// that slides to a lane, rolls a ball down it, and slides back to the middle.
+// All of it runs inside the simulation and draws only from the game's random
+// generator, so both co-op machines see the same fight.
+
+namespace
+{
+	enum RomanState
+	{
+		ROMAN_STATE_ENTER = 0,
+		ROMAN_STATE_IDLE = 1,
+		ROMAN_STATE_MOVE = 2,
+		ROMAN_STATE_WINDUP = 3,
+		ROMAN_STATE_RECOVER = 4,
+		ROMAN_STATE_RETURN = 5,
+		ROMAN_STATE_DYING = 6,  // EffectedByDamage tests this value directly
+	};
+
+	constexpr float ROMAN_MOVE_SPEED = 2.5f;  // pixels a tick
+	constexpr int   ROMAN_ENTER_TICKS = 150;
+	constexpr int   ROMAN_WINDUP_TICKS = 80;   // the warning glow before a ball
+	constexpr int   ROMAN_RECOVER_TICKS = 200;
+	constexpr int   ROMAN_DYING_TICKS = 300;
+	constexpr float ROMAN_BALL_X = 470.0f;     // where a ball forms: just in front of him
+	constexpr int   ROMAN_BLOCK_COLS = 3;
+	constexpr int   ROMAN_BLOCK_ROWS = 3;
+
+	float RomanTopForRow(Board* theBoard, int theCenterRow)
+	{
+		return static_cast<float>(theBoard->GridToPixelY(ROMAN_FIRST_COL, theCenterRow - 1));
+	}
+
+	float RomanRowHeight(Board* theBoard)
+	{
+		return static_cast<float>(theBoard->GridToPixelY(ROMAN_FIRST_COL, 1) - theBoard->GridToPixelY(ROMAN_FIRST_COL, 0));
+	}
+
+	float RomanColWidth(Board* theBoard)
+	{
+		return static_cast<float>(theBoard->GridToPixelX(ROMAN_FIRST_COL + 1, 0) - theBoard->GridToPixelX(ROMAN_FIRST_COL, 0));
+	}
+}
+
+bool Zombie::IsCoopRoman()
+{
+	return mZombieType == ZombieType::ZOMBIE_BOSS && mApp->IsCoopRomanLevel();
+}
+
+int Zombie::RowDeviationFrom(int theRow)
+{
+	if (mZombieType != ZombieType::ZOMBIE_BOSS)
+		return mRow - theRow;
+	if (!IsCoopRoman())
+		return 0;
+
+	if (theRow < mRow - 1)
+		return (mRow - 1) - theRow;
+	if (theRow > mRow + 1)
+		return (mRow + 1) - theRow;
+	return 0;
+}
+
+void Zombie::InitCoopRoman()
+{
+	mPosX = 0.0f;
+	mPosY = 0.0f;
+	mZombieRect = Rect(0, 0, 0, 0);  // GetCoopRomanRect follows him instead
+	mZombieAttackRect = Rect(0, 0, 0, 0);
+	mBodyHealth = ROMAN_HEALTH;
+	mZombiePhase = ZombiePhase::PHASE_BOSS_IDLE;
+	mRow = ROMAN_CENTER_ROW;
+	mFireballRow = -1;
+	mIsFireBall = false;
+	mBossFireBallReanimID = ReanimationID::REANIMATIONID_NULL;
+
+	mCoopBossState = ROMAN_STATE_ENTER;
+	mCoopBossTimer = ROMAN_ENTER_TICKS;
+	mCoopBossAttacksLeft = 0;
+	mCoopBossTargetRow = ROMAN_CENTER_ROW;
+	mCoopBossAttackLane = ROMAN_CENTER_ROW;
+	mCoopBossSummonTimer = ROMAN_FIRST_SUMMON_TICKS;
+	mCoopBossNextFire = true;
+	mCoopBossTopY = IsOnBoard() ? RomanTopForRow(mBoard, ROMAN_CENTER_ROW) : 0.0f;
+}
+
+Rect Zombie::GetCoopRomanRect()
+{
+	if (!IsOnBoard())
+		return Rect(0, 0, 0, 0);
+
+	const int aLeft = mBoard->GridToPixelX(ROMAN_FIRST_COL, 0);
+	const int aWidth = static_cast<int>(RomanColWidth(mBoard)) * ROMAN_BLOCK_COLS;
+	const int aHeight = static_cast<int>(RomanRowHeight(mBoard)) * ROMAN_BLOCK_ROWS;
+	return Rect(aLeft + 10, static_cast<int>(mCoopBossTopY) + 10, aWidth - 20, aHeight - 20);
+}
+
+void Zombie::CoopRomanPickTarget()
+{
+	mCoopBossAttackLane = Rand(5);
+	mCoopBossTargetRow = std::clamp(mCoopBossAttackLane, 1, 3);
+	mCoopBossNextFire = Rand(2) == 0;
+	mCoopBossState = ROMAN_STATE_MOVE;
+}
+
+bool Zombie::CoopRomanSlideTowards(float theTopY)
+{
+	const float aDiff = theTopY - mCoopBossTopY;
+	if (std::abs(aDiff) <= ROMAN_MOVE_SPEED)
+	{
+		mCoopBossTopY = theTopY;
+		return true;
+	}
+	mCoopBossTopY += aDiff > 0.0f ? ROMAN_MOVE_SPEED : -ROMAN_MOVE_SPEED;
+	return false;
+}
+
+void Zombie::CoopRomanSpawnBall()
+{
+	mFireballRow = mCoopBossAttackLane;
+	mIsFireBall = mCoopBossNextFire;
+
+	const float aPosY = mBoard->GetPosYBasedOnRow(ROMAN_BALL_X + 75.0f, mFireballRow) - 90.0f;
+	const int aRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mFireballRow, 0);
+	Reanimation* aBall = mApp->AddReanimation(ROMAN_BALL_X, aPosY, aRenderOrder,
+		mIsFireBall ? ReanimationType::REANIM_BOSS_FIREBALL : ReanimationType::REANIM_BOSS_ICEBALL);
+	aBall->PlayReanim("anim_form", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 16.0f);
+	aBall->mIsAttachment = true;
+	if (mIsFireBall)
+	{
+		aBall->AssignRenderGroupToTrack("additive", RENDER_GROUP_BOSS_FIREBALL_ADDITIVE);
+		aBall->AssignRenderGroupToTrack("superglow", RENDER_GROUP_BOSS_FIREBALL_ADDITIVE);
+	}
+	else
+	{
+		aBall->AssignRenderGroupToTrack("ice_highlight", RENDER_GROUP_BOSS_FIREBALL_ADDITIVE);
+	}
+	mBossFireBallReanimID = mApp->ReanimationGetID(aBall);
+	mApp->PlayFoley(FoleyType::FOLEY_BOSS_BOULDER_ATTACK);
+}
+
+void Zombie::CoopRomanStartDeath()
+{
+	if (mCoopBossState == ROMAN_STATE_DYING)
+		return;
+
+	mCoopBossState = ROMAN_STATE_DYING;
+	mCoopBossTimer = ROMAN_DYING_TICKS;
+	BossDestroyFireball();
+	BossDestroyIceballInRow();
+	mApp->PlaySample(SOUND_BOSSEXPLOSION);
+	mApp->PlayFoley(FoleyType::FOLEY_GARGANTUDEATH);
+}
+
+void Zombie::UpdateCoopRoman()
+{
+	// A ball keeps rolling whatever Roman is doing, frozen included.
+	UpdateBossFireball();
+
+	if (mCoopBossState == ROMAN_STATE_DYING)
+	{
+		mCoopBossTimer--;
+		if (mCoopBossTimer % 25 == 0)
+		{
+			const Rect aRect = GetCoopRomanRect();
+			const float aX = RandRangeFloat(static_cast<float>(aRect.mX), static_cast<float>(aRect.mX + aRect.mWidth));
+			const float aY = RandRangeFloat(static_cast<float>(aRect.mY), static_cast<float>(aRect.mY + aRect.mHeight));
+			mApp->AddPvzpParticle(aX, aY, Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 0), ParticleEffect::PARTICLE_BOSS_EXPLOSION);
+			mApp->PlayFoley(FoleyType::FOLEY_BOSS_EXPLOSION_SMALL);
+			mBoard->ShakeBoard(1, 2);
+		}
+		if (mCoopBossTimer <= 0)
+		{
+			BossDie();   // takes everyone else down with him
+			DropLoot();  // and the level's award drops where he stood
+		}
+		return;
+	}
+
+	// A couple of ordinary zombies now and then, to keep the lawn busy.
+	if (mIceTrapCounter == 0 && mCoopBossState != ROMAN_STATE_ENTER && --mCoopBossSummonTimer <= 0)
+	{
+		for (int i = 0; i < 2; i++)
+		{
+			const ZombieType aType = Rand(3) == 0 ? ZombieType::ZOMBIE_TRAFFIC_CONE : ZombieType::ZOMBIE_NORMAL;
+			mBoard->AddZombieInRow(aType, Rand(5), 0);
+		}
+		mCoopBossSummonTimer = RandRangeInt(ROMAN_SUMMON_MIN_TICKS, ROMAN_SUMMON_MAX_TICKS);
+	}
+
+	if (mIceTrapCounter > 0)
+		return;  // frozen: an Ice-shroom buys a breather
+
+	switch (mCoopBossState)
+	{
+	case ROMAN_STATE_ENTER:
+		if (--mCoopBossTimer <= 0)
+		{
+			mCoopBossState = ROMAN_STATE_IDLE;
+			mCoopBossTimer = RandRangeInt(ROMAN_IDLE_MIN_TICKS, ROMAN_IDLE_MAX_TICKS);
+		}
+		break;
+
+	case ROMAN_STATE_IDLE:
+		if (--mCoopBossTimer <= 0)
+		{
+			mCoopBossAttacksLeft = RandRangeInt(1, 3);
+			CoopRomanPickTarget();
+		}
+		break;
+
+	case ROMAN_STATE_MOVE:
+		if (CoopRomanSlideTowards(RomanTopForRow(mBoard, mCoopBossTargetRow)))
+		{
+			mCoopBossState = ROMAN_STATE_WINDUP;
+			mCoopBossTimer = ROMAN_WINDUP_TICKS;
+		}
+		break;
+
+	case ROMAN_STATE_WINDUP:
+		if (--mCoopBossTimer <= 0)
+		{
+			// One ball at a time: if the last is still rolling, hold it.
+			if (mApp->ReanimationTryToGet(mBossFireBallReanimID) == nullptr)
+			{
+				CoopRomanSpawnBall();
+				mCoopBossState = ROMAN_STATE_RECOVER;
+				mCoopBossTimer = ROMAN_RECOVER_TICKS;
+			}
+			else
+			{
+				mCoopBossTimer = 10;
+			}
+		}
+		break;
+
+	case ROMAN_STATE_RECOVER:
+		if (--mCoopBossTimer <= 0)
+		{
+			if (--mCoopBossAttacksLeft > 0)
+			{
+				CoopRomanPickTarget();
+			}
+			else
+			{
+				mCoopBossTargetRow = ROMAN_CENTER_ROW;
+				mCoopBossState = ROMAN_STATE_RETURN;
+			}
+		}
+		break;
+
+	case ROMAN_STATE_RETURN:
+		if (CoopRomanSlideTowards(RomanTopForRow(mBoard, ROMAN_CENTER_ROW)))
+		{
+			mCoopBossState = ROMAN_STATE_IDLE;
+			mCoopBossTimer = RandRangeInt(ROMAN_IDLE_MIN_TICKS, ROMAN_IDLE_MAX_TICKS);
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	// The lanes he can be hit from follow him as he slides.
+	const float aRowsDown = (mCoopBossTopY - RomanTopForRow(mBoard, 1)) / RomanRowHeight(mBoard);
+	mRow = std::clamp(static_cast<int>(std::floor(aRowsDown + 0.5f)) + 1, 1, 3);
+}
+
+void Zombie::DrawCoopRoman(Graphics* g)
+{
+	const Rect aRect = GetCoopRomanRect();
+	const float aCenterX = aRect.mX + aRect.mWidth * 0.5f - mX;
+	const float aBob = static_cast<float>(sin(mZombieAge * 0.05)) * 4.0f;
+	const float aBottomY = aRect.mY + aRect.mHeight + 6.0f - mY + aBob;
+	const float aHeight = static_cast<float>(aRect.mHeight) + 10.0f;
+
+	// What the glow says: hit, frozen, about to throw fire or ice, going out.
+	Color aGlow(0, 0, 0, 0);
+	if (mCoopBossState == ROMAN_STATE_DYING)
+	{
+		aGlow = Color(255, 255, 255, (mCoopBossTimer / 4) % 2 ? 200 : 40);
+	}
+	else if (mIceTrapCounter > 0)
+	{
+		aGlow = Color(140, 220, 255, 150);
+	}
+	else if (mCoopBossState == ROMAN_STATE_WINDUP)
+	{
+		const int aPulse = 80 + static_cast<int>(100.0 * (0.5 + 0.5 * sin(mCoopBossTimer * 0.35)));
+		aGlow = mCoopBossNextFire ? Color(255, 90, 30, aPulse) : Color(120, 200, 255, aPulse);
+	}
+	else if (mJustGotShotCounter > 0)
+	{
+		aGlow = Color(255, 255, 255, std::min(mJustGotShotCounter * 10, 140));
+	}
+
+	int aAlpha = 255;
+	if (mCoopBossState == ROMAN_STATE_ENTER)
+		aAlpha = std::clamp(255 - mCoopBossTimer * 255 / ROMAN_ENTER_TICKS, 0, 255);
+
+	CoopArt::DrawRoman(g, aCenterX, aBottomY, aHeight, aGlow, aAlpha);
 }

@@ -37,6 +37,8 @@ extern const unsigned char gCoopArt_luca[];
 extern const std::size_t gCoopArt_luca_size;
 extern const unsigned char gCoopArt_cheese[];
 extern const std::size_t gCoopArt_cheese_size;
+extern const unsigned char gCoopArt_roman[];
+extern const std::size_t gCoopArt_roman_size;
 
 namespace
 {
@@ -54,6 +56,7 @@ namespace
 	// belong to is torn down at exit regardless.
 	Image* gLucaImage = nullptr;
 	Image* gCheeseImage = nullptr;
+	Image* gRomanImage = nullptr;
 	bool   gLoaded = false;
 
 	void LoadArt()
@@ -63,6 +66,7 @@ namespace
 		gLoaded = true;
 		gLucaImage = gLawnApp->GetImageFromMemory(gCoopArt_luca, gCoopArt_luca_size, "coop/luca.png");
 		gCheeseImage = gLawnApp->GetImageFromMemory(gCoopArt_cheese, gCoopArt_cheese_size, "coop/cheese.png");
+		gRomanImage = gLawnApp->GetImageFromMemory(gCoopArt_roman, gCoopArt_roman_size, "coop/roman.png");
 	}
 }
 
@@ -125,4 +129,38 @@ void CoopArt::DrawCheese(Graphics* g, float theCenterX, float theCenterY, float 
 	const Rect aSrcRect(0, 0, anImage->mWidth, anImage->mHeight);
 	const Color& aColor = aG.mColorizeImages ? aG.mColor : Color::White;
 	PvzpBltMatrix(&aG, anImage, aTransform, aG.mClipRect, aColor, aG.mDrawMode, aSrcRect);
+}
+
+Image* CoopArt::RomanImage()
+{
+	LoadArt();
+	return gRomanImage;
+}
+
+void CoopArt::DrawRoman(Graphics* g, float theCenterX, float theBottomY, float theHeight, const Color& theGlow, int theAlpha)
+{
+	Image* anImage = RomanImage();
+	if (anImage == nullptr || theAlpha <= 0)
+		return;
+
+	const float aScale = theHeight / static_cast<float>(anImage->mHeight);
+	const float aLeft = theCenterX - anImage->mWidth * aScale * 0.5f;
+	const float aTop = theBottomY - anImage->mHeight * aScale;
+
+	Graphics aG(*g);
+	aG.SetLinearBlend(true);
+	if (theAlpha < 255)
+	{
+		aG.SetColorizeImages(true);
+		aG.SetColor(Color(255, 255, 255, theAlpha));
+	}
+	PvzpDrawImageScaledF(&aG, anImage, aLeft, aTop, aScale, aScale);
+
+	if (theGlow.mAlpha > 0)
+	{
+		aG.SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
+		aG.SetColorizeImages(true);
+		aG.SetColor(Color(theGlow.mRed, theGlow.mGreen, theGlow.mBlue, theGlow.mAlpha * theAlpha / 255));
+		PvzpDrawImageScaledF(&aG, anImage, aLeft, aTop, aScale, aScale);
+	}
 }

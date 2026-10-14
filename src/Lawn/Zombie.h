@@ -156,6 +156,16 @@ public:
 	ReanimationID                   mSpecialHeadReanimID;
 	int32_t                         mFireballRow;
 	bool                            mIsFireBall;
+	// PvZ Co-op, Luca vs. Roman: the boss's own state (see UpdateCoopRoman).
+	// Not saved: co-op never saves mid-level.
+	int32_t                         mCoopBossState;
+	int32_t                         mCoopBossTimer;
+	int32_t                         mCoopBossAttacksLeft;
+	int32_t                         mCoopBossTargetRow;   // the centre row he is heading for
+	int32_t                         mCoopBossAttackLane;  // the lane the next ball rolls down
+	int32_t                         mCoopBossSummonTimer;
+	bool                            mCoopBossNextFire;
+	float                           mCoopBossTopY;        // top of his 3x3 block, in pixels
 	ReanimationID                   mMoweredReanimID;
 	ReanimationID                   mZombatarHeadReanimID;
 	int32_t                         mLastPortalX;
@@ -353,6 +363,20 @@ public:
 	void                            CheckForBoardEdge();
 	void                            UpdateYeti();
 	void                            DrawBossPart(Graphics* g, BossPart theBossPart);
+	// Luca vs. Roman.
+	bool                            IsCoopRoman();
+	// How many lanes away from theRow this zombie is, for anything that only
+	// reaches its own lane: 0 means within reach. Dr. Zomboss fills the whole
+	// right side, so every lane reaches him; Roman, only the three he covers.
+	int                             RowDeviationFrom(int theRow);
+	void                            InitCoopRoman();
+	void                            UpdateCoopRoman();
+	void                            CoopRomanPickTarget();
+	bool                            CoopRomanSlideTowards(float theTopY);
+	void                            CoopRomanSpawnBall();
+	void                            CoopRomanStartDeath();
+	Rect                            GetCoopRomanRect();
+	void                            DrawCoopRoman(Graphics* g);
 	void                            BossSetupReanim();
 	void                            MowDown();
 	void                            UpdateMowered();

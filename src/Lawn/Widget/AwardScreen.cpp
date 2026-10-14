@@ -323,6 +323,11 @@ void AwardScreen::Draw(Graphics* g)
 		DrawAwardSeed(g, SEED_LUCA);
 		DrawCoopPrizeLine(g);
 	}
+	else if (mAwardType == AWARD_COOP_ROMAN_BEATEN)
+	{
+		DrawBottom(g, "Roman Defeated!", "Luca vs. Roman", "Luca and his cheese win the day. Roman will be back... probably.");
+		g->DrawImage(Sexy::IMAGE_TROPHY_HI_RES, BOARD_WIDTH / 2 - Sexy::IMAGE_TROPHY_HI_RES->mWidth / 2, 137);
+	}
 	else if (mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE)
 	{
 		DrawBottom(g, "Challenge Complete!", "$10,000", "Prize money for beating Gargantuar Onslaught. Spend it at Crazy Dave's!");
@@ -522,7 +527,8 @@ void AwardScreen::StartButtonPressed()
 		mApp->KillAwardScreen();
 		mApp->ShowCreditScreen();
 	}
-	else if (mAwardType == AWARD_HELP_ZOMBIENOTE || mAwardType == AWARD_COOP_LUCA || mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE)
+	else if (mAwardType == AWARD_HELP_ZOMBIENOTE || mAwardType == AWARD_COOP_LUCA || mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE ||
+		mAwardType == AWARD_COOP_ROMAN_BEATEN)
 	{
 		mApp->KillAwardScreen();
 		mApp->ShowGameSelector();

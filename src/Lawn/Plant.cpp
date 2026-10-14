@@ -190,7 +190,8 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 		mBlinkCountdown = 400 + Sexy::Rand(400);
 	}
 
-	if (IsNocturnal(mSeedType) && mBoard && !mBoard->StageIsNight())
+	// Roman is fought by day, and the Ice-shroom on his conveyor has to work.
+	if (IsNocturnal(mSeedType) && mBoard && !mBoard->StageIsNight() && !mApp->IsCoopRomanLevel())
 		SetSleeping(true);
 
 	if (mLaunchRate > 0)
@@ -693,7 +694,7 @@ void Plant::DoRowAreaDamage(int theDamage, unsigned int theDamageFlags)
 	{
 		if (aZombie->mDead)
 			continue;
-		int aDiffY = (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS) ? 0 : (aZombie->mRow - mRow);
+		int aDiffY = aZombie->RowDeviationFrom(mRow);
 		if (mSeedType == SeedType::SEED_GLOOMSHROOM)
 		{
 			if (aDiffY < -1 || aDiffY > 1)
@@ -885,7 +886,7 @@ bool Plant::FindStarFruitTarget()
 		Rect aZombieRect = aZombie->GetZombieRect();
 		if (aZombie->EffectedByDamage(aDamageRangeFlags))
 		{
-			if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && mPlantCol >= 5)
+			if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && !aZombie->IsCoopRoman() && mPlantCol >= 5)
 				return true;
 
 			if (aZombie->mRow == mRow)
@@ -1091,7 +1092,8 @@ void Plant::UpdateProductionPlant()
 // building as it gets close -- on its own clock (see PlantInitialize).
 void Plant::UpdateLucaSun()
 {
-	if (!IsInPlay() || mApp->IsIZombieLevel() || mBoard->HasLevelAwardDropped())
+	// No sun against Roman: the conveyor is what feeds that fight.
+	if (!IsInPlay() || mApp->IsIZombieLevel() || mApp->IsCoopRomanLevel() || mBoard->HasLevelAwardDropped())
 		return;
 
 	// mStateCountdown is counted down for every plant in UpdateAbilities.
@@ -1357,7 +1359,7 @@ void Plant::UpdateScaredyShroom()
 		if (aZombie->mDead)
 			continue;
 		Rect aZombieRect = aZombie->GetZombieRect();
-		int aDiffY = (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS) ? 0 : (aZombie->mRow - mRow);
+		int aDiffY = aZombie->RowDeviationFrom(mRow);
 		if (!aZombie->mMindControlled && !aZombie->IsDeadOrDying() && aDiffY <= 1 && aDiffY >= -1 && GetCircleRectOverlap(mX, mY + 20.0f, 120, aZombieRect))
 		{
 			aHasZombieNearby = true;
@@ -1445,7 +1447,7 @@ void Plant::DoSquashDamage()
 	{
 		if (aZombie->mDead)
 			continue;
-		if ((aZombie->mRow == mRow || aZombie->mZombieType == ZombieType::ZOMBIE_BOSS) && aZombie->EffectedByDamage(aDamageRangeFlags))
+		if (aZombie->RowDeviationFrom(mRow) == 0 && aZombie->EffectedByDamage(aDamageRangeFlags))
 		{
 			Rect aZombieRect = aZombie->GetZombieRect();
 			if (GetRectOverlap(aAttackRect, aZombieRect) > (aZombie->mZombieType == ZombieType::ZOMBIE_FOOTBALL ? -20 : 0))
@@ -1468,7 +1470,7 @@ Zombie* Plant::FindSquashTarget()
 	{
 		if (aZombie->mDead)
 			continue;
-		if ((aZombie->mRow == mRow || aZombie->mZombieType == ZombieType::ZOMBIE_BOSS) &&
+		if (aZombie->RowDeviationFrom(mRow) == 0 &&
 			aZombie->mHasHead && !aZombie->IsTangleKelpTarget() && aZombie->EffectedByDamage(aDamageRangeFlags))
 		{
 			Rect aZombieRect = aZombie->GetZombieRect();
@@ -4304,7 +4306,7 @@ void Plant::BurnRow(int theRow)
 	{
 		if (aZombie->mDead)
 			continue;
-		if ((aZombie->mZombieType == ZombieType::ZOMBIE_BOSS || aZombie->mRow == theRow) && aZombie->EffectedByDamage(aDamageRangeFlags))
+		if (aZombie->RowDeviationFrom(theRow) == 0 && aZombie->EffectedByDamage(aDamageRangeFlags))
 		{
 			aZombie->RemoveColdEffects();
 			aZombie->ApplyBurn();
@@ -4862,11 +4864,7 @@ Zombie* Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon)
 	{
 		if (aZombie->mDead)
 			continue;
-		int aRowDeviation = aZombie->mRow - theRow;
-		if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS)
-		{
-			aRowDeviation = 0;
-		}
+		int aRowDeviation = aZombie->RowDeviationFrom(theRow);
 
 		if (!aZombie->mHasHead || aZombie->IsTangleKelpTarget())
 		{

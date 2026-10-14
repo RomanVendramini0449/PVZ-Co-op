@@ -242,7 +242,7 @@ Zombie* Projectile::FindCollisionTarget()
 	{
 		if (aZombie->mDead)
 			continue;
-		if ((aZombie->mZombieType == ZombieType::ZOMBIE_BOSS || aZombie->mRow == mRow) && aZombie->EffectedByDamage(static_cast<unsigned int>(mDamageRangeFlags)))
+		if (aZombie->RowDeviationFrom(mRow) == 0 && aZombie->EffectedByDamage(static_cast<unsigned int>(mDamageRangeFlags)))
 		{
 			if (aZombie->mZombiePhase == ZombiePhase::PHASE_SNORKEL_WALKING_IN_POOL && mPosZ <= 45.0f)
 			{
@@ -441,17 +441,13 @@ bool Projectile::IsZombieHitBySplash(Zombie* theZombie)
 		aProjectileRect.mWidth = 100;
 	}
 
-	int aRowDeviation = theZombie->mRow - mRow;
+	int aRowDeviation = theZombie->RowDeviationFrom(mRow);
 	Rect aZombieRect = theZombie->GetZombieRect();
 	if (theZombie->IsFireResistant() && mProjectileType == ProjectileType::PROJECTILE_FIREBALL)
 	{
 		return false;
 	}
 
-	if (theZombie->mZombieType == ZombieType::ZOMBIE_BOSS)
-	{
-		aRowDeviation = 0;
-	}
 	if (mProjectileType == ProjectileType::PROJECTILE_FIREBALL)
 	{
 		if (aRowDeviation != 0)

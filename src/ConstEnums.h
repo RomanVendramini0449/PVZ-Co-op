@@ -109,6 +109,7 @@ enum AwardType : int32_t
 	AWARD_PRECREDITS_ZOMBIENOTE,
 	AWARD_COOP_LUCA,  // PvZ Co-op: Luca, for beating Gargantuar Onslaught
 	AWARD_COOP_ONSLAUGHT_PRIZE,  // PvZ Co-op: its prize money, every win after
+	AWARD_COOP_ROMAN_BEATEN,     // PvZ Co-op: Luca vs. Roman won
 };
 enum BackgroundType : int32_t
 {
@@ -456,6 +457,7 @@ enum GameMode : int32_t
 	// PvZ Co-op bonus levels, reached from Level Select only.
 	GAMEMODE_COOP_ONSLAUGHT,  // Gargantuar Onslaught: unlocks Luca
 	GAMEMODE_COOP_SANDBOX,    // Dev Sandbox: every plant, endless sun
+	GAMEMODE_COOP_ROMAN,      // Luca vs. Roman: a boss fight, unlocked with Luca
 	NUM_GAME_MODES
 };
 enum GameObjectType : int32_t

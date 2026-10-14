@@ -634,6 +634,8 @@ void Board::PickZombieWaves()
 			mNumWaves = 12;
 		else if (aGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT)
 			mNumWaves = ONSLAUGHT_WAVES;
+		else if (aGameMode == GameMode::GAMEMODE_COOP_ROMAN)
+			mNumWaves = 1;  // no waves: Roman and his summons are the level
 		else if (aGameMode == GameMode::GAMEMODE_CHALLENGE_WALLNUT_BOWLING || aGameMode == GameMode::GAMEMODE_CHALLENGE_AIR_RAID ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_GRAVE_DANGER || aGameMode == GameMode::GAMEMODE_CHALLENGE_HIGH_GRAVITY ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_PORTAL_COMBAT || aGameMode == GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS ||
@@ -659,6 +661,9 @@ void Board::PickZombieWaves()
 
 		bool aIsFlagWave = IsFlagWave(aWave);
 		bool aIsFinalWave = aWave == mNumWaves - 1;
+
+		if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
+			continue;
 
 		// Gargantuar Onslaught: two Gargantuars for every lane, then three
 		// in the last wave (SpawnZombieWave lines them up).
@@ -945,6 +950,7 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_SHOVEL:
 	case GameMode::GAMEMODE_CHALLENGE_SQUIRREL:
 	case GameMode::GAMEMODE_COOP_ONSLAUGHT:
+	case GameMode::GAMEMODE_COOP_ROMAN:
 		mBackground = BackgroundType::BACKGROUND_1_DAY;
 		break;
 
@@ -3218,6 +3224,15 @@ void Board::ApplyCoopCommand(const Coop::Command& theCommand)
 	case Coop::CommandType::DebugLose:
 		if (mApp->mGameScene == GameScenes::SCENE_PLAYING)
 			ZombiesWon(nullptr);
+		break;
+
+	case Coop::CommandType::DebugHurtBoss:
+		if (Zombie* aBoss = GetBossZombie())
+		{
+			const int aLeft = std::max(theCommand.mArg * 100, 1);
+			if (aBoss->mBodyHealth > aLeft)
+				aBoss->TakeDamage(aBoss->mBodyHealth - aLeft, 0U);
+		}
 		break;
 
 	case Coop::CommandType::ChooserPick:
@@ -5940,7 +5955,7 @@ void Board::UpdateIce()
 
 void Board::UpdateProgressMeter()
 {
-	if (mApp->IsFinalBossLevel())
+	if (mApp->IsBossFightLevel())
 	{
 		Zombie* aBoss = GetBossZombie();
 		if (aBoss && !aBoss->IsDeadOrDying())
@@ -6562,6 +6577,26 @@ bool RenderItemSortFunc(const RenderItem& theItem1, const RenderItem& theItem2)
 void Board::AddBossRenderItem(RenderItem* theRenderList, int& theCurRenderItem, Zombie* theBossZombie)
 {
 	PVZP_ASSERT(theCurRenderItem < MAX_RENDER_ITEMS);
+	if (theBossZombie->IsCoopRoman())
+	{
+		// Roman is one picture, plus whatever ball he has rolling.
+		RenderItem* aItem = &theRenderList[theCurRenderItem];
+		aItem->mRenderObjectType = RenderObjectType::RENDER_ITEM_BOSS_PART;
+		aItem->mZPos = MakeRenderOrder(RenderLayer::RENDER_LAYER_BOSS, 4, 2);
+		aItem->mBossPart = BossPart::BOSS_PART_MAIN;
+		theCurRenderItem++;
+
+		Reanimation* aBallReanim = mApp->ReanimationTryToGet(theBossZombie->mBossFireBallReanimID);
+		if (aBallReanim)
+		{
+			aItem = &theRenderList[theCurRenderItem];
+			aItem->mRenderObjectType = RenderObjectType::RENDER_ITEM_BOSS_PART;
+			aItem->mZPos = aBallReanim->mRenderOrder;
+			aItem->mBossPart = BossPart::BOSS_PART_FIREBALL;
+			theCurRenderItem++;
+		}
+		return;
+	}
 	int aBackLegRow = 1;
 	int aFrontLegRow = 3;
 	int aBackArmRow = 4;
@@ -7128,7 +7163,7 @@ bool Board::HasProgressMeter()
 {
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED_TWIST ||
-		mApp->IsFinalBossLevel() ||
+		mApp->IsBossFightLevel() ||
 		mApp->IsSlotMachineLevel() ||
 		mApp->IsSquirrelLevel() ||
 		mApp->IsIZombieLevel())
@@ -7152,7 +7187,7 @@ bool Board::ProgressMeterHasFlags()
 		return false;
 
 	if (mApp->IsWhackAZombieLevel() ||
-		mApp->IsFinalBossLevel() ||
+		mApp->IsBossFightLevel() ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED_TWIST ||
 		mApp->IsSlotMachineLevel() ||
@@ -7236,7 +7271,7 @@ void Board::DrawProgressMeter(Graphics* g)
 		mApp->IsSquirrelLevel() ||
 		mApp->IsSlotMachineLevel() ||
 		mApp->IsIZombieLevel() ||
-		mApp->IsFinalBossLevel())
+		mApp->IsBossFightLevel())
 		return;
 	int aHeadProgress = PvzpAnimateCurve(0, 150, mProgressMeterWidth, 0, 135, CURVE_LINEAR);
 	g->DrawImageCel(Sexy::IMAGE_FLAGMETERPARTS, aCelWidth - aHeadProgress + 580, 572, 0, 0);
@@ -9253,7 +9288,8 @@ bool Board::HasConveyorBeltSeedBank()
 		mApp->IsBungeeBlitzLevel() ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_PORTAL_COMBAT ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_COLUMN ||
-		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_INVISIGHOUL;
+		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_INVISIGHOUL ||
+		mApp->IsCoopRomanLevel();
 }
 
 int Board::GetNumSeedsInBank()
@@ -10000,11 +10036,7 @@ int Board::KillAllZombiesInRadius(int theRow, int theX, int theY, int theRadius,
 		if (aZombie->EffectedByDamage(theDamageRangeFlags))
 		{
 			Rect aZombieRect = aZombie->GetZombieRect();
-			int aRowDist = aZombie->mRow - theRow;
-			if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS)
-			{
-				aRowDist = 0;
-			}
+			int aRowDist = aZombie->RowDeviationFrom(theRow);
 
 			if (aRowDist <= theRowRange && aRowDist >= -theRowRange && GetCircleRectOverlap(theX, theY, theRadius, aZombieRect))
 			{

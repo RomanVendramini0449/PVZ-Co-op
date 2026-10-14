@@ -370,6 +370,17 @@ void CutScene::PreloadResources()
 	{
 		Plant::PreloadPlantResources(mApp->GetAwardSeedForLevel(mBoard->mLevel));
 	}
+	if (mApp->IsCoopRomanLevel())
+	{
+		// Loaded now, in the intro, rather than as Roman appears: a load in
+		// the middle of play is a hitch for both co-op players.
+		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_BOSS);
+		ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_BOSS_FIREBALL, true);
+		ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_BOSS_ICEBALL, true);
+		Plant::PreloadPlantResources(SeedType::SEED_LUCA);
+		Plant::PreloadPlantResources(SeedType::SEED_JALAPENO);
+		Plant::PreloadPlantResources(SeedType::SEED_ICESHROOM);
+	}
 
 	if (mCrazyDaveDialogStart != -1)
 	{

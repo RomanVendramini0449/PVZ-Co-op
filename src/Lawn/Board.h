@@ -52,6 +52,16 @@ constexpr const int ONSLAUGHT_LANES = 5;
 constexpr const int ONSLAUGHT_FIRST_PER_LANE = 2;
 constexpr const int ONSLAUGHT_LAST_PER_LANE = 3;
 constexpr const int ONSLAUGHT_PRIZE_COINS = 1000;      // $10,000 (coins count in tens)
+// Luca vs. Roman: Roman fills a 3x3 block over the last three columns, which
+// nothing can be planted in, and moves up and down within them.
+constexpr const int ROMAN_FIRST_COL = 6;
+constexpr const int ROMAN_CENTER_ROW = 2;
+constexpr const int ROMAN_HEALTH = 60000;               // one and a half Dr. Zombosses
+constexpr const int ROMAN_IDLE_MIN_TICKS = 400;         // rests 4-7 s between attack runs
+constexpr const int ROMAN_IDLE_MAX_TICKS = 700;
+constexpr const int ROMAN_FIRST_SUMMON_TICKS = 1500;
+constexpr const int ROMAN_SUMMON_MIN_TICKS = 1800;      // a couple of zombies every 18-28 s
+constexpr const int ROMAN_SUMMON_MAX_TICKS = 2800;
 constexpr const int ONSLAUGHT_LINE_SPACING = 75;       // pixels between a lane's Gargantuars
 constexpr const int ONSLAUGHT_SETUP_TICKS = 3000;      // 30 s before the first wave
 constexpr const int ONSLAUGHT_AFTER_WAVE_TICKS = 1000; // 10 s after a wave is gone

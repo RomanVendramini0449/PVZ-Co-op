@@ -24,6 +24,7 @@
 
 namespace Sexy
 {
+	class Color;
 	class Graphics;
 	class Image;
 }
@@ -51,6 +52,13 @@ namespace CoopArt
 
 	// The cheese, centred on (theCenterX, theCenterY), turned by theRotation.
 	void DrawCheese(Sexy::Graphics* g, float theCenterX, float theCenterY, float theRotation);
+
+	// Roman, the boss of Luca vs. Roman, standing on (theCenterX, theBottomY)
+	// and theHeight tall. theGlow is drawn over him additively; theAlpha
+	// fades him in.
+	Sexy::Image* RomanImage();
+	void DrawRoman(Sexy::Graphics* g, float theCenterX, float theBottomY, float theHeight,
+		const Sexy::Color& theGlow, int theAlpha);
 }
 
 #endif

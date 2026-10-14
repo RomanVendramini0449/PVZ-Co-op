@@ -238,6 +238,16 @@ Sunflower's clock with the Sunflower's glow, and costs 300. The unlock lives in
 `mPurchases[STORE_ITEM_UNLOCK_LUCA]`, so it saves with the profile and reaches
 the joining player along with the host's upgrades.
 
+**Luca vs. Roman** (`GAMEMODE_COOP_ROMAN`), unlocked along with Luca: a boss
+fight on the day lawn. The conveyor brings Luca (who makes no sun here),
+Jalapenos and Ice-shrooms, one belt per player. Roman fills a 3x3 block over the
+last three columns, where nothing can be planted; every few seconds he slides to
+a lane, rolls a fireball or an iceball down it -- an Ice-shroom puts out fire, a
+Jalapeno in the lane melts ice -- and slides back to the middle, and now and
+then he calls up a couple of zombies. Plants only reach him from the three
+lanes he covers. He is Dr. Zomboss's zombie type underneath (health bar and
+balls included) with 60,000 health. His art is `assets/coop/roman.png`.
+
 ### 10.3b Delete All Saves
 
 A button in the menu's top-right corner wipes every profile's progress, after a

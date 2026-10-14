@@ -364,6 +364,8 @@ public:
 	bool					IsChallengeMode();
 	// Gargantuar Onslaught or the Dev Sandbox, from Level Select.
 	bool					IsCoopBonusLevel();
+	bool					IsCoopRomanLevel();
+	bool					IsBossFightLevel();
 	static bool			IsEndlessIZombie(GameMode theGameMode);
 	void							CrazyDaveDoneHanding();
 	inline std::string				GetCurrentLevelName() { return "Unknown"; }

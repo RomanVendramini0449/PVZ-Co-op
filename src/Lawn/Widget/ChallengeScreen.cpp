@@ -111,7 +111,8 @@ constinit const ChallengeDefinition gChallengeDefs[NUM_CHALLENGE_MODES] = {
 	{ .mChallengeMode = GameMode::GAMEMODE_INTRO, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 2, .mCol = 3, .mChallengeName = "Intro" },
 	// PvZ Co-op bonus levels: played from Level Select, never listed here.
 	{ .mChallengeMode = GameMode::GAMEMODE_COOP_ONSLAUGHT, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 4, .mCol = 0, .mChallengeName = "Gargantuar Onslaught" },
-	{ .mChallengeMode = GameMode::GAMEMODE_COOP_SANDBOX, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 4, .mCol = 1, .mChallengeName = "Dev Sandbox" }
+	{ .mChallengeMode = GameMode::GAMEMODE_COOP_SANDBOX, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 4, .mCol = 1, .mChallengeName = "Dev Sandbox" },
+	{ .mChallengeMode = GameMode::GAMEMODE_COOP_ROMAN, .mChallengeIconIndex = 10, .mPage = ChallengePage::CHALLENGE_PAGE_LIMBO, .mRow = 4, .mCol = 2, .mChallengeName = "Luca vs. Roman" }
 };
 
 ChallengeScreen::ChallengeScreen(LawnApp* theApp, ChallengePage thePage)

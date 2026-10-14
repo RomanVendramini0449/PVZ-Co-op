@@ -190,6 +190,11 @@ void Challenge::InitLevel()
 
 void Challenge::StartLevel()
 {
+	if (mApp->IsCoopRomanLevel())
+	{
+		// Roman takes his place on the right as play begins.
+		mBoard->AddZombieInRow(ZOMBIE_BOSS, ROMAN_CENTER_ROW, 0);
+	}
 	if (mApp->IsWhackAZombieLevel())
 	{
 		mBoard->mZombieCountDown = 200;
@@ -1475,7 +1480,19 @@ void Challenge::ConveyorBeltDeliverSeed(SeedType& theLastSeedType)
 {
 	PvzpWeightedArray aSeedPickArray[20];
 	int aSeedPickCount = 0;
-	if (mBoard->mLevel == 10)
+	if (mApp->IsCoopRomanLevel())
+	{
+		// Luca to fight with; Jalapenos for the iceballs, Ice-shrooms for the
+		// fireballs.
+		aSeedPickCount = 3;
+		aSeedPickArray[0].mItem = SEED_LUCA;
+		aSeedPickArray[0].mWeight = 50;
+		aSeedPickArray[1].mItem = SEED_JALAPENO;
+		aSeedPickArray[1].mWeight = 25;
+		aSeedPickArray[2].mItem = SEED_ICESHROOM;
+		aSeedPickArray[2].mWeight = 25;
+	}
+	else if (mBoard->mLevel == 10)
 	{
 		aSeedPickCount = 7;
 		aSeedPickArray[0].mItem = SEED_PEASHOOTER;
@@ -2263,6 +2280,10 @@ void Challenge::PlantAdded(Plant* thePlant)
 
 PlantingReason Challenge::CanPlantAt(int theGridX, int theGridY, SeedType theSeedType)
 {
+	if (mApp->IsCoopRomanLevel() && theGridX >= ROMAN_FIRST_COL)
+	{
+		return PLANTING_NOT_HERE;  // Roman's ground
+	}
 	if (mApp->IsWallnutBowlingLevel())
 	{
 		return theGridX > 2 ? PLANTING_NOT_PASSED_LINE : PLANTING_OK;
@@ -2550,6 +2571,12 @@ void Challenge::InitZombieWaves()
 		// The waves themselves are written out in Board::PickZombieWaves.
 		aList[ZOMBIE_GARGANTUAR] = true;
 	}
+	else if (aGameMode == GAMEMODE_COOP_ROMAN)
+	{
+		// No waves; these are what Roman calls up now and then.
+		aList[ZOMBIE_NORMAL] = true;
+		aList[ZOMBIE_TRAFFIC_CONE] = true;
+	}
 	else if (aGameMode == GAMEMODE_COOP_SANDBOX)
 	{
 		// A bit of everything a pool lawn can hold, to try plants against.
@@ -2580,7 +2607,7 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_PAIL] = true;
 	}
 
-	if (mApp->CanSpawnYetis() && !mApp->IsWhackAZombieLevel() && !mApp->IsLittleTroubleLevel() && aGameMode != GAMEMODE_COOP_ONSLAUGHT)
+	if (mApp->CanSpawnYetis() && !mApp->IsWhackAZombieLevel() && !mApp->IsLittleTroubleLevel() && aGameMode != GAMEMODE_COOP_ONSLAUGHT && aGameMode != GAMEMODE_COOP_ROMAN)
 		aList[ZOMBIE_YETI] = true;
 }
 
@@ -2753,7 +2780,7 @@ bool Challenge::UpdateZombieSpawning()
 		return true;
 	}
 	else return
-		mApp->IsFinalBossLevel() ||
+		mApp->IsBossFightLevel() ||
 		mApp->mGameMode == GAMEMODE_CHALLENGE_ICE ||
 		mApp->mGameMode == GAMEMODE_CHALLENGE_ZEN_GARDEN ||
 		mApp->mGameMode == GAMEMODE_TREE_OF_WISDOM ||

@@ -137,6 +137,7 @@ enum class CommandType : uint8_t
 	                  // Crazy Dave, let go of what you hold. arg = KeyCode
 	DebugWin = 9,     // test script only: win the level, on both machines
 	DebugLose = 10,   // test script only: lose it -- "the zombies ate your brains"
+	DebugHurtBoss = 11, // test script only: knock the boss down to arg x 100 health
 };
 
 struct Command

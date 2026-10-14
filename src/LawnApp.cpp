@@ -1932,9 +1932,9 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		// And $10,000, every time.
 		mPlayerInfo->AddCoins(ONSLAUGHT_PRIZE_COINS);
 	}
-	else if (mGameMode == GameMode::GAMEMODE_COOP_SANDBOX)
+	else if (mGameMode == GameMode::GAMEMODE_COOP_SANDBOX || mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
 	{
-		// Nothing to earn in the sandbox.
+		// Nothing to earn in the sandbox; beating Roman is its own reward.
 	}
 	else
 	{
@@ -2104,6 +2104,10 @@ void LawnApp::CheckForGameEnd()
 		{
 			ShowAwardScreen(aUnlockedNewChallenge ? AwardType::AWARD_COOP_LUCA : AwardType::AWARD_COOP_ONSLAUGHT_PRIZE, true);
 		}
+		else if (mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
+		{
+			ShowAwardScreen(AwardType::AWARD_COOP_ROMAN_BEATEN, true);
+		}
 		else
 		{
 			ShowGameSelector();
@@ -2198,6 +2202,7 @@ void LawnApp::UpdatePlayTimeStats()
 //     <seconds> log <text>        a marker in stdout
 //     <seconds> win               win the current level (both machines)
 //     <seconds> lose              lose it: Game Over (both machines)
+//     <seconds> hurtboss <h>      knock the boss down to h x 100 health (co-op)
 //     <seconds> clickzombie       click the leftmost zombie on the lawn
 //     <seconds> tryagain          press Game Over's Try Again, if it is up
 //
@@ -2386,6 +2391,12 @@ void LawnApp::RunTestScript()
 				Coop::Game::Get().GetLockstep().QueueLocalCommand(Coop::CommandType::DebugWin, 0, 0);
 			else if (mBoard)
 				mBoard->DebugWinLevel();
+		}
+		else if (aStep.mVerb == "hurtboss")
+		{
+			// Knock the boss down to <x> x 100 health, through the lockstep.
+			if (Coop::Game::Get().IsInGame())
+				Coop::Game::Get().GetLockstep().QueueLocalCommand(Coop::CommandType::DebugHurtBoss, 0, 0, static_cast<int16_t>(aStep.mX));
 		}
 		else if (aStep.mVerb == "lose")
 		{
@@ -2921,7 +2932,19 @@ bool LawnApp::IsPuzzleMode()
 
 bool LawnApp::IsCoopBonusLevel()
 {
-	return mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT || mGameMode == GameMode::GAMEMODE_COOP_SANDBOX;
+	return mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT || mGameMode == GameMode::GAMEMODE_COOP_SANDBOX ||
+		mGameMode == GameMode::GAMEMODE_COOP_ROMAN;
+}
+
+bool LawnApp::IsCoopRomanLevel()
+{
+	return mGameMode == GameMode::GAMEMODE_COOP_ROMAN;
+}
+
+// Dr. Zomboss's level or Roman's: a boss with a health bar instead of waves.
+bool LawnApp::IsBossFightLevel()
+{
+	return IsFinalBossLevel() || IsCoopRomanLevel();
 }
 
 bool LawnApp::IsChallengeMode()
