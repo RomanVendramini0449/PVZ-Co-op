@@ -60,6 +60,7 @@ public:
 	static Game& Get();
 
 	Session&  GetSession() { return mSession; }
+	const Session& GetSession() const { return mSession; }
 	Lockstep& GetLockstep() { return mLockstep; }
 
 	bool IsConnected() const { return mSession.IsConnected(); }

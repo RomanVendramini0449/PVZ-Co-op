@@ -89,6 +89,10 @@ private:
 	// title screen. Until then it is not on any screen that can follow us.
 	bool                     mPeerReady = false;
 	bool                     mSentReady = false;
+	// The other player's name and colour (0x00RRGGBB), from their PlayerInfo.
+	std::string              mRemoteName;
+	uint32_t                 mRemoteColor = 0;
+	bool                     mHasRemoteInfo = false;
 
 	uint64_t      mLocalBuildHash = 0;
 	uint64_t      mLocalAssetHash = 0;
@@ -155,6 +159,13 @@ public:
 
 	// Client: say we are past the title screen. Sent once per session.
 	bool SendPeerReady();
+
+	// Either side: this player's name and colour (0x00RRGGBB). Sent once
+	// connected and again whenever either changes.
+	bool SendPlayerInfo(const std::string& theName, uint32_t theColor);
+	bool               HasRemoteInfo() const { return mHasRemoteInfo; }
+	const std::string& GetRemoteName() const { return mRemoteName; }
+	uint32_t           GetRemoteColor() const { return mRemoteColor; }
 	// Host: has the client said so?
 	bool IsPeerReady() const { return mPeerReady; }
 };

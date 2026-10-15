@@ -25,6 +25,7 @@
 #include "Challenge.h"
 #include "SeedPacket.h"
 #include "../LawnApp.h"
+#include "../Coop/CoopGame.h"
 #include "CursorObject.h"
 #include "../Resources.h"
 #include "MessageWidget.h"
@@ -895,7 +896,8 @@ void SeedPacket::WasPlanted()
 	{
 		mTimesUsed++;
 		mRefreshing = true;
-		mRefreshTime = Plant::GetRefreshTime(mPacketType, mImitaterType);
+		// Co-op Inferno and Apocalypse recharge slower (Coop::DifficultyRules).
+		mRefreshTime = Plant::GetRefreshTime(mPacketType, mImitaterType) * Coop::Game::Get().GetRules().mRechargePercent / 100;
 	}
 }
 

@@ -24,6 +24,13 @@ Difficulties
   Wild       normal sun, every zombie 1x to 2x tougher (rolled per zombie)
   Horde      1.5x as many zombies, each 1x to 2x tougher
   Nightmare  Hard's sun, 1.5x as many zombies, each 1.2x to 2x tougher
+  Inferno    Hard's sun, 2x as many zombies, each 1.5x to 2.5x tougher,
+             plants recharge 25% slower
+  Apocalypse each sun worth 10, 2.5x as many zombies, each 2x to 3x
+             tougher, plants recharge 50% slower
+
+Your colour: pick one on the main menu (top right, under Delete All Saves).
+It's your cursor on your friend's screen and the colour of your name.
 
 Sun is your own. Every sun the game makes comes once for each of you. Your
 friend's suns are greyed out and you cannot pick them up; their total shows

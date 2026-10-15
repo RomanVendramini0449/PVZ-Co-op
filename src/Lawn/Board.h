@@ -60,6 +60,8 @@ constexpr const int ONSLAUGHT_PRIZE_COINS = 1000;      // $10,000 (coins count i
 constexpr const int YETI_SPRAY_YETIS = 50;
 constexpr const int YETI_SPRAY_FIRST_WAVE_PERCENT = 40;  // 20 of 50
 constexpr const int YETI_SPRAY_LEVEL = 40;  // 4-10, the stormy night
+// Adventure Plus: its own run of levels, after the campaign.
+constexpr const int ADVENTURE_PLUS_LEVELS = 10;
 constexpr const int ROMAN_FIRST_COL = 6;
 constexpr const int ROMAN_CENTER_ROW = 2;
 constexpr const int ROMAN_HEALTH = 60000;               // one and a half Dr. Zombosses

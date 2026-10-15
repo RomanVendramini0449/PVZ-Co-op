@@ -98,6 +98,95 @@ namespace
 	private:
 		GameSelector* mOwner;
 	};
+
+	// "Your colour": a row of swatches under Delete All Saves. The colour is
+	// this player's cursor on the other player's screen and the colour their
+	// name is written in -- on the welcome sign, and on the house sign when
+	// it is their house. Kept in the settings; sent to the other player as
+	// soon as it changes.
+	class ColorPickerWidget : public Widget
+	{
+	public:
+		static constexpr int SWATCH = 14;
+		static constexpr int GAP = 4;
+		static constexpr int LABEL_WIDTH = 72;
+
+		explicit ColorPickerWidget(LawnApp* theApp) : mApp(theApp)
+		{
+			mHasAlpha = true;
+			mHasTransparencies = true;
+			mDoFinger = true;
+		}
+		static int WidthNeeded() { return LABEL_WIDTH + NUM_COOP_PLAYER_COLORS * (SWATCH + GAP) + 6; }
+		int SwatchAt(int x, int y) const
+		{
+			const int aTop = (mHeight - SWATCH) / 2;
+			if (y < aTop - 2 || y >= aTop + SWATCH + 2)
+				return -1;
+			for (int i = 0; i < NUM_COOP_PLAYER_COLORS; i++)
+			{
+				const int aLeft = LABEL_WIDTH + i * (SWATCH + GAP);
+				if (x >= aLeft - 2 && x < aLeft + SWATCH + 2)
+					return i;
+			}
+			return -1;
+		}
+		void Draw(Graphics* g) override
+		{
+			g->SetColor(Color(20, 30, 20, 190));
+			g->FillRect(0, 0, mWidth, mHeight);
+			g->SetColor(Color(0, 0, 0, 160));
+			g->DrawRect(0, 0, mWidth - 1, mHeight - 1);
+
+			_Font* aFont = Sexy::FONT_BRIANNETOD12;
+			const Color aMine = mApp->CoopPlayerColor(Coop::Game::Get().IsConnected() ? Coop::Game::Get().GetLocalPlayerIndex() : 0);
+			g->SetFont(aFont);
+			g->SetColor(aMine);
+			g->DrawString("Your colour", 8, mHeight / 2 + aFont->GetAscent() / 2 - 1);
+
+			const int aTop = (mHeight - SWATCH) / 2;
+			for (int i = 0; i < NUM_COOP_PLAYER_COLORS; i++)
+			{
+				const uint32_t aValue = COOP_PLAYER_COLORS[i];
+				const Color aColor((aValue >> 16) & 0xFF, (aValue >> 8) & 0xFF, aValue & 0xFF);
+				const int aLeft = LABEL_WIDTH + i * (SWATCH + GAP);
+				const bool aPicked = aColor.mRed == aMine.mRed && aColor.mGreen == aMine.mGreen && aColor.mBlue == aMine.mBlue;
+				if (aPicked || i == mHover)
+				{
+					g->SetColor(aPicked ? Color(255, 255, 255) : Color(170, 170, 170));
+					g->FillRect(aLeft - 2, aTop - 2, SWATCH + 4, SWATCH + 4);
+				}
+				g->SetColor(Color(0, 0, 0));
+				g->FillRect(aLeft - 1, aTop - 1, SWATCH + 2, SWATCH + 2);
+				g->SetColor(aColor);
+				g->FillRect(aLeft, aTop, SWATCH, SWATCH);
+			}
+		}
+		void MouseMove(int x, int y) override
+		{
+			const int aHover = SwatchAt(x, y);
+			if (aHover != mHover)
+			{
+				mHover = aHover;
+				MarkDirty();
+			}
+		}
+		void MouseLeave() override { Widget::MouseLeave(); mHover = -1; MarkDirty(); }
+		void MouseUp(int x, int y, int theClickCount) override
+		{
+			const int aSwatch = SwatchAt(x, y);
+			if (theClickCount <= 0 || aSwatch < 0)
+				return;
+			mApp->CoopSetLocalColor(COOP_PLAYER_COLORS[aSwatch]);
+			mApp->PlaySample(Sexy::SOUND_TAP);
+			if (mParent)
+				mParent->MarkDirty();
+			MarkDirty();
+		}
+	private:
+		LawnApp* mApp;
+		int      mHover = -1;
+	};
 }
 
 GameSelector::GameSelector(LawnApp* theApp)
@@ -406,6 +495,11 @@ GameSelector::GameSelector(LawnApp* theApp)
 	mDeleteSavesButton->Resize(648, 6, 144, 24);
 	mDeleteSavesButton->mVisible = !Coop::Game::Get().IsFollower();
 	AddWidget(mDeleteSavesButton);
+	// Under it, right-aligned to the same edge. Everyone gets this one, the
+	// joining player included: a colour is nobody's progress.
+	mCoopColorPicker = new ColorPickerWidget(theApp);
+	mCoopColorPicker->Resize(792 - ColorPickerWidget::WidthNeeded(), 34, ColorPickerWidget::WidthNeeded(), 22);
+	AddWidget(mCoopColorPicker);
 	AddWidget(mOverlayWidget);
 
 	// This build is the campaign and nothing else (docs/SPEC.md 10.1).
@@ -667,7 +761,12 @@ void GameSelector::Draw(Graphics* g)
 		SexyTransform2D aOffsetMatrix;
 		// add the widget position so the text moves when sliding
 		aOffsetMatrix.Translate(170.5f - static_cast<int>(aStringWidth * 0.5f) + mX, 102.5f + mY);
-		PvzpDrawStringMatrix(g, Sexy::FONT_BRIANNETOD16, aOverlayMatrix * aOffsetMatrix, aWelcomeStr, Color(255, 245, 200));
+		// In the colour this player picked (the picker under Delete All
+		// Saves); the sign's own cream until they pick one.
+		Color aNameColor(255, 245, 200);
+		if (Coop::Game::Get().IsConnected() || mApp->CoopGetLocalColor() != 0)
+			aNameColor = mApp->CoopPlayerColor(Coop::Game::Get().IsConnected() ? Coop::Game::Get().GetLocalPlayerIndex() : 0);
+		PvzpDrawStringMatrix(g, Sexy::FONT_BRIANNETOD16, aOverlayMatrix * aOffsetMatrix, aWelcomeStr, aNameColor);
 
 	}
 
@@ -1222,6 +1321,12 @@ namespace
 		{ kBonusRoman,     kLevelSelectX,       kBonusY + kBonusH + 8,      300 },
 	};
 	constexpr int kBonusBottom = kBonusY + 2 * kBonusH + 8;
+
+	// Adventure Plus: a row of its ten levels under the bonus levels. Their
+	// hit-test codes are kPlusBase + 1 .. kPlusBase + 10.
+	constexpr int kPlusY = kBonusBottom + 34;
+	constexpr int kPlusBase = 2000;
+	constexpr int kPlusBottom = kPlusY + kLevelCellH;
 }
 
 namespace
@@ -1299,6 +1404,11 @@ void GameSelector::CoopLevelSelectClicked(int x, int y)
 		CoopStartBonusLevel(GameMode::GAMEMODE_COOP_SANDBOX);
 	else if (aLevel == kBonusRoman)
 		CoopStartBonusLevel(GameMode::GAMEMODE_COOP_ROMAN);
+	else if (aLevel > kPlusBase && aLevel <= kPlusBase + ADVENTURE_PLUS_LEVELS)
+	{
+		mApp->mCoopPlusLevel = aLevel - kPlusBase;
+		CoopStartBonusLevel(GameMode::GAMEMODE_COOP_ADVENTURE_PLUS);
+	}
 	else if (aLevel > 0)
 		CoopStartLevel(aLevel);
 }
@@ -1359,6 +1469,9 @@ int GameSelector::CoopLevelSelectHitTest(int x, int y) const
 			return aButton.mCode;
 		}
 	}
+
+	if (y >= kPlusY && y < kPlusBottom && x >= kLevelSelectX && x < kLevelSelectX + ADVENTURE_PLUS_LEVELS * kLevelCellW)
+		return kPlusBase + (x - kLevelSelectX) / kLevelCellW + 1;
 
 	const int aCol = (x - kLevelSelectX) / kLevelCellW;
 	const int aRow = (y - kLevelSelectY) / kLevelCellH;
@@ -1453,10 +1566,28 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 		g->DrawString(aNote, aButton.mX + 12, aButton.mY + 34);
 	}
 
+	// Adventure Plus: ten levels past the campaign. Beaten ones are gold.
+	g->SetFont(Sexy::FONT_BRIANNETOD12);
+	g->SetColor(Color(200, 200, 190));
+	g->DrawString("Adventure Plus (its own ten levels; your campaign is left alone):",
+		kLevelSelectX, kPlusY - 8);
+	const uint32_t aPlusBeaten = mApp->mPlayerInfo ? mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_ADVENTURE_PLUS_BEATEN] : 0;
+	for (int aCol = 0; aCol < ADVENTURE_PLUS_LEVELS; aCol++)
+	{
+		const int aX = kLevelSelectX + aCol * kLevelCellW;
+		const bool aBeaten = (aPlusBeaten >> aCol) & 1;
+		g->SetColor(aBeaten ? Color(150, 115, 25, 235) : Color(70, 40, 90, 235));
+		g->FillRect(aX + 2, kPlusY + 2, kLevelCellW - 4, kLevelCellH - 4);
+		char aLabel[16];
+		snprintf(aLabel, sizeof(aLabel), "+%d", aCol + 1);
+		g->SetColor(Color(255, 245, 200));
+		g->DrawString(aLabel, aX + 16, kPlusY + kLevelCellH - 12);
+	}
+
 	g->SetFont(Sexy::FONT_BRIANNETOD12);
 	g->SetColor(Color(200, 200, 190));
 	g->DrawString("Click anywhere else to cancel.",
-		kLevelSelectX, kBonusBottom + 22);
+		kLevelSelectX, kPlusBottom + 22);
 }
 
 // The bonus levels need no campaign progress, so unlike CoopStartLevel this
@@ -1526,8 +1657,8 @@ bool GameSelector::CoopHostMayStartLevel()
 	if (!aCoop.IsConnected() || !aCoop.IsHost() || aCoop.IsPeerReady())
 		return true;
 
-	mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "Not Yet!",
-		"The other player hasn't reached\nthe main menu yet.\n\nWait for them to click through\nthe title screen.",
+	const std::string aText = mApp->CoopPlayerName(1) + " hasn't reached\nthe main menu yet.\n\nWait for them to click through\nthe title screen.";
+	mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "Not Yet!", aText.c_str(),
 		"[DIALOG_BUTTON_OK]", "", Dialog::BUTTONS_FOOTER);
 	return false;
 }
@@ -1612,8 +1743,8 @@ void GameSelector::ButtonDepress(int theId)
 		if (Coop::Game::Get().IsFollower())
 		{
 			// Say why, rather than just not responding.
-			mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[MODE_LOCKED]",
-				"The host starts the game.\n\nYou will join the level\nautomatically.",
+			const std::string aText = mApp->CoopHostName() + " (host) starts\nthe game.\n\nYou will join the level\nautomatically.";
+			mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "[MODE_LOCKED]", aText.c_str(),
 				"[DIALOG_BUTTON_OK]", "", Dialog::BUTTONS_FOOTER);
 			break;
 		}

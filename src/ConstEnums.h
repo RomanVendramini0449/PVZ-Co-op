@@ -458,6 +458,7 @@ enum GameMode : int32_t
 	GAMEMODE_COOP_ONSLAUGHT,  // Gargantuar Onslaught: unlocks Luca
 	GAMEMODE_COOP_SANDBOX,    // Dev Sandbox: every plant, endless sun
 	GAMEMODE_COOP_ROMAN,      // Luca vs. Roman: a boss fight, unlocked with Luca
+	GAMEMODE_COOP_ADVENTURE_PLUS,  // Adventure Plus: ten levels of its own (LawnApp::mCoopPlusLevel)
 	NUM_GAME_MODES
 };
 enum GameObjectType : int32_t
@@ -1168,12 +1169,19 @@ enum StoreItem : int32_t
 	// in the purchases so it saves with the profile and reaches the other
 	// player along with the host's upgrades.
 	STORE_ITEM_UNLOCK_LUCA = 40,
-	// PvZ Co-op: sold in Crazy Dave's shop. Level 4-10 then brings 20 Yetis.
+	// PvZ Co-op: sold in Crazy Dave's shop. Level 4-10 then brings a Yeti horde.
 	STORE_ITEM_YETI_SPRAY = 41,
 	// PvZ Co-op: not sold. Losses on 4-10 since it was last beaten; each one
 	// thins the Yetis by a fifth. Kept with the purchases so it saves, and
 	// reaches the joining player, like them.
 	STORE_ITEM_YETI_SPRAY_LOSSES = 42,
+	// PvZ Co-op: shop skins, a new look and nothing else. Kernel is drawn in
+	// place of the Squash, Philippe in place of the Jalapeno.
+	STORE_ITEM_KERNEL_SQUASH = 43,
+	STORE_ITEM_PHILIPPE_PEPPER = 44,
+	// PvZ Co-op: not sold. Which Adventure Plus levels have been beaten, one
+	// bit each (bit 0 is level 1).
+	STORE_ITEM_ADVENTURE_PLUS_BEATEN = 45,
 	STORE_ITEM_INVALID = -1
 };
 enum StorePages : int32_t
@@ -1182,7 +1190,8 @@ enum StorePages : int32_t
 	STORE_PAGE_PLANT_UPGRADES = 1,
 	STORE_PAGE_ZEN1 = 2,
 	STORE_PAGE_ZEN2 = 3,
-	NUM_STORE_PAGES = 4
+	STORE_PAGE_COOP = 4,  // PvZ Co-op's own wares; always open
+	NUM_STORE_PAGES = 5
 };
 enum PvzpCurves : int32_t
 {

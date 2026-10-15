@@ -456,3 +456,6 @@ build-*/
 
 # Game recordings
 *.dmo
+
+# Art templates extracted from the game files: local reference only.
+art-templates/

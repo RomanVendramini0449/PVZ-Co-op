@@ -179,6 +179,7 @@ namespace
 		thePacker.U32(theSetup.mRngSeed);
 		thePacker.U8(static_cast<uint8_t>(theSetup.mDifficulty));
 		thePacker.U32(static_cast<uint32_t>(theSetup.mPrevBoardResult));
+		thePacker.U32(theSetup.mPlusLevel);
 		thePacker.U32(static_cast<uint32_t>(theSetup.mProfileLevel));
 		thePacker.U32(static_cast<uint32_t>(theSetup.mCoins));
 		thePacker.U32(theSetup.mFinishedAdventure);
@@ -194,6 +195,7 @@ namespace
 		theSetup.mRngSeed = theCursor.U32();
 		theSetup.mDifficulty = static_cast<Difficulty>(theCursor.U8());
 		theSetup.mPrevBoardResult = static_cast<int32_t>(theCursor.U32());
+		theSetup.mPlusLevel = theCursor.U32();
 		theSetup.mProfileLevel = static_cast<int32_t>(theCursor.U32());
 		theSetup.mCoins = static_cast<int32_t>(theCursor.U32());
 		theSetup.mFinishedAdventure = theCursor.U32();
@@ -245,6 +247,9 @@ bool Session::StartHost(uint16_t thePort, Difficulty theDifficulty, uint32_t the
 {
 	mIsHost = true;
 	mSentHello = false;
+	mRemoteName.clear();
+	mRemoteColor = 0;
+	mHasRemoteInfo = false;
 	mInbound.clear();
 	mOutbound.clear();
 	mPendingBatches.clear();
@@ -275,6 +280,9 @@ bool Session::StartJoin(const std::string& theHost, uint16_t thePort)
 {
 	mIsHost = false;
 	mSentHello = false;
+	mRemoteName.clear();
+	mRemoteColor = 0;
+	mHasRemoteInfo = false;
 	mInbound.clear();
 	mOutbound.clear();
 	mPendingBatches.clear();
@@ -539,6 +547,23 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 		mPeerReady = true;
 		return true;
 
+	case MsgType::PlayerInfo:
+	{
+		const uint32_t aLength = aCursor.U8();
+		if (aLength > MAX_PLAYER_NAME)
+			return false;
+		std::string aName;
+		for (uint32_t i = 0; i < aLength; i++)
+			aName.push_back(static_cast<char>(aCursor.U8()));
+		const uint32_t aColor = aCursor.U32();
+		if (!aCursor.mOk)
+			return false;
+		mRemoteName = aName;
+		mRemoteColor = aColor;
+		mHasRemoteInfo = true;
+		return true;
+	}
+
 	case MsgType::Bye:
 		if (mEndReason == EndReason::None)
 			mEndReason = EndReason::PeerLeft;
@@ -678,6 +703,21 @@ bool Session::SendHostScreen(HostScreen theScreen, int32_t theArg, const LevelSe
 	aPacker.U8(static_cast<uint8_t>(theScreen));
 	aPacker.U32(static_cast<uint32_t>(theArg));
 	PackSetup(aPacker, theProfile);
+	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
+}
+
+bool Session::SendPlayerInfo(const std::string& theName, uint32_t theColor)
+{
+	if (!IsConnected())
+		return false;
+
+	const std::string aName = theName.substr(0, MAX_PLAYER_NAME);
+	Packer aPacker;
+	aPacker.U8(static_cast<uint8_t>(MsgType::PlayerInfo));
+	aPacker.U8(static_cast<uint8_t>(aName.size()));
+	for (char aChar : aName)
+		aPacker.U8(static_cast<uint8_t>(aChar));
+	aPacker.U32(theColor);
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
 }
 
@@ -883,7 +923,7 @@ bool ParseLaunchOptions(int argc, char** argv, std::string& theErrorOut)
 				return false;
 			if (!ParseDifficulty(aValue.c_str(), aOptions.mDifficulty))
 			{
-				theErrorOut = "--difficulty must be normal, hard, wild, horde or nightmare";
+				theErrorOut = "--difficulty must be normal, hard, wild, horde, nightmare, inferno or apocalypse";
 				return false;
 			}
 		}

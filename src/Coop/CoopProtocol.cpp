@@ -45,12 +45,14 @@ const char* GetRejectReasonText(RejectReason theReason)
 }
 
 static const DifficultyRules gDifficultyRules[DIFFICULTY_COUNT] = {
-	// name         key           summary                                                   sun   health    count
-	{ "Normal",    "normal",    "the game as it comes",                                      1, 1, 100, 100, 100 },
-	{ "Hard",      "hard",      "each sun worth 15, zombies 1.2x tougher",                   3, 5, 120, 120, 100 },
-	{ "Wild",      "wild",      "normal sun, every zombie 1x to 2x tougher",                 1, 1, 100, 200, 100 },
-	{ "Horde",     "horde",     "1.5x the zombies, each 1x to 2x tougher",                   1, 1, 100, 200, 150 },
-	{ "Nightmare", "nightmare", "sun worth 15, 1.5x the zombies, each 1.2x to 2x tougher",   3, 5, 120, 200, 150 },
+	// name          key            summary                                                              sun   health    count recharge
+	{ "Normal",     "normal",     "the game as it comes",                                                 1, 1, 100, 100, 100, 100 },
+	{ "Hard",       "hard",       "each sun worth 15, zombies 1.2x tougher",                              3, 5, 120, 120, 100, 100 },
+	{ "Wild",       "wild",       "normal sun, every zombie 1x to 2x tougher",                            1, 1, 100, 200, 100, 100 },
+	{ "Horde",      "horde",      "1.5x the zombies, each 1x to 2x tougher",                              1, 1, 100, 200, 150, 100 },
+	{ "Nightmare",  "nightmare",  "sun worth 15, 1.5x the zombies, each 1.2x to 2x tougher",              3, 5, 120, 200, 150, 100 },
+	{ "Inferno",    "inferno",    "sun worth 15, 2x the zombies, each 1.5x to 2.5x tougher, slow recharge", 3, 5, 150, 250, 200, 125 },
+	{ "Apocalypse", "apocalypse", "sun worth 10, 2.5x the zombies, each 2x to 3x tougher, slower recharge", 2, 5, 200, 300, 250, 150 },
 };
 
 const DifficultyRules& GetDifficultyRules(Difficulty theDifficulty)

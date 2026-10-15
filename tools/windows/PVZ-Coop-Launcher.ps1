@@ -30,7 +30,9 @@ $Difficulties = @(
     @{ Key = 'hard';      Label = 'Hard  (sun worth 15, zombies 1.2x tougher)' },
     @{ Key = 'wild';      Label = 'Wild  (normal sun, zombies 1x to 2x tougher)' },
     @{ Key = 'horde';     Label = 'Horde  (1.5x the zombies, 1x to 2x tougher)' },
-    @{ Key = 'nightmare'; Label = 'Nightmare  (all of it: Hard sun, Horde zombies)' }
+    @{ Key = 'nightmare'; Label = 'Nightmare  (all of it: Hard sun, Horde zombies)' },
+    @{ Key = 'inferno';   Label = 'Inferno  (2x zombies, 1.5x-2.5x tougher, slow recharge)' },
+    @{ Key = 'apocalypse'; Label = 'Apocalypse  (sun worth 10, 2.5x zombies, 2x-3x tougher)' }
 )
 
 # Remembered between runs so nobody re-types a path or an address every time.
@@ -390,6 +392,7 @@ $cmbDiff = New-Object System.Windows.Forms.ComboBox
 $cmbDiff.Location = New-Object System.Drawing.Point(104, 79)
 $cmbDiff.Size = New-Object System.Drawing.Size(300, 22)
 $cmbDiff.DropDownStyle = 'DropDownList'
+$cmbDiff.DropDownWidth = 400  # the longer descriptions, in full, when open
 foreach ($difficulty in $Difficulties) { [void]$cmbDiff.Items.Add($difficulty.Label) }
 $grp.Controls.Add($cmbDiff)
 

@@ -539,8 +539,84 @@ std::string LawnApp::CoopWindowTitle() const
 
 	const bool aConnected = aSession.IsConnected();
 	if (aSession.IsHost())
-		return aConnected ? "PvZ Co-op - Host - 1 player connected" : "PvZ Co-op - Host - 0 players connected";
-	return aConnected ? "PvZ Co-op - Connected" : "PvZ Co-op - Not Connected";
+		return aConnected
+			? "PvZ Co-op - " + CoopHostName() + " (host) - " + CoopPlayerName(1) + " connected"
+			: "PvZ Co-op - " + CoopHostName() + " (host) - 0 players connected";
+	return aConnected ? "PvZ Co-op - Connected to " + CoopHostName() : "PvZ Co-op - Not Connected";
+}
+
+std::string LawnApp::CoopPlayerName(int thePlayer) const
+{
+	const Coop::Game& aCoop = Coop::Game::Get();
+	const bool aLocal = !aCoop.IsConnected() || thePlayer == aCoop.GetLocalPlayerIndex();
+	// The joining player's own name stays theirs while they borrow the host's
+	// progress (CoopBorrowHostProfile leaves it alone).
+	std::string aName;
+	if (aLocal)
+		aName = mPlayerInfo ? mPlayerInfo->mName : std::string();
+	else if (aCoop.GetSession().HasRemoteInfo())
+		aName = aCoop.GetSession().GetRemoteName();
+	if (aName.empty())
+		aName = thePlayer == 0 ? "Host" : "Player 2";
+	return aName;
+}
+
+uint32_t LawnApp::CoopGetLocalColor()
+{
+	if (!mCoopLocalColorLoaded)
+	{
+		mCoopLocalColorLoaded = true;
+		int aValue = 0;
+		if (RegistryReadInteger("CoopColor", &aValue))
+			mCoopLocalColor = static_cast<uint32_t>(aValue) & 0xFFFFFFu;
+	}
+	return mCoopLocalColor;
+}
+
+void LawnApp::CoopSetLocalColor(uint32_t theColor)
+{
+	mCoopLocalColor = theColor & 0xFFFFFFu;
+	mCoopLocalColorLoaded = true;
+	RegistryWriteInteger("CoopColor", static_cast<int>(mCoopLocalColor));
+}
+
+Sexy::Color LawnApp::CoopPlayerColor(int thePlayer)
+{
+	const Coop::Game& aCoop = Coop::Game::Get();
+	uint32_t aColor = 0;
+	if (!aCoop.IsConnected() || thePlayer == aCoop.GetLocalPlayerIndex())
+		aColor = CoopGetLocalColor();
+	else if (aCoop.GetSession().HasRemoteInfo())
+		aColor = aCoop.GetSession().GetRemoteColor();
+	// Not picked yet: blue for the host, orange for the player who joins,
+	// so the two are told apart from the start.
+	if (aColor == 0)
+		aColor = thePlayer == 0 ? COOP_PLAYER_COLORS[0] : COOP_PLAYER_COLORS[1];
+	return Sexy::Color((aColor >> 16) & 0xFF, (aColor >> 8) & 0xFF, aColor & 0xFF);
+}
+
+// Once connected, and again whenever this player renames or recolours: the
+// other machine draws our cursor and our name with these.
+void LawnApp::CoopSendPlayerInfoIfChanged()
+{
+	Coop::Game& aCoop = Coop::Game::Get();
+	if (!aCoop.IsConnected())
+	{
+		mCoopInfoSent = false;
+		return;
+	}
+
+	const std::string aName = mPlayerInfo ? mPlayerInfo->mName : std::string();
+	const uint32_t aColor = CoopGetLocalColor();
+	if (mCoopInfoSent && aName == mCoopSentName && aColor == mCoopSentColor)
+		return;
+
+	if (aCoop.GetSession().SendPlayerInfo(aName, aColor))
+	{
+		mCoopInfoSent = true;
+		mCoopSentName = aName;
+		mCoopSentColor = aColor;
+	}
 }
 
 void LawnApp::CoopRefreshWindowTitle()
@@ -580,6 +656,7 @@ void LawnApp::CoopAnnounceLevel()
 	Coop::LevelSetup aSetup = CoopMakeProfileSetup();
 	aSetup.mLevel = static_cast<uint32_t>(mPlayerInfo->mLevel);
 	aSetup.mGameMode = static_cast<int32_t>(mGameMode);
+	aSetup.mPlusLevel = IsAdventurePlusLevel() ? static_cast<uint32_t>(mCoopPlusLevel) : 0;
 	// Not reset yet: InitLevel reads it as "how the last level went".
 	aSetup.mPrevBoardResult = static_cast<int32_t>(mBoardResult);
 
@@ -589,7 +666,8 @@ void LawnApp::CoopAnnounceLevel()
 	// waves. Mixing in the level matters: without it every level in the
 	// campaign would run the same random sequence.
 	aSetup.mRngSeed = aCoop.GetSession().GetParams().mRngSeed
-		^ (static_cast<uint32_t>(mPlayerInfo->mLevel) * 2654435761u);
+		^ (static_cast<uint32_t>(mPlayerInfo->mLevel) * 2654435761u)
+		^ (aSetup.mPlusLevel * 40503u);
 
 	aCoop.HostEnterLevel(aSetup);
 
@@ -665,6 +743,7 @@ void LawnApp::CoopFollowIntoLevel(const Coop::LevelSetup& theSetup)
 	CoopTearDownForFollow();
 
 	mGameMode = static_cast<GameMode>(theSetup.mGameMode);
+	mCoopPlusLevel = static_cast<int>(theSetup.mPlusLevel);
 	// The host's, not ours: a retry after a loss skips the intro on the host,
 	// and this machine must skip it too.
 	mBoardResult = static_cast<BoardResult>(theSetup.mPrevBoardResult);
@@ -816,13 +895,13 @@ void LawnApp::CoopHandleDisconnect()
 	switch (aSession.GetEndReason())
 	{
 	case Coop::Session::EndReason::PeerLeft:
-		aReason = aWasHost ? "The joining player left the game." : "The host left the game.";
+		aReason = aWasHost ? CoopPlayerName(1) + " left the game." : CoopHostName() + " (host) left the game.";
 		break;
 	case Coop::Session::EndReason::LocalLeft:
 		aReason = "You left the co-op game.";
 		break;
 	case Coop::Session::EndReason::Lost:
-		aReason = aWasHost ? "Lost the connection to the joining player." : "Lost the connection to the host.";
+		aReason = aWasHost ? "Lost the connection to " + CoopPlayerName(1) + "." : "Lost the connection to " + CoopHostName() + " (host).";
 		break;
 	default:
 		aReason = aSession.GetStatusText();
@@ -886,6 +965,7 @@ void LawnApp::CoopUpdateFlow()
 	mCoopWasConnected = aConnected;
 	if (aJustDisconnected)
 		CoopHandleDisconnect();
+	CoopSendPlayerInfoIfChanged();
 	if (!aConnected)
 		return;
 
@@ -1947,6 +2027,13 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 	{
 		// Nothing to earn in the sandbox.
 	}
+	else if (mGameMode == GameMode::GAMEMODE_COOP_ADVENTURE_PLUS)
+	{
+		// Ticked off on Level Select. Kept with the purchases, so it saves and
+		// reaches the joining player like the rest of the host's progress.
+		if (mCoopPlusLevel >= 1 && mCoopPlusLevel <= ADVENTURE_PLUS_LEVELS)
+			mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_ADVENTURE_PLUS_BEATEN] |= 1u << (mCoopPlusLevel - 1);
+	}
 	else
 	{
 		aUnlockedNewChallenge = !HasBeatenChallenge(mGameMode);
@@ -2620,13 +2707,17 @@ void LawnApp::LoadingThreadProc()
 	// PvZ Co-op's own words. The game's strings come from the stock
 	// main.pak, which knows nothing of them.
 	mStringProperties.insert_or_assign("CRAZY_DAVE_3950",
-		"YETI SPRAY! One whiff and every Yeti for miles comes running to the stormy night lawn. FIFTY Yetis, twenty of them right away! Think of the diamonds!");
+		"YETI SPRAY! One whiff and every Yeti for miles will come running in droves! Only works during an especially terrible storm.");
+	mStringProperties.insert_or_assign("CRAZY_DAVE_3951",
+		"That's KERNEL! He used to be a regular old squash. Don't ask him about it. He squashes zombies exactly the same, he's just angrier about it.");
+	mStringProperties.insert_or_assign("CRAZY_DAVE_3952",
+		"This pepper is CRAZY! His name is Philippe. He burns a whole lane just like a regular Jalapeno, but he enjoys it WAY too much.");
 	mStringProperties.insert_or_assign("LUCA", "Luca");
 	mStringProperties.insert_or_assign("LUCA_TOOLTIP", "Shoots cheese and makes sun");
 	mStringProperties.insert_or_assign("LUCA_DESCRIPTION",
 		"Luca throws cheese at zombies and makes sun while he's at it.{SHORTLINE}"
 		"{KEYWORD}Damage:{STAT} heavy-ish{BR}{KEYWORD}Sun:{STAT} like a Sunflower{SHORTLINE}"
-		"Nobody is quite sure where the cheese comes from.");
+		"Nobody is quite sure where his cheese comes from, but we do know it's never ending.");
 
 	if (mTitleScreen)
 	{
@@ -2984,7 +3075,7 @@ bool LawnApp::IsPuzzleMode()
 bool LawnApp::IsCoopBonusLevel()
 {
 	return mGameMode == GameMode::GAMEMODE_COOP_ONSLAUGHT || mGameMode == GameMode::GAMEMODE_COOP_SANDBOX ||
-		mGameMode == GameMode::GAMEMODE_COOP_ROMAN;
+		mGameMode == GameMode::GAMEMODE_COOP_ROMAN || mGameMode == GameMode::GAMEMODE_COOP_ADVENTURE_PLUS;
 }
 
 // Yeti Spray: 20 Yetis on level 4-10, a fifth fewer for every loss there
@@ -3002,6 +3093,11 @@ int LawnApp::YetiSprayYetiCount()
 	for (uint32_t i = 0; i < aLosses; i++)
 		aCount = aCount * 4 / 5;
 	return std::max(aCount, 1);
+}
+
+bool LawnApp::IsAdventurePlusLevel()
+{
+	return mGameMode == GameMode::GAMEMODE_COOP_ADVENTURE_PLUS;
 }
 
 bool LawnApp::IsCoopRomanLevel()
@@ -3406,7 +3502,8 @@ bool LawnApp::AdvanceCrazyDaveText()
 std::string LawnApp::GetCrazyDaveText(int theMessageIndex)
 {
 	std::string aMessage = std::format("[CRAZY_DAVE_{}]", theMessageIndex);
-	aMessage = PvzpReplaceString(aMessage, "{PLAYER_NAME}", mPlayerInfo->mName);
+	// Dave is talking at the host's house, so it is the host he greets.
+	aMessage = PvzpReplaceString(aMessage, "{PLAYER_NAME}", CoopHostName());
 	aMessage = PvzpReplaceString(aMessage, "{MONEY}", GetMoneyString(mPlayerInfo->mCoins));
 	int aCost = StoreScreen::GetItemCost(StoreItem::STORE_ITEM_PACKET_UPGRADE);
 	aMessage = PvzpReplaceString(aMessage, "{UPGRADE_COST}", GetMoneyString(aCost));

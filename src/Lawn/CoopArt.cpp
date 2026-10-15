@@ -41,6 +41,16 @@ extern const unsigned char gCoopArt_roman[];
 extern const std::size_t gCoopArt_roman_size;
 extern const unsigned char gCoopArt_yeti_spray[];
 extern const std::size_t gCoopArt_yeti_spray_size;
+extern const unsigned char gCoopArt_cursor_fill[];
+extern const std::size_t gCoopArt_cursor_fill_size;
+extern const unsigned char gCoopArt_cursor_outline[];
+extern const std::size_t gCoopArt_cursor_outline_size;
+extern const unsigned char gCoopArt_kernel_squash[];
+extern const std::size_t gCoopArt_kernel_squash_size;
+extern const unsigned char gCoopArt_philippe_pepper[];
+extern const std::size_t gCoopArt_philippe_pepper_size;
+extern const unsigned char gCoopArt_adventure_plus_background[];
+extern const std::size_t gCoopArt_adventure_plus_background_size;
 
 namespace
 {
@@ -60,7 +70,22 @@ namespace
 	Image* gCheeseImage = nullptr;
 	Image* gRomanImage = nullptr;
 	Image* gYetiSprayImage = nullptr;
+	Image* gCursorFillImage = nullptr;
+	Image* gCursorOutlineImage = nullptr;
+	Image* gKernelSquashImage = nullptr;
+	Image* gPhilippePepperImage = nullptr;
+	Image* gAdventurePlusBackground = nullptr;
 	bool   gLoaded = false;
+
+	// The arrow's tip, in the cursor art (assets/coop/cursor_*.png).
+	constexpr float CURSOR_TIP_X = 3.0f;
+	constexpr float CURSOR_TIP_Y = 3.0f;
+
+	// The skins' height on the lawn, standing where the plant they replace
+	// stands: Kernel a touch taller than a Squash's body, Philippe about a
+	// Jalapeno's (his art is drawn on a slant, so it is nearly square).
+	constexpr float KERNEL_HEIGHT = 84.0f;
+	constexpr float PHILIPPE_HEIGHT = 78.0f;
 
 	void LoadArt()
 	{
@@ -71,6 +96,47 @@ namespace
 		gCheeseImage = gLawnApp->GetImageFromMemory(gCoopArt_cheese, gCoopArt_cheese_size, "coop/cheese.png");
 		gRomanImage = gLawnApp->GetImageFromMemory(gCoopArt_roman, gCoopArt_roman_size, "coop/roman.png");
 		gYetiSprayImage = gLawnApp->GetImageFromMemory(gCoopArt_yeti_spray, gCoopArt_yeti_spray_size, "coop/yeti_spray.png");
+		gCursorFillImage = gLawnApp->GetImageFromMemory(gCoopArt_cursor_fill, gCoopArt_cursor_fill_size, "coop/cursor_fill.png");
+		gCursorOutlineImage = gLawnApp->GetImageFromMemory(gCoopArt_cursor_outline, gCoopArt_cursor_outline_size, "coop/cursor_outline.png");
+		gKernelSquashImage = gLawnApp->GetImageFromMemory(gCoopArt_kernel_squash, gCoopArt_kernel_squash_size, "coop/kernel_squash.png");
+		gPhilippePepperImage = gLawnApp->GetImageFromMemory(gCoopArt_philippe_pepper, gCoopArt_philippe_pepper_size, "coop/philippe_pepper.png");
+		if (gCoopArt_adventure_plus_background_size > 0)
+		{
+			gAdventurePlusBackground = gLawnApp->GetImageFromMemory(gCoopArt_adventure_plus_background,
+				gCoopArt_adventure_plus_background_size, "coop/adventure_plus_background.png");
+		}
+	}
+
+	// A picture standing in for a plant: theHeight tall at scale 1, its base
+	// at the middle of the bottom of the plant's 80x80 frame.
+	void DrawStandIn(Graphics* g, Image* theImage, float theHeight, float theX, float theY,
+		float theScaleX, float theScaleY, float theSquashX, float theSquashY, int theGlow)
+	{
+		if (theImage == nullptr)
+			return;
+
+		const float aImageScale = theHeight / static_cast<float>(theImage->mHeight);
+		const float aScaleX = aImageScale * theScaleX * theSquashX;
+		const float aScaleY = aImageScale * theScaleY * theSquashY;
+
+		// Anchored at the base, so a squash bends it about where it stands.
+		const float aBaseX = theX + 40.0f * theScaleX;
+		const float aBaseY = theY + 79.0f * theScaleY;
+		const float aLeft = aBaseX - theImage->mWidth * aScaleX * 0.5f;
+		const float aTop = aBaseY - theImage->mHeight * aScaleY;
+
+		Graphics aG(*g);
+		aG.SetLinearBlend(true);
+		PvzpDrawImageScaledF(&aG, theImage, aLeft, aTop, aScaleX, aScaleY);
+
+		if (theGlow > 0)
+		{
+			// A plant's glow is the plant drawn again, additively.
+			aG.SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
+			aG.SetColorizeImages(true);
+			aG.SetColor(Color(255, 255, 255, std::min(theGlow, 255)));
+			PvzpDrawImageScaledF(&aG, theImage, aLeft, aTop, aScaleX, aScaleY);
+		}
 	}
 }
 
@@ -167,6 +233,58 @@ void CoopArt::DrawRoman(Graphics* g, float theCenterX, float theBottomY, float t
 		aG.SetColor(Color(theGlow.mRed, theGlow.mGreen, theGlow.mBlue, theGlow.mAlpha * theAlpha / 255));
 		PvzpDrawImageScaledF(&aG, anImage, aLeft, aTop, aScale, aScale);
 	}
+}
+
+void CoopArt::DrawCursor(Graphics* g, float theX, float theY, const Color& theColor)
+{
+	LoadArt();
+	if (gCursorFillImage == nullptr || gCursorOutlineImage == nullptr)
+		return;
+
+	Graphics aG(*g);
+	aG.SetLinearBlend(true);
+	aG.SetDrawMode(Graphics::DRAWMODE_NORMAL);
+	const float aLeft = theX - CURSOR_TIP_X;
+	const float aTop = theY - CURSOR_TIP_Y;
+	aG.SetColorizeImages(false);
+	aG.DrawImageF(gCursorOutlineImage, aLeft, aTop);
+	// The fill is white; colourising tints it to the player's colour.
+	aG.SetColorizeImages(true);
+	aG.SetColor(Color(theColor.mRed, theColor.mGreen, theColor.mBlue, 255));
+	aG.DrawImageF(gCursorFillImage, aLeft, aTop);
+}
+
+static Image* SkinImage(CoopArt::Skin theSkin)
+{
+	return theSkin == CoopArt::Skin::KernelSquash ? gKernelSquashImage : gPhilippePepperImage;
+}
+
+void CoopArt::DrawSkin(Graphics* g, Skin theSkin, float theX, float theY, float theScaleX, float theScaleY,
+	float theSquashX, float theSquashY, int theGlow)
+{
+	LoadArt();
+	const float aHeight = theSkin == Skin::KernelSquash ? KERNEL_HEIGHT : PHILIPPE_HEIGHT;
+	DrawStandIn(g, SkinImage(theSkin), aHeight, theX, theY, theScaleX, theScaleY, theSquashX, theSquashY, theGlow);
+}
+
+void CoopArt::DrawSkinIcon(Graphics* g, Skin theSkin, float theCenterX, float theBottomY, float theHeight)
+{
+	LoadArt();
+	Image* anImage = SkinImage(theSkin);
+	if (anImage == nullptr)
+		return;
+
+	// The caller's mode and colour, so the shop's hover highlight works.
+	const float aScale = theHeight / static_cast<float>(anImage->mHeight);
+	Graphics aG(*g);
+	aG.SetLinearBlend(true);
+	PvzpDrawImageScaledF(&aG, anImage, theCenterX - anImage->mWidth * aScale * 0.5f, theBottomY - theHeight, aScale, aScale);
+}
+
+Image* CoopArt::AdventurePlusBackground()
+{
+	LoadArt();
+	return gAdventurePlusBackground;
 }
 
 void CoopArt::DrawYetiSpray(Graphics* g, float theCenterX, float theBottomY, float theHeight)

@@ -4071,6 +4071,10 @@ void Plant::Draw(Graphics* g)
 		{
 			DrawLuca(g, aOffsetX, aOffsetY);
 		}
+		else if (DrawShopSkin(g, aOffsetX, aOffsetY))
+		{
+			// Kernel or Philippe, bought from Crazy Dave, in place of the plant.
+		}
 		else if (mBodyReanimID != ReanimationID::REANIMATIONID_NULL)
 		{
 			Reanimation* aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
@@ -4165,6 +4169,79 @@ void Plant::DrawLuca(Graphics* g, float theOffsetX, float theOffsetY)
 	CoopArt::DrawLuca(g, theOffsetX, theOffsetY, 1.0f, 1.0f, aSquashX, aSquashY, aGlow);
 }
 
+// The shop skins (StoreScreen's PvZ Co-op page): a new look for a plant, and
+// nothing else. Which skin a seed type wears, if it has been bought.
+static bool GetShopSkin(SeedType theSeedType, CoopArt::Skin& theSkinOut)
+{
+	if (gLawnApp == nullptr || gLawnApp->mPlayerInfo == nullptr)
+		return false;
+	const uint32_t* aPurchases = gLawnApp->mPlayerInfo->mPurchases;
+	if (theSeedType == SeedType::SEED_SQUASH && aPurchases[StoreItem::STORE_ITEM_KERNEL_SQUASH] > 0)
+	{
+		theSkinOut = CoopArt::Skin::KernelSquash;
+		return true;
+	}
+	if (theSeedType == SeedType::SEED_JALAPENO && aPurchases[StoreItem::STORE_ITEM_PHILIPPE_PEPPER] > 0)
+	{
+		theSkinOut = CoopArt::Skin::PhilippePepper;
+		return true;
+	}
+	return false;
+}
+
+// The skin follows what the plant underneath is doing -- its reanimation
+// still runs, unseen, so nothing about how it plays changes. Kernel crouches,
+// stretches as he leaps and lands flat; Philippe swells and glows as his fuse
+// burns down. Everything here is drawing only.
+bool Plant::DrawShopSkin(Graphics* g, float theOffsetX, float theOffsetY)
+{
+	CoopArt::Skin aSkin;
+	if (!GetShopSkin(mSeedType, aSkin))
+		return false;
+
+	const uint32_t aCounter = IsOnBoard() ? mBoard->mMainCounter : mApp->mAppCounter;
+	const float aTime = static_cast<float>(fmod((mRow * 97.0 + mPlantCol * 61.0 + static_cast<double>(aCounter)) * 0.045, 2.0 * PI));
+	float aSquashX = 1.0f + 0.02f * sin(aTime);
+	float aSquashY = 1.0f - 0.02f * sin(aTime);
+	float aScale = 1.0f;
+	int aGlow = 0;
+
+	if (aSkin == CoopArt::Skin::KernelSquash)
+	{
+		if (mState == PlantState::STATE_SQUASH_PRE_LAUNCH)
+		{
+			const float aCrouch = 1.0f - std::clamp(mStateCountdown, 0, 45) / 45.0f;
+			aSquashX = 1.0f + 0.12f * aCrouch;
+			aSquashY = 1.0f - 0.18f * aCrouch;
+		}
+		else if (mState == PlantState::STATE_SQUASH_RISING || mState == PlantState::STATE_SQUASH_FALLING)
+		{
+			aSquashX = 0.9f;
+			aSquashY = 1.12f;
+		}
+		else if (mState == PlantState::STATE_SQUASH_DONE_FALLING)
+		{
+			aSquashX = 1.35f;
+			aSquashY = 0.5f;
+		}
+	}
+	else if (IsInPlay() && mDoSpecialCountdown > 0)
+	{
+		// Philippe's fuse: 100 ticks from planting to the blast.
+		const float aBurn = 1.0f - std::clamp(mDoSpecialCountdown, 0, 100) / 100.0f;
+		aScale = 1.0f + 0.4f * aBurn;
+		aGlow = static_cast<int>(160.0f * aBurn);
+	}
+
+	if (mHighlighted)
+		aGlow = std::max(aGlow, 196);
+	else if (mEatenFlashCountdown > 0)
+		aGlow = std::max(aGlow, std::clamp(mEatenFlashCountdown * 3, 0, 255));
+
+	CoopArt::DrawSkin(g, aSkin, theOffsetX, theOffsetY, aScale, aScale, aSquashX, aSquashY, aGlow);
+	return true;
+}
+
 void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitaterType, DrawVariation theDrawVariation, float thePosX, float thePosY)
 {
 	Graphics aSeedG(*g);
@@ -4229,6 +4306,11 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
 			// Its reanimation is a Peashooter's, kept only for the aiming;
 			// what it looks like is its own art.
 			CoopArt::DrawLuca(&aSeedG, thePosX + aOffsetX, thePosY + aOffsetY, aSeedG.mScaleX, aSeedG.mScaleY);
+		}
+		else if (CoopArt::Skin aSkin; GetShopSkin(aSeedType, aSkin))
+		{
+			// The seed packet and the plant in the hand wear the skin too.
+			CoopArt::DrawSkin(&aSeedG, aSkin, thePosX + aOffsetX, thePosY + aOffsetY, aSeedG.mScaleX, aSeedG.mScaleY);
 		}
 		else if (aPlantDef.mReanimationType != ReanimationType::REANIM_NONE)
 		{

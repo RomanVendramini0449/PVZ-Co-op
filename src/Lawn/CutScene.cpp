@@ -930,7 +930,11 @@ void CutScene::StartLevelIntro()
 		}
 	}
 
-	aHouseMessage = PvzpReplaceString(aHouseMessage, "{PLAYER}", mApp->mPlayerInfo->mName);
+	if (mApp->IsAdventurePlusLevel() && mCrazyDaveTime <= 0)
+		aHouseMessage = std::format("Adventure Plus {}", mApp->mCoopPlusLevel);
+	// Co-op: it is the host's house whoever is looking, so the joining
+	// player sees "Roman's House" rather than their own name on it.
+	aHouseMessage = PvzpReplaceString(aHouseMessage, "{PLAYER}", mApp->CoopHostName());
 	if (!aHouseMessage.empty())
 	{
 		mBoard->DisplayAdvice(aHouseMessage, MessageStyle::MESSAGE_STYLE_HOUSE_NAME, AdviceType::ADVICE_NONE);

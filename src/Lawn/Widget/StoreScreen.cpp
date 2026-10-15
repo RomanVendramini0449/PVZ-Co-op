@@ -62,11 +62,14 @@ static StoreItem gStoreItemSpots[NUM_STORE_PAGES][MAX_PAGE_SPOTS] =
 	{ STORE_ITEM_PACKET_UPGRADE,    STORE_ITEM_POOL_CLEANER,        STORE_ITEM_RAKE,                STORE_ITEM_ROOF_CLEANER,
 	  STORE_ITEM_PLANT_GATLINGPEA,  STORE_ITEM_PLANT_TWINSUNFLOWER, STORE_ITEM_PLANT_GLOOMSHROOM,   STORE_ITEM_PLANT_CATTAIL },
 	{ STORE_ITEM_PLANT_SPIKEROCK,   STORE_ITEM_PLANT_GOLD_MAGNET,   STORE_ITEM_PLANT_WINTERMELON,   STORE_ITEM_PLANT_COBCANNON,
-	  STORE_ITEM_PLANT_IMITATER,    STORE_ITEM_FIRSTAID,            STORE_ITEM_YETI_SPRAY,          STORE_ITEM_INVALID },
+	  STORE_ITEM_PLANT_IMITATER,    STORE_ITEM_FIRSTAID,            STORE_ITEM_INVALID,             STORE_ITEM_INVALID },
 	{ STORE_ITEM_POTTED_MARIGOLD_1, STORE_ITEM_POTTED_MARIGOLD_2,   STORE_ITEM_POTTED_MARIGOLD_3,   STORE_ITEM_GOLD_WATERINGCAN,
 	  STORE_ITEM_FERTILIZER,        STORE_ITEM_BUG_SPRAY,           STORE_ITEM_PHONOGRAPH,          STORE_ITEM_GARDENING_GLOVE },
 	{ STORE_ITEM_MUSHROOM_GARDEN,   STORE_ITEM_AQUARIUM_GARDEN,     STORE_ITEM_WHEEL_BARROW,        STORE_ITEM_STINKY_THE_SNAIL,
-	  STORE_ITEM_TREE_OF_WISDOM,    STORE_ITEM_TREE_FOOD,           STORE_ITEM_INVALID,             STORE_ITEM_INVALID }
+	  STORE_ITEM_TREE_OF_WISDOM,    STORE_ITEM_TREE_FOOD,           STORE_ITEM_INVALID,             STORE_ITEM_INVALID },
+	// PvZ Co-op's page: open from the start, so nothing here waits on progress.
+	{ STORE_ITEM_YETI_SPRAY,        STORE_ITEM_KERNEL_SQUASH,       STORE_ITEM_PHILIPPE_PEPPER,     STORE_ITEM_INVALID,
+	  STORE_ITEM_INVALID,           STORE_ITEM_INVALID,             STORE_ITEM_INVALID,             STORE_ITEM_INVALID }
 };
 
 StoreScreenOverlay::StoreScreenOverlay(StoreScreen* theParent)
@@ -367,6 +370,14 @@ void StoreScreen::DrawItemIcon(Graphics* g, int theItemPosition, StoreItem theIt
 	{
 		CoopArt::DrawYetiSpray(g, aPosX + 25.0f, aPosY + 70.0f, 78.0f);
 	}
+	else if (theItemType == STORE_ITEM_KERNEL_SQUASH)
+	{
+		CoopArt::DrawSkinIcon(g, CoopArt::Skin::KernelSquash, aPosX + 25.0f, aPosY + 70.0f, 72.0f);
+	}
+	else if (theItemType == STORE_ITEM_PHILIPPE_PEPPER)
+	{
+		CoopArt::DrawSkinIcon(g, CoopArt::Skin::PhilippePepper, aPosX + 25.0f, aPosY + 70.0f, 66.0f);
+	}
 	else if (theItemType == STORE_ITEM_TREE_FOOD)
 	{
 		g->DrawImage(Sexy::IMAGE_TREEFOOD, aPosX - 8, aPosY - 2);
@@ -603,6 +614,8 @@ void StoreScreen::UpdateMouse()
 				case STORE_ITEM_FIRSTAID:               aMessageIndex = 2033;                           break;
 				case STORE_ITEM_PVZ:                    aMessageIndex = 2034;                           break;
 				case STORE_ITEM_YETI_SPRAY:             aMessageIndex = 3950;                           break;
+				case STORE_ITEM_KERNEL_SQUASH:          aMessageIndex = 3951;                           break;
+				case STORE_ITEM_PHILIPPE_PEPPER:        aMessageIndex = 3952;                           break;
 				default:                                PVZP_ASSERT(false);                              break;
 				}
 				if (mApp->mCrazyDaveMessageIndex != aMessageIndex)
@@ -832,6 +845,8 @@ bool StoreScreen::IsPageShown(StorePages thePage)
 {
 	// trial mode only shows the default page
 	if (mApp->IsTrialStageLocked()) return thePage == STORE_PAGE_SLOT_UPGRADES;
+	// PvZ Co-op's own page is always there.
+	if (thePage == STORE_PAGE_COOP) return true;
 	// finishing adventure unlocks all pages
 	if (mApp->HasFinishedAdventure()) return true;
 	// the plant upgrades page requires reaching adventure 5-2 (level 42)
@@ -863,7 +878,7 @@ void StoreScreen::ButtonDepress(int theId)
 				mPage = (StorePages)(mPage - 1);
 				if (mPage < STORE_PAGE_SLOT_UPGRADES)
 				{
-					mPage = STORE_PAGE_ZEN2;
+					mPage = static_cast<StorePages>(NUM_STORE_PAGES - 1);
 				}
 			}
 			else
@@ -936,6 +951,8 @@ int StoreScreen::GetItemCost(StoreItem theStoreItem)
 	case STORE_ITEM_TREE_FOOD:                          return 250;
 	case STORE_ITEM_FIRSTAID:                           return 200;
 	case STORE_ITEM_YETI_SPRAY:                         return 300;
+	case STORE_ITEM_KERNEL_SQUASH:                      return 200;   // $2,000
+	case STORE_ITEM_PHILIPPE_PEPPER:                    return 200;   // $2,000
 	default: PVZP_ASSERT(false);                              return 0;
 	}
 }

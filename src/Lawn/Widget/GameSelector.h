@@ -162,6 +162,7 @@ public:
 	void                        CoopStartLevel(int theLevel);
 	// "Delete All Saves", with a confirmation first.
 	Widget*                     mDeleteSavesButton = nullptr;  // owned by the widget tree
+	Widget*                     mCoopColorPicker = nullptr;    // likewise
 	void                        ClickedDeleteAllSaves();
 	// Gargantuar Onslaught or the Dev Sandbox.
 	void                        CoopStartBonusLevel(GameMode theGameMode);

@@ -1274,7 +1274,8 @@ void SeedChooserScreen::CloseSeedChooser()
 		if (aChosenSeed.mRefreshing)
 		{
 			aSeedPacket.mRefreshCounter = aChosenSeed.mRefreshCounter;
-			aSeedPacket.mRefreshTime = Plant::GetRefreshTime(aSeedPacket.mPacketType, aSeedPacket.mImitaterType);
+			aSeedPacket.mRefreshTime = Plant::GetRefreshTime(aSeedPacket.mPacketType, aSeedPacket.mImitaterType)
+				* Coop::Game::Get().GetRules().mRechargePercent / 100;
 			aSeedPacket.mRefreshing = true;
 			aSeedPacket.mActive = false;
 		}

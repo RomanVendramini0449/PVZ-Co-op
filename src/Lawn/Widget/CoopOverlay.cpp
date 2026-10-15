@@ -73,6 +73,9 @@ void CoopOverlay::Draw(Graphics* g)
 
 	const Color aNormal(255, 245, 200);
 	const Color aWarning(255, 160, 160);
+	// People by name: "Roman (host)", "Luca".
+	const std::string aHost = mApp->CoopHostName() + " (host)";
+	const std::string aOther = mApp->CoopPlayerName(aCoop.GetRemotePlayerIndex());
 
 	// A level that was restarted because the games fell out of sync says so
 	// for a few seconds, rather than silently starting over.
@@ -104,16 +107,16 @@ void CoopOverlay::Draw(Graphics* g)
 		}
 		else if (aLockstep.ShouldShowWaiting())
 		{
-			DrawBanner(g, "Waiting for the other player...", 128, aNormal);
+			DrawBanner(g, "Waiting for " + aOther + "...", 128, aNormal);
 		}
 		else if (aCoop.IsFollower() && mApp->GetDialog(Dialogs::DIALOG_GAME_OVER))
 		{
-			DrawBanner(g, "Waiting for the host to try again...", mHeight - 22, aNormal);
+			DrawBanner(g, "Waiting for " + aHost + " to try again...", mHeight - 22, aNormal);
 		}
 		else if (aCoop.IsFollower() && mApp->mSeedChooserScreen && mApp->mBoard
 			&& mApp->mBoard->mCutScene && mApp->mBoard->mCutScene->mSeedChoosing)
 		{
-			DrawBanner(g, "Pick seeds together. The host presses Let's Rock!", mHeight - 22, aNormal);
+			DrawBanner(g, "Pick seeds together. " + aHost + " presses Let's Rock!", mHeight - 22, aNormal);
 		}
 		return;
 	}
@@ -133,14 +136,14 @@ void CoopOverlay::Draw(Graphics* g)
 		// The joining player goes wherever the host goes. Each of these
 		// screens is the host's to leave, so say what is being waited on.
 		if (mApp->GetDialog(Dialogs::DIALOG_STORE))
-			DrawBanner(g, "The host is shopping. Money and upgrades are shared.", mHeight - 22, aNormal);
+			DrawBanner(g, aHost + " is shopping. Money and upgrades are shared.", mHeight - 22, aNormal);
 		else if (mApp->mAwardScreen)
-			DrawBanner(g, "Waiting for the host to continue...", mHeight - 22, aNormal);
+			DrawBanner(g, "Waiting for " + aHost + " to continue...", mHeight - 22, aNormal);
 		else if (mApp->mCreditScreen)
 			return;
 		else if (mApp->mGameSelector)
 		{
-			DrawBanner(g, "Connected. Waiting for the host to start a level...", mHeight - 50, aNormal);
+			DrawBanner(g, "Connected. Waiting for " + aHost + " to start a level...", mHeight - 50, aNormal);
 			DrawBanner(g, aDifficultyText, mHeight - 22, aDifficultyHard ? aWarning : aNormal);
 		}
 		return;
@@ -151,8 +154,8 @@ void CoopOverlay::Draw(Graphics* g)
 	if (mApp->mGameSelector && !mApp->mAwardScreen && !mApp->mCreditScreen && !mApp->GetDialog(Dialogs::DIALOG_STORE))
 	{
 		DrawBanner(g, aCoop.IsPeerReady()
-			? "Co-op: the other player is connected"
-			: "Co-op: waiting for the other player to reach the menu...", mHeight - 50, aNormal);
+			? "Co-op: " + aOther + " is connected"
+			: "Co-op: waiting for " + aOther + " to reach the menu...", mHeight - 50, aNormal);
 		DrawBanner(g, aDifficultyText, mHeight - 22, aDifficultyHard ? aWarning : aNormal);
 	}
 }

@@ -59,6 +59,14 @@ namespace Sexy
 	class ButtonWidget;
 };
 
+// The colours a co-op player can pick on the main menu (0x00RRGGBB). Bright
+// enough to read as text on the menu and to spot as a cursor on any lawn.
+// The first two are the defaults for the host and the joining player.
+constexpr uint32_t COOP_PLAYER_COLORS[] = {
+	0x50C8FF, 0xFFA03C, 0x78E65A, 0xFF6482, 0xC88CFF, 0xFFE650, 0x46E6D2, 0xFFFFFF,
+};
+constexpr int NUM_COOP_PLAYER_COLORS = static_cast<int>(sizeof(COOP_PLAYER_COLORS) / sizeof(COOP_PLAYER_COLORS[0]));
+
 using namespace Sexy;
 
 class LevelStats
@@ -119,6 +127,17 @@ public:
 	uint32_t						mCoopLastProfileHash = 0;
 	// Client: the difficulty the host has chosen, for display on the menu.
 	Coop::Difficulty				mCoopShownDifficulty = Coop::Difficulty::Normal;
+	// This player's colour (0x00RRGGBB; 0 until picked, meaning the default
+	// for their role), kept in the settings. It is their cursor on the other
+	// player's screen and the colour of their name.
+	uint32_t						mCoopLocalColor = 0;
+	bool							mCoopLocalColorLoaded = false;
+	// The name and colour last sent to the other player.
+	std::string						mCoopSentName;
+	uint32_t						mCoopSentColor = 0;
+	bool							mCoopInfoSent = false;
+	// Adventure Plus: the level being played, 1-10; 0 outside it.
+	int								mCoopPlusLevel = 0;
 	std::unique_ptr<LevelStats>		mLastLevelStats;
 	std::atomic<bool>					mCloseRequest;
 	uint32_t						mAppCounter;
@@ -235,6 +254,15 @@ public:
 	void							CoopBorrowHostProfile(const Coop::LevelSetup& theSetup);
 	void							CoopReturnOwnProfile();
 	bool							CoopIsWaitingForHost() const { return mCoopWaitingForHost; }
+	// Player names and colours (player 0 is the host). A name is what that
+	// player typed for their profile, or "Host" / "Player 2" until known.
+	std::string						CoopPlayerName(int thePlayer) const;
+	// The host's name: whose house, roof and backyard every level is.
+	std::string						CoopHostName() const { return CoopPlayerName(0); }
+	Sexy::Color						CoopPlayerColor(int thePlayer);
+	uint32_t						CoopGetLocalColor();
+	void							CoopSetLocalColor(uint32_t theColor);
+	void							CoopSendPlayerInfoIfChanged();
 	void							CoopSetWaitingForHost(bool theWaiting) { mCoopWaitingForHost = theWaiting; }
 	void							DoHighScoreDialog();
 	void							DoBackToMain();
@@ -365,6 +393,7 @@ public:
 	// Gargantuar Onslaught or the Dev Sandbox, from Level Select.
 	bool					IsCoopBonusLevel();
 	bool					IsCoopRomanLevel();
+	bool					IsAdventurePlusLevel();
 	int						YetiSprayYetiCount();
 	bool					IsBossFightLevel();
 	static bool			IsEndlessIZombie(GameMode theGameMode);

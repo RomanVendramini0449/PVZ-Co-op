@@ -7278,7 +7278,8 @@ bool Zombie::TrySpawnLevelAward()
 		// the first time, the prize money every time after.
 		aCoinType = mApp->HasSeedType(SeedType::SEED_LUCA) ? CoinType::COIN_AWARD_MONEY_BAG : CoinType::COIN_FINAL_SEED_PACKET;
 	}
-	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_SANDBOX || mApp->mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
+	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_SANDBOX || mApp->mGameMode == GameMode::GAMEMODE_COOP_ROMAN ||
+		mApp->mGameMode == GameMode::GAMEMODE_COOP_ADVENTURE_PLUS)
 	{
 		aCoinType = CoinType::COIN_TROPHY;  // the way out of the level
 	}

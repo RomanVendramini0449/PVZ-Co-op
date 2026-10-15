@@ -62,6 +62,24 @@ namespace CoopArt
 	void DrawYetiSpray(Sexy::Graphics* g, float theCenterX, float theBottomY, float theHeight);
 	void DrawRoman(Sexy::Graphics* g, float theCenterX, float theBottomY, float theHeight,
 		const Sexy::Color& theGlow, int theAlpha);
+
+	// The other player's pointer: one arrow, its tip on (theX, theY), filled
+	// with their colour inside a dark outline.
+	void DrawCursor(Sexy::Graphics* g, float theX, float theY, const Sexy::Color& theColor);
+
+	// Shop skins (bought from Crazy Dave; purely a look). Kernel stands in for
+	// the Squash, Philippe for the Jalapeno. Drawn like Luca: in a plant's
+	// 80x80 frame whose top-left is (theX, theY), scaled by theScaleX/Y, and
+	// bent about the base by theSquashX/Y. theGlow brightens it (0-255).
+	enum class Skin { KernelSquash, PhilippePepper };
+	void DrawSkin(Sexy::Graphics* g, Skin theSkin, float theX, float theY, float theScaleX, float theScaleY,
+		float theSquashX = 1.0f, float theSquashY = 1.0f, int theGlow = 0);
+	// The skin at shop size, standing on (theCenterX, theBottomY).
+	void DrawSkinIcon(Sexy::Graphics* g, Skin theSkin, float theCenterX, float theBottomY, float theHeight);
+
+	// Adventure Plus's own lawn, 1400x600 like the day lawn it replaces;
+	// nullptr until assets/coop/adventure_plus_background.png exists.
+	Sexy::Image* AdventurePlusBackground();
 }
 
 #endif

@@ -26,6 +26,7 @@
 #include "ZenGarden.h"
 #include "BoardInclude.h"
 #include "../Coop/CoopGame.h"
+#include "CoopArt.h"
 #include "LawnCommon.h"
 #include "System/Music.h"
 #include "System/SaveGame.h"
@@ -639,6 +640,8 @@ void Board::PickZombieWaves()
 			mNumWaves = ONSLAUGHT_WAVES;
 		else if (aGameMode == GameMode::GAMEMODE_COOP_ROMAN)
 			mNumWaves = 1;  // no waves: Roman and his summons are the level
+		else if (aGameMode == GameMode::GAMEMODE_COOP_ADVENTURE_PLUS)
+			mNumWaves = 20;  // two flags, like a campaign level
 		else if (aGameMode == GameMode::GAMEMODE_CHALLENGE_WALLNUT_BOWLING || aGameMode == GameMode::GAMEMODE_CHALLENGE_AIR_RAID ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_GRAVE_DANGER || aGameMode == GameMode::GAMEMODE_CHALLENGE_HIGH_GRAVITY ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_PORTAL_COMBAT || aGameMode == GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS ||
@@ -737,6 +740,12 @@ void Board::PickZombieWaves()
 		else if (mApp->IsAdventureMode() && mApp->HasFinishedAdventure() && mLevel != 5)
 		{
 			aZombiePoints = aWave * 2 / 5 + 1;
+		}
+		else if (mApp->IsAdventurePlusLevel())
+		{
+			// Ramps faster than the campaign, and each level starts a little
+			// stronger than the last. (Placeholder until each level is designed.)
+			aZombiePoints = aWave / 2 + 1 + mApp->mCoopPlusLevel / 3;
 		}
 		else
 		{
@@ -1023,6 +1032,9 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_SQUIRREL:
 	case GameMode::GAMEMODE_COOP_ONSLAUGHT:
 	case GameMode::GAMEMODE_COOP_ROMAN:
+	// Adventure Plus plays on the day lawn's layout, under its own picture
+	// when there is one (DrawBackdrop).
+	case GameMode::GAMEMODE_COOP_ADVENTURE_PLUS:
 		mBackground = BackgroundType::BACKGROUND_1_DAY;
 		break;
 
@@ -3438,33 +3450,11 @@ void Board::DrawRemoteCursor(Graphics* g)
 		aRemoteCursor->EndDraw(g);
 	}
 
-	// Drawn with primitives rather than an image, so it needs no art asset
-	// and cannot go missing. An arrow is not convex, so it is two convex
-	// pieces: the head and the tail. A dark outline first -- the same shape
-	// stamped around the pointer -- then the fill keeps it readable over
-	// bright lawn and dark night levels alike. Well over the size of a
-	// system pointer, so it is easy to find at a glance.
-	const Point aHead[3] = { Point(aX, aY), Point(aX, aY + 24), Point(aX + 17, aY + 17) };
-	const Point aTail[4] = { Point(aX + 5, aY + 16), Point(aX + 10, aY + 15), Point(aX + 14, aY + 25), Point(aX + 10, aY + 27) };
-	auto aStamp = [g](const Point* thePoints, int theCount, int theDX, int theDY)
-	{
-		Point aMoved[4];
-		for (int i = 0; i < theCount; i++)
-			aMoved[i] = Point(thePoints[i].mX + theDX, thePoints[i].mY + theDY);
-		g->PolyFill(aMoved, theCount, true);
-	};
-
-	g->SetColor(Color(0, 0, 0, 255));
-	static constexpr int OUTLINE[8][2] = { {-2, 0}, {2, 0}, {0, -2}, {0, 2}, {-2, -2}, {2, -2}, {-2, 2}, {2, 2} };
-	for (const auto& anOffset : OUTLINE)
-	{
-		aStamp(aHead, 3, anOffset[0], anOffset[1]);
-		aStamp(aTail, 4, anOffset[0], anOffset[1]);
-	}
-
-	g->SetColor(Color(80, 200, 255, 255));
-	aStamp(aHead, 3, 0, 0);
-	aStamp(aTail, 4, 0, 0);
+	// One arrow, drawn from the mod's own art (assets/coop/cursor_*.png): a
+	// dark outline with the fill tinted to the colour that player picked on
+	// the main menu. It used to be stamped from two polygons, head and tail,
+	// whose outlines overlapped and read as two pointers on top of each other.
+	CoopArt::DrawCursor(g, static_cast<float>(aX), static_cast<float>(aY), mApp->CoopPlayerColor(aPlayer));
 }
 
 void Board::ApplyMouseMove(int x, int y)
@@ -6657,6 +6647,11 @@ void Board::DrawBackdrop(Graphics* g)
 		Rect aSrcRect(232, 0, aWidth, Sexy::IMAGE_BACKGROUND1->GetHeight());
 		g->DrawImage(Sexy::IMAGE_BACKGROUND1, 232 - BOARD_OFFSET, 0, aSrcRect);
 	}
+	else if (Image* aPlusImage = mApp->IsAdventurePlusLevel() ? CoopArt::AdventurePlusBackground() : nullptr)
+	{
+		// The same 1400x600 frame as the day lawn, so the grid still fits.
+		g->DrawImage(aPlusImage, -BOARD_OFFSET, 0);
+	}
 	else if (aBgImage)
 	{
 		if (aBgImage == Sexy::IMAGE_BACKGROUND_MUSHROOMGARDEN || aBgImage == Sexy::IMAGE_BACKGROUND_GREENHOUSE || aBgImage == Sexy::IMAGE_AQUARIUM1)
@@ -7441,6 +7436,8 @@ void Board::DrawLevel(Graphics* g)
 	else
 	{
 		aLevelStr = mApp->GetCurrentChallengeDef().mChallengeName;
+		if (mApp->IsAdventurePlusLevel())
+			aLevelStr = std::format("Adventure Plus {}", mApp->mCoopPlusLevel);
 		if (mApp->IsSurvivalMode() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND)
 		{
 			int aFlags = GetSurvivalFlagsCompleted();
@@ -7957,7 +7954,7 @@ void Board::DrawCoopPartnerSun(Graphics* g)
 		return;
 
 	const int aPartner = (GetLocalCoopPlayer() + 1) % mCoopPlayerCount;
-	const std::string aLabel = aPartner == 0 ? "Host's sun" : "Partner's sun";
+	const std::string aLabel = mApp->CoopPlayerName(aPartner) + "'s sun";
 	const std::string aAmount = std::to_string(std::max(GetPlayerSunMoney(aPartner), 0));
 
 	_Font* aLabelFont = FONT_BRIANNETOD12;

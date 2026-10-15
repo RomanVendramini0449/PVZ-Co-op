@@ -2578,6 +2578,18 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_NORMAL] = true;
 		aList[ZOMBIE_TRAFFIC_CONE] = true;
 	}
+	else if (aGameMode == GAMEMODE_COOP_ADVENTURE_PLUS)
+	{
+		// Placeholder line-up until each level is designed: every level adds
+		// one zombie type to the last one's.
+		static const ZombieType kPlusRoster[] = {
+			ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_POLEVAULTER, ZOMBIE_PAIL, ZOMBIE_NEWSPAPER,
+			ZOMBIE_DOOR, ZOMBIE_FOOTBALL, ZOMBIE_DANCER, ZOMBIE_JACK_IN_THE_BOX, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR,
+		};
+		const int aTypes = std::clamp(mApp->mCoopPlusLevel + 1, 2, static_cast<int>(sizeof(kPlusRoster) / sizeof(kPlusRoster[0])));
+		for (int i = 0; i < aTypes; i++)
+			aList[kPlusRoster[i]] = true;
+	}
 	else if (aGameMode == GAMEMODE_COOP_SANDBOX)
 	{
 		// A bit of everything a pool lawn can hold, to try plants against.
@@ -2608,7 +2620,8 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_PAIL] = true;
 	}
 
-	if (mApp->CanSpawnYetis() && !mApp->IsWhackAZombieLevel() && !mApp->IsLittleTroubleLevel() && aGameMode != GAMEMODE_COOP_ONSLAUGHT && aGameMode != GAMEMODE_COOP_ROMAN)
+	if (mApp->CanSpawnYetis() && !mApp->IsWhackAZombieLevel() && !mApp->IsLittleTroubleLevel() && aGameMode != GAMEMODE_COOP_ONSLAUGHT && aGameMode != GAMEMODE_COOP_ROMAN &&
+		aGameMode != GAMEMODE_COOP_ADVENTURE_PLUS)
 		aList[ZOMBIE_YETI] = true;
 }
 

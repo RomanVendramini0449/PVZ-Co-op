@@ -22,6 +22,7 @@
 #include "Board.h"
 #include "Challenge.h"
 #include "../LawnApp.h"
+#include "../Coop/CoopGame.h"
 #include "../Resources.h"
 #include "MessageWidget.h"
 #include "graphics/Font.h"
@@ -426,6 +427,9 @@ void MessageWidget::Draw(Graphics* g)
 	case MessageStyle::MESSAGE_STYLE_HOUSE_NAME:
 		aPosY = 550;
 		aColor = Color(255, 255, 255, 255);
+		// Co-op: "Roman's House" in the colour Roman picked.
+		if (Coop::Game::Get().IsConnected())
+			aColor = mApp->CoopPlayerColor(0);
 		aFadeOut = true;
 		break;
 

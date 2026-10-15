@@ -30,7 +30,7 @@ namespace Coop
 
 // Bumped on any wire-format change. Peers with different versions are rejected
 // at handshake rather than allowed to desync later.
-constexpr uint32_t PROTOCOL_VERSION = 8;
+constexpr uint32_t PROTOCOL_VERSION = 9;
 
 constexpr uint16_t DEFAULT_PORT = 1337;
 
@@ -61,7 +61,12 @@ enum class MsgType : uint8_t
 	LeaveLevel = 9,   // host -> client: level over, follow me out
 	HostScreen = 10,  // host -> client: the screen the host is on, outside a level
 	PeerReady = 11,   // client -> host: past the title screen, ready to follow
+	PlayerInfo = 12,  // both ways: this player's name and colour, whenever they change
 };
+
+// A player's name is at most this long on the wire (the game's own profile
+// names are shorter still).
+constexpr uint32_t MAX_PLAYER_NAME = 32;
 
 // Where the host is when it is not in a level. The client shows the same
 // screen, view-only: outside a level the host drives and the client follows
@@ -94,9 +99,11 @@ enum class Difficulty : uint8_t
 	Wild = 2,       // normal sun; each zombie's health rolls 1x to 2x
 	Horde = 3,      // normal sun; 1.5x as many zombies, health 1x to 2x
 	Nightmare = 4,  // all of it: Hard's sun, 1.5x as many zombies, 1.2x to 2x
+	Inferno = 5,    // Hard's sun, 2x the zombies, 1.5x to 2.5x, slower recharge
+	Apocalypse = 6, // sun worth 10, 2.5x the zombies, 2x to 3x, much slower recharge
 };
 
-constexpr int DIFFICULTY_COUNT = 5;
+constexpr int DIFFICULTY_COUNT = 7;
 
 // What a difficulty does (SPEC.md section 8). Integer ratios and percentages
 // only: both machines must reach bit-identical results, which a float
@@ -111,6 +118,7 @@ struct DifficultyRules
 	int         mHealthMinPercent;    // each zombie's health is a roll between
 	int         mHealthMaxPercent;    // these two, inclusive
 	int         mZombieCountPercent;  // 150: half as many zombies again
+	int         mRechargePercent;     // seed packet recharge time, 100 as normal
 };
 
 // Unknown values (a newer peer, a corrupt byte) read as Normal.
@@ -225,6 +233,8 @@ struct LevelSetup
 	// machines must know it was a retry, or one sits in the intro while the
 	// other plays.
 	int32_t  mPrevBoardResult = 0;
+	// Adventure Plus: which of its levels (1-10); 0 for anything else.
+	uint32_t mPlusLevel = 0;
 
 	int32_t  mProfileLevel = 1;
 	int32_t  mCoins = 0;

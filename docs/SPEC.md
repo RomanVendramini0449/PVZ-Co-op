@@ -167,6 +167,28 @@ slightly behind.
 
 ---
 
+### Names and colours
+
+Players are named, not "the host" and "the other player": every message,
+the window title, the partner's sun counter and the disconnect notice use the
+name each player typed for their profile ("Roman (host)", "Luca"), falling
+back to "Host" / "Player 2" until it is known. It is the host's house, so
+the house sign reads "Roman's House" on both screens, and Crazy Dave greets
+the host.
+
+Each player picks a colour on the main menu (a row of swatches under Delete
+All Saves; saved in the settings as `CoopColor`). It is their cursor on the
+other player's screen, their name on the welcome sign, and -- for the host
+-- the house sign. Names and colours travel in a `PlayerInfo` message, sent
+once connected and again whenever either changes.
+
+The remote cursor itself is one anti-aliased arrow (`assets/coop/cursor_*.png`:
+a white fill tinted to the player's colour inside a dark outline). It used to
+be stamped from two polygons whose outlines overlapped, which read as two
+pointers on top of each other.
+
+---
+
 ## 8. Difficulty
 
 Chosen by the host -- in the launcher, or with the main menu's difficulty
@@ -180,6 +202,11 @@ simulation). The table lives in `Coop::GetDifficultyRules()`.
 | **Wild** | ×1 | **1× to 2×**, rolled per zombie | ×1 |
 | **Horde** | ×1 | **1× to 2×**, rolled per zombie | **×1.5** |
 | **Nightmare** | **×3/5** | **1.2× to 2×**, rolled per zombie | **×1.5** |
+| **Inferno** | **×3/5** | **1.5× to 2.5×**, rolled per zombie | **×2** |
+| **Apocalypse** | **×2/5** (a 25-sun is worth 10) | **2× to 3×**, rolled per zombie | **×2.5** |
+
+Inferno also makes every seed packet recharge 25% slower, Apocalypse 50%
+(`DifficultyRules::mRechargePercent`, applied when a packet is used).
 
 - **Sun ×3/5 is universal** — sunflowers, sky sun, Sun-shroom, Twin Sunflower,
   everything: a regular sun is worth 15, a small one 9, a large one 30.
@@ -193,7 +220,7 @@ simulation). The table lives in `Coop::GetDifficultyRules()`.
   `mShieldHealth`, `mFlyingHealth` before the maximums are taken. The rolled
   modes draw each zombie's percentage from the gameplay generator, so both
   machines roll the same. Bosses take the low end instead of a roll.
-- **×1.5 zombies**: after each wave is picked, half as many again are added,
+- **More zombies** (×1.5 and up): after each wave is picked, the extra are added,
   each a copy of one already in the wave (never a second flag or boss). The
   fraction carries to the next wave, so even one-zombie waves grow.
 - Everything is **integer rational math** (`x * 3 / 5`, `x * percent / 100`). No
@@ -286,6 +313,25 @@ stampede, but only once bought: 50 Yetis on top of the level's own zombies,
 (a full wave passes its share on to the next). Every loss on 4-10 cuts the
 count by a fifth for the next try; beating 4-10 resets it. Yetis still run off
 after a while if nobody stops them.
+
+**Adventure Plus** (`GAMEMODE_COOP_ADVENTURE_PLUS`), a row of ten levels
+under the bonus levels, open from the start. Each is a 20-wave level on the
+day lawn's layout, drawn with `assets/coop/adventure_plus_background.png`
+when that file exists (1400x600, the day lawn's frame -- see
+`art-templates/adventure-plus/README.txt`) and the day lawn when it does not.
+For now each level adds one zombie type to the last one's and starts a little
+stronger; the real designs come later. A win drops a trophy, goes back to the
+menu and marks the level gold on Level Select
+(`mPurchases[STORE_ITEM_ADVENTURE_PLUS_BEATEN]`, one bit per level). Which
+level is played travels in `LevelSetup::mPlusLevel`.
+
+**Crazy Dave's shop** has a fifth page for the mod's own wares, always open:
+Yeti Spray, and two skins at $2,000 each -- **Kernel** (drawn in place of the
+Squash) and **Philippe** (in place of the Jalapeno). A skin is only a look:
+the plant underneath plays exactly as before, its reanimation running unseen,
+and the art follows what it is doing (Kernel crouches, leaps and lands flat;
+Philippe swells as his fuse burns). Seed packets and the plant in hand wear
+it too.
 
 ### 10.3b Delete All Saves
 
