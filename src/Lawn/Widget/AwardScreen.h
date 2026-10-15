@@ -70,7 +70,7 @@ public:
 	void				Resize(int theX, int theY, int theWidth, int theHeight) override { Widget::Resize(theX, theY, theWidth, theHeight); }
 	static void			DrawBottom(Graphics* g, std::string_view theTitle, std::string_view theAward, std::string_view theMessage);
 	void				DrawAwardSeed(Graphics* g, SeedType theSeedType = SEED_NONE);
-	void				DrawCoopPrizeLine(Graphics* g);
+	void				DrawCoopPrizeLine(Graphics* g, int theCoins);
 	void				Draw(Graphics* g) override;
 	void				Update() override;
 	void				AddedToManager(WidgetManager* theWidgetManager) override { Widget::AddedToManager(theWidgetManager); }

@@ -26,6 +26,7 @@
 #include "ZenGarden.h"
 #include "Challenge.h"
 #include "../LawnApp.h"
+#include "../Coop/CoopGame.h"
 #include "SeedPacket.h"
 #include "CursorObject.h"
 #include "../Resources.h"
@@ -52,6 +53,7 @@ void Coin::CoinInitialize(int theX, int theY, CoinType theCoinType, CoinMotion t
 	mPosX = theX;
 	mPosY = theY;
 	mType = theCoinType;
+	mCoopOwner = -1;  // Board::AddCoinForPlayer sets it after
 	mCollectionDistance = 0.0f;
 	mDead = false;
 	mWidth = 60;
@@ -420,9 +422,19 @@ bool Coin::IsMoney()
 	return IsMoney(mType);
 }
 
+bool Coin::IsSun(CoinType theType)
+{
+	return theType == CoinType::COIN_SUN || theType == CoinType::COIN_SMALLSUN || theType == CoinType::COIN_LARGESUN;
+}
+
 bool Coin::IsSun()
 {
-	return mType == CoinType::COIN_SUN || mType == CoinType::COIN_SMALLSUN || mType == CoinType::COIN_LARGESUN;
+	return IsSun(mType);
+}
+
+bool Coin::IsOtherPlayersSun()
+{
+	return mBoard != nullptr && mCoopOwner >= 0 && mCoopOwner != mBoard->GetLocalCoopPlayer();
 }
 
 bool Coin::IsPresentWithAdvice()
@@ -436,8 +448,10 @@ void Coin::ScoreCoin()
 
 	if (IsSun())
 	{
+		// To whoever it belongs to -- not whoever is active, which during the
+		// simulation is always player 0 (Board::CoopSimulationScope).
 		int aSunValue = GetSunValue();
-		mBoard->AddSunMoney(aSunValue);
+		mBoard->AddSunMoney(aSunValue, mCoopOwner);
 	}
 	else if (IsMoney())
 	{
@@ -827,6 +841,22 @@ void Coin::Draw(Graphics* g)
 		g->SetColorizeImages(true);
 		g->DrawImage(IMAGE_AWARDPICKUPGLOW, mPosX - 56.0f, mPosY - 50.0f);
 		g->SetColorizeImages(false);
+	}
+
+	// The other player's sun: greyed out and see-through, so you can watch
+	// what they are up to without mistaking it for yours. Once they pick it
+	// up it is gone -- it is not flying to this screen's sun counter.
+	if (IsOtherPlayersSun())
+	{
+		if (mIsBeingCollected || mAttachmentID == AttachmentID::ATTACHMENTID_NULL)
+			return;
+		Graphics theAttachmentGraphics(*g);
+		MakeParentGraphicsFrame(&theAttachmentGraphics);
+		const Color aColor = GetColor();
+		AttachmentOverrideColor(mAttachmentID, Color(150, 150, 150, aColor.mAlpha * 140 / 255));
+		AttachmentDraw(mAttachmentID, &theAttachmentGraphics, false);
+		AttachmentOverrideColor(mAttachmentID, aColor);
+		return;
 	}
 
 	if (mAttachmentID != AttachmentID::ATTACHMENTID_NULL)
@@ -1301,7 +1331,19 @@ float Coin::GetSunScale()
 
 int Coin::GetSunValue()
 {
-	return mType == CoinType::COIN_SUN ? 25 : mType == CoinType::COIN_SMALLSUN ? 15 : mType == CoinType::COIN_LARGESUN ? 50 : 0;
+	const int aValue = mType == CoinType::COIN_SUN ? 25 : mType == CoinType::COIN_SMALLSUN ? 15 : mType == CoinType::COIN_LARGESUN ? 50 : 0;
+
+	// Co-op Hard and Nightmare: every sun is worth three fifths -- a regular
+	// sun 15, a small one 9, a large one 30 (docs/SPEC.md section 8). Three
+	// fifths divides every sun value exactly, so nothing is lost to rounding.
+	//
+	// Decided here, with the sun's value, so a sun is counted the same while
+	// it flies to the bank as when it lands. The cut used to be made on
+	// arrival, in Board::AddSunMoney, while sun in flight was counted at full
+	// value: a packet lit up as affordable, then went dark when the sun landed
+	// short, and spending against sun in flight overdrew the bank.
+	const Coop::DifficultyRules& aRules = Coop::Game::Get().GetRules();
+	return aValue * aRules.mSunNumerator / aRules.mSunDenominator;
 }
 
 int Coin::GetCoinValue(CoinType theCoinType)
@@ -1394,7 +1436,9 @@ void Coin::MouseDown([[maybe_unused]] int x, [[maybe_unused]] int y, int theClic
 
 	if (theClickCount >= 0 && !mIsBeingCollected)
 	{
-		PlayCollectSound();
+		// The other player picking up their own sun is silent here.
+		if (mCoopOwner < 0 || mCoopOwner == mBoard->GetLocalCoopPlayer())
+			PlayCollectSound();
 		Collect();
 
 		if (mApp->IsFirstTimeAdventureMode() && mBoard->mLevel == 1)
@@ -1434,6 +1478,13 @@ bool Coin::MouseHitTest(int theX, int theY, HitResult* theHitResult)
 
 	bool aCanHitCoin = true;
 	if (mDead || mIsBeingCollected)
+	{
+		aCanHitCoin = false;
+	}
+	// Split sun: only its owner can touch it. The board is on the clicking
+	// player whenever a click is applied, and on this machine's player for
+	// the hover cursor, so the active player is the one to ask about.
+	if (mBoard && !BelongsTo(mBoard->GetActivePlayer()))
 	{
 		aCanHitCoin = false;
 	}

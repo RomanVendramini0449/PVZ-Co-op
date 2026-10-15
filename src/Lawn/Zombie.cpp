@@ -891,16 +891,24 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 		ReanimShowPrefix("anim_tongue", RENDER_GROUP_NORMAL);
 	}
 
-	// Hard mode: zombies need 1.5x more damage to kill (docs/SPEC.md 8).
+	// Co-op difficulty (docs/SPEC.md 8): Hard makes every zombie 1.2x
+	// tougher; Wild, Horde and Nightmare roll each one's toughness between the
+	// rules' bounds, so no two are quite alike. A boss takes the low end
+	// rather than a roll -- a doubled Dr. Zomboss is a different game.
 	// Applied before the maximums are taken, so health bars still read full
 	// on spawn, and following the same pattern the Little Trouble level above
-	// uses to scale health. Integer math so both machines agree exactly.
-	if (Coop::Game::Get().IsHardMode())
+	// uses to scale health. Integer math and the gameplay generator, so both
+	// machines agree exactly.
+	const Coop::DifficultyRules& aRules = Coop::Game::Get().GetRules();
+	if (aRules.mHealthMinPercent != 100 || aRules.mHealthMaxPercent != 100)
 	{
-		mBodyHealth = mBodyHealth * 3 / 2;
-		mHelmHealth = mHelmHealth * 3 / 2;
-		mShieldHealth = mShieldHealth * 3 / 2;
-		mFlyingHealth = mFlyingHealth * 3 / 2;
+		int aPercent = aRules.mHealthMinPercent;
+		if (aRules.mHealthMaxPercent > aRules.mHealthMinPercent && mZombieType != ZombieType::ZOMBIE_BOSS)
+			aPercent += Rand(aRules.mHealthMaxPercent - aRules.mHealthMinPercent + 1);
+		mBodyHealth = mBodyHealth * aPercent / 100;
+		mHelmHealth = mHelmHealth * aPercent / 100;
+		mShieldHealth = mShieldHealth * aPercent / 100;
+		mFlyingHealth = mFlyingHealth * aPercent / 100;
 	}
 
 	mBodyMaxHealth = mBodyHealth;

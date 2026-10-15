@@ -59,6 +59,9 @@ public:
 	bool                    mHasBouncyArrow;
 	bool                    mHitGround;
 	int32_t                 mTimesDropped;
+	// Co-op split sun: the one player who can collect this sun; -1 for a
+	// coin anyone can (all money, and all sun in single player).
+	int32_t                 mCoopOwner = -1;
 
 public:
 	Coin();
@@ -96,6 +99,11 @@ public:
 	void                    PlayGroundSound();
 
 	static bool  IsMoney(CoinType theType);
+	static bool  IsSun(CoinType theType);
+	// Can thePlayer collect this coin? (mCoopOwner)
+	bool         BelongsTo(int thePlayer) const { return mCoopOwner < 0 || mCoopOwner == thePlayer; }
+	// The other co-op player's sun: drawn greyed out, not clickable here.
+	bool         IsOtherPlayersSun();
 };
 
 #endif

@@ -266,11 +266,17 @@ your game is untouched.
 
 Double-click **`PVZ-Coop-Launcher.bat`**. A small window opens:
 
-- It finds your Plants vs. Zombies folder by itself; `Browse` if it guesses
-  wrong. It tells you whether it can see `main.pak`.
+- It finds your Plants vs. Zombies folder by itself: first the folder the
+  launcher is in (and the ones above it), so unzipping the mod into your game
+  folder just works, then Steam's libraries and the usual install places. If
+  it guesses wrong, `Browse` opens the normal Windows file window: pick
+  `PlantsVsZombies.exe` (or `main.pak`) and its folder is used. It tells you
+  whether it can see `main.pak`.
 - Pick **Host a game** or **Join a game**.
 - Hosting shows **your own address**, so you can read it straight out to the
-  other player, and lets you pick the difficulty.
+  other player, and lets you pick the difficulty: Normal, Hard, Wild, Horde or
+  Nightmare (see `docs/SPEC.md` section 8). The host can change it later from
+  the main menu, between levels.
 - Joining just needs their address typed in. The port is filled in for you.
 - Press **Start**. The game launches with the right settings.
 

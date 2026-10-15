@@ -881,9 +881,11 @@ bool ParseLaunchOptions(int argc, char** argv, std::string& theErrorOut)
 		{
 			if (!TakeValue(i, argc, argv, "--difficulty", aValue, theErrorOut))
 				return false;
-			if (aValue == "normal")    aOptions.mDifficulty = Difficulty::Normal;
-			else if (aValue == "hard") aOptions.mDifficulty = Difficulty::Hard;
-			else { theErrorOut = "--difficulty must be 'normal' or 'hard'"; return false; }
+			if (!ParseDifficulty(aValue.c_str(), aOptions.mDifficulty))
+			{
+				theErrorOut = "--difficulty must be normal, hard, wild, horde or nightmare";
+				return false;
+			}
 		}
 		else
 		{
@@ -986,7 +988,7 @@ int RunSelfTest()
 	}
 	printf("coop selftest: params agree (seed=%u difficulty=%s delay=%u)\n",
 		aHostParams.mRngSeed,
-		aHostParams.mDifficulty == Difficulty::Hard ? "hard" : "normal",
+		GetDifficultyRules(aHostParams.mDifficulty).mKey,
 		aHostParams.mInputDelay);
 
 	// Round-trip a command the way Phase 2 will.

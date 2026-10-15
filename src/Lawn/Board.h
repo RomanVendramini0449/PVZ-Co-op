@@ -54,12 +54,16 @@ constexpr const int ONSLAUGHT_LAST_PER_LANE = 3;
 constexpr const int ONSLAUGHT_PRIZE_COINS = 1000;      // $10,000 (coins count in tens)
 // Luca vs. Roman: Roman fills a 3x3 block over the last three columns, which
 // nothing can be planted in, and moves up and down within them.
-// Yeti Spray: how many Yetis level 4-10 brings at full strength.
-constexpr const int YETI_SPRAY_YETIS = 20;
+// Yeti Spray: how many Yetis level 4-10 brings at full strength, and the
+// share of them that comes in the very first wave (the rest come with the
+// flag waves).
+constexpr const int YETI_SPRAY_YETIS = 50;
+constexpr const int YETI_SPRAY_FIRST_WAVE_PERCENT = 40;  // 20 of 50
 constexpr const int YETI_SPRAY_LEVEL = 40;  // 4-10, the stormy night
 constexpr const int ROMAN_FIRST_COL = 6;
 constexpr const int ROMAN_CENTER_ROW = 2;
 constexpr const int ROMAN_HEALTH = 60000;               // one and a half Dr. Zombosses
+constexpr const int ROMAN_PRIZE_COINS = 1500;           // $15,000 a win (coins count in tens)
 constexpr const int ROMAN_IDLE_MIN_TICKS = 400;         // rests 4-7 s between attack runs
 constexpr const int ROMAN_IDLE_MAX_TICKS = 700;
 constexpr const int ROMAN_FIRST_SUMMON_TICKS = 1500;
@@ -178,6 +182,15 @@ public:
 	CursorPreview*						mCursorPreview;
 	SeedBank*							mSeedBank;
 	int									mActivePlayer;
+	// Co-op: each player has their own sun (docs/SPEC.md section 5). The
+	// active player's is always the one in mSunMoney -- SetActivePlayer()
+	// parks it here and takes out the next player's -- so every existing
+	// `mSunMoney` reads and spends the sun of whoever is acting, the same way
+	// mSeedBank always points at their bank. Only while mCoopSplitSun.
+	int32_t								mCoopSunMoney[Coop::PLAYER_COUNT];
+	// Set as the level starts and fixed after: does this level split the
+	// sun? A few modes keep one pool (CoopModeSplitsSun).
+	bool								mCoopSplitSun;
 	// 1 in single player, 2 in co-op. Guards the per-player loops so a
 	// single-player game behaves exactly as it did before.
 	int									mCoopPlayerCount;
@@ -316,6 +329,9 @@ public:
 	Plant*							AddPlant(int theGridX, int theGridY, SeedType theSeedType, SeedType theImitaterType = SeedType::SEED_NONE);
 	Projectile*						AddProjectile(int theX, int theY, int theRenderOrder, int theRow, ProjectileType theProjectileType);
 	Coin*							AddCoin(int theX, int theY, CoinType theCoinType, CoinMotion theCoinMotion);
+	// One coin that only thePlayer can collect (-1: anyone). AddCoin calls
+	// this once per player for sun when the sun is split.
+	Coin*							AddCoinForPlayer(int thePlayer, int theX, int theY, CoinType theCoinType, CoinMotion theCoinMotion);
 	void							RefreshSeedPacketFromCursor();
 	ZombieType						PickGraveRisingZombieType();
 	ZombieType						PickZombieType(int theZombiePoints, int theWaveIndex, ZombiePicker* theZombiePicker);
@@ -354,7 +370,8 @@ public:
 	void							ButtonMouseEnter(int) override{}
 	void							ButtonMouseLeave(int) override{}
 	void							ButtonMouseMove(int, int, int) override{}
-	void					AddSunMoney(int theAmount);
+	// To thePlayer's sun; -1 is whoever is acting.
+	void					AddSunMoney(int theAmount, int thePlayer = -1);
 	bool							TakeSunMoney(int theAmount);
 	bool					CanTakeSunMoney(int theAmount);
 	void					Pause(bool thePause);
@@ -441,6 +458,7 @@ public:
 	void							InitZombieWavesForLevel(int theForLevel);
 	unsigned int					SeedNotRecommendedForLevel(SeedType theSeedType);
 	void							DrawTopRightUI(Graphics* g);
+	void							DrawCoopPartnerSun(Graphics* g);
 	void							DrawFog(Graphics* g);
 	void							UpdateFog();
 	int					LeftFogColumn();
@@ -533,6 +551,21 @@ public:
 	// remote cursor sat on top of your own and showed what YOU were holding.
 	void				GetPlayerMouse(int thePlayer, int& theX, int& theY) const;
 	bool				IsBoardButtonHit(GameButton* theButton, int theX, int theY) const;
+	// Split sun (mCoopSunMoney). Any player's sun, whoever is active.
+	bool				IsCoopSplitSun() const { return mCoopSplitSun; }
+	bool				CoopModeSplitsSun();
+	int32_t&			PlayerSunMoney(int thePlayer);
+	int					GetPlayerSunMoney(int thePlayer) const;
+	void				SetEveryPlayerSunMoney(int theAmount);
+	// Does any player have sun (or, with theCountInFlight, sun on its way)?
+	// Enough to bring in the seed bank on levels that start without one.
+	bool				CoopAnyPlayerHasSun(bool theCountInFlight);
+	// Whose screen this is: the local player in co-op, 0 otherwise.
+	int					GetLocalCoopPlayer() const;
+	// Is the player acting right now the one at this machine? Gates purely
+	// presentational reactions -- the buzzer, the flashing sun counter --
+	// that would otherwise go off for the other player's actions as well.
+	bool				IsLocalPlayerActing() const { return mActivePlayer == GetLocalCoopPlayer(); }
 	bool				IsCoopHostOnlyMoment();
 	void				ApplyCoopKey(Coop::PlayerId thePlayer, KeyCode theKey);
 	void				DebugWinLevel();

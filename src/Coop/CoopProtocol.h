@@ -30,7 +30,7 @@ namespace Coop
 
 // Bumped on any wire-format change. Peers with different versions are rejected
 // at handshake rather than allowed to desync later.
-constexpr uint32_t PROTOCOL_VERSION = 7;
+constexpr uint32_t PROTOCOL_VERSION = 8;
 
 constexpr uint16_t DEFAULT_PORT = 1337;
 
@@ -90,8 +90,35 @@ const char* GetRejectReasonText(RejectReason theReason);
 enum class Difficulty : uint8_t
 {
 	Normal = 0,
-	Hard = 1,  // sun x3/5 (25 -> 15), zombie health x1.5 (SPEC.md section 8)
+	Hard = 1,       // sun x3/5 (25 -> 15), zombie health x1.2
+	Wild = 2,       // normal sun; each zombie's health rolls 1x to 2x
+	Horde = 3,      // normal sun; 1.5x as many zombies, health 1x to 2x
+	Nightmare = 4,  // all of it: Hard's sun, 1.5x as many zombies, 1.2x to 2x
 };
+
+constexpr int DIFFICULTY_COUNT = 5;
+
+// What a difficulty does (SPEC.md section 8). Integer ratios and percentages
+// only: both machines must reach bit-identical results, which a float
+// multiplier cannot promise.
+struct DifficultyRules
+{
+	const char* mName;                // for menus: "Nightmare"
+	const char* mKey;                 // --difficulty value, launcher setting: "nightmare"
+	const char* mSummary;             // one line saying what it does
+	int         mSunNumerator;        // each sun is worth value * num / den
+	int         mSunDenominator;
+	int         mHealthMinPercent;    // each zombie's health is a roll between
+	int         mHealthMaxPercent;    // these two, inclusive
+	int         mZombieCountPercent;  // 150: half as many zombies again
+};
+
+// Unknown values (a newer peer, a corrupt byte) read as Normal.
+const DifficultyRules& GetDifficultyRules(Difficulty theDifficulty);
+// The main menu's difficulty button steps through them in order.
+Difficulty GetNextDifficultyInCycle(Difficulty theDifficulty);
+// "hard" -> Difficulty::Hard. False for anything it does not know.
+bool ParseDifficulty(const char* theKey, Difficulty& theDifficultyOut);
 
 // Player index. Doubles as the index into Board::mSeedBank[2], so the host is
 // always seed bank 0 and the joining player always seed bank 1.

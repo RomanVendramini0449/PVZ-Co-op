@@ -1938,9 +1938,14 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		// And $10,000, every time.
 		mPlayerInfo->AddCoins(ONSLAUGHT_PRIZE_COINS);
 	}
-	else if (mGameMode == GameMode::GAMEMODE_COOP_SANDBOX || mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
+	else if (mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
 	{
-		// Nothing to earn in the sandbox; beating Roman is its own reward.
+		// $15,000 for keeping Roman at bay, every time.
+		mPlayerInfo->AddCoins(ROMAN_PRIZE_COINS);
+	}
+	else if (mGameMode == GameMode::GAMEMODE_COOP_SANDBOX)
+	{
+		// Nothing to earn in the sandbox.
 	}
 	else
 	{
@@ -2615,7 +2620,7 @@ void LawnApp::LoadingThreadProc()
 	// PvZ Co-op's own words. The game's strings come from the stock
 	// main.pak, which knows nothing of them.
 	mStringProperties.insert_or_assign("CRAZY_DAVE_3950",
-		"YETI SPRAY! One whiff and every Yeti for miles comes running to the stormy night lawn. TWENTY Yetis! Think of the diamonds!");
+		"YETI SPRAY! One whiff and every Yeti for miles comes running to the stormy night lawn. FIFTY Yetis, twenty of them right away! Think of the diamonds!");
 	mStringProperties.insert_or_assign("LUCA", "Luca");
 	mStringProperties.insert_or_assign("LUCA_TOOLTIP", "Shoots cheese and makes sun");
 	mStringProperties.insert_or_assign("LUCA_DESCRIPTION",

@@ -88,7 +88,12 @@ public:
 			return mLevelSetup.mDifficulty;
 		return mDifficultyOverridden ? mDifficulty : mSession.GetParams().mDifficulty;
 	}
-	bool IsHardMode() const { return IsConnected() && GetDifficulty() == Difficulty::Hard; }
+	// What the live difficulty does to sun, zombie health and zombie count.
+	// Normal's rules (nothing changes) outside co-op.
+	const DifficultyRules& GetRules() const
+	{
+		return GetDifficultyRules(IsConnected() ? GetDifficulty() : Difficulty::Normal);
+	}
 	// Host, between levels. Takes effect from the next level entered.
 	void SetNextDifficulty(Difficulty theDifficulty) { mDifficulty = theDifficulty; mDifficultyOverridden = true; }
 	Difficulty GetNextDifficulty() const { return mDifficultyOverridden ? mDifficulty : mSession.GetParams().mDifficulty; }

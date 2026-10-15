@@ -761,8 +761,11 @@ void SeedPacket::MouseDown([[maybe_unused]] int x, [[maybe_unused]] int y, [[may
 		int aCost = mBoard->GetCurrentPlantCost(mPacketType, mImitaterType);
 		if (!mBoard->CanTakeSunMoney(aCost) && !mBoard->HasConveyorBeltSeedBank())
 		{
-			mApp->PlaySample(SOUND_BUZZER);
-			mBoard->mOutOfMoneyCounter = 70;
+			if (mBoard->IsLocalPlayerActing())
+			{
+				mApp->PlaySample(SOUND_BUZZER);
+				mBoard->mOutOfMoneyCounter = 70;
+			}
 			if (mApp->IsFirstTimeAdventureMode() && mBoard->mLevel == 1 && mBoard->mHelpDisplayed[AdviceType::ADVICE_CLICK_ON_SUN])
 			{
 				mBoard->DisplayAdvice("[ADVICE_CANT_AFFORD_PLANT]", MessageStyle::MESSAGE_STYLE_TUTORIAL_LEVEL1, AdviceType::ADVICE_CANT_AFFORD_PLANT);

@@ -1,0 +1,39 @@
+PvZ Co-op - how to play
+=======================
+
+Both players need:
+  - their own Plants vs. Zombies (the Steam Game of the Year edition), and
+  - this exact zip. Co-op refuses to connect two different builds, so if one
+    of you updates, both of you update.
+
+1. Unzip this folder anywhere. Easiest: unzip it INTO your Plants vs. Zombies
+   folder (the one with PlantsVsZombies.exe and main.pak) and the launcher
+   finds the game by itself. Anywhere else, it looks in your Steam libraries;
+   if it still cannot find the game, press Browse and pick PlantsVsZombies.exe.
+
+2. Double-click PVZ-Coop-Launcher.bat.
+
+3. One of you picks "Host a game" (and the difficulty), the other picks
+   "Join a game" and types the host's address. Press Start on both.
+   The host can change the difficulty later from the main menu's
+   DIFFICULTY button, between levels.
+
+Difficulties
+  Normal     the game as it comes
+  Hard       each sun worth 15 instead of 25, zombies 1.2x tougher
+  Wild       normal sun, every zombie 1x to 2x tougher (rolled per zombie)
+  Horde      1.5x as many zombies, each 1x to 2x tougher
+  Nightmare  Hard's sun, 1.5x as many zombies, each 1.2x to 2x tougher
+
+Sun is your own. Every sun the game makes comes once for each of you. Your
+friend's suns are greyed out and you cannot pick them up; their total shows
+under the Menu button. Seed cooldowns are your own too. Money is shared.
+
+Playing over the internet: the host's port (1337 unless you changed it) must
+be reachable - forward it on the router, or both join the same virtual LAN
+(Tailscale, ZeroTier, Radmin VPN) and use that address.
+
+Trouble connecting? 1-HOST-nettest.bat and 2-JOIN-nettest.bat test the
+connection without starting the game. 3-SELFTEST.bat checks the build.
+Saves live in %APPDATA%\io.github.wszqkzqk\PvZPortable, not in the game
+folder, so your normal PvZ save is never touched.

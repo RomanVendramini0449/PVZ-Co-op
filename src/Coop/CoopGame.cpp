@@ -200,7 +200,7 @@ bool EstablishSessionFromLaunchOptions()
 
 	printf("co-op: connected. %s\n", aSession.GetStatusText().c_str());
 	printf("co-op: difficulty %s, shared seed %u\n",
-		aSession.GetParams().mDifficulty == Difficulty::Hard ? "HARD" : "normal",
+		GetDifficultyRules(aSession.GetParams().mDifficulty).mName,
 		aSession.GetParams().mRngSeed);
 	fflush(stdout);
 	return true;

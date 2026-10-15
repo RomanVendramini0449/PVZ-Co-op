@@ -2007,7 +2007,8 @@ void Challenge::Update()
 	}
 	if ((mApp->IsScaryPotterLevel() || mApp->IsWhackAZombieLevel()) && mBoard->mSeedBank->mY < 0)
 	{
-		if (mBoard->mSunMoney + mBoard->CountSunBeingCollected() > 0 || mBoard->mSeedBank->mY > Sexy::IMAGE_SEEDBANK->mWidth)
+		// Either player's first sun brings the bank in (split sun, SPEC.md 5).
+		if (mBoard->CoopAnyPlayerHasSun(true) || mBoard->mSeedBank->mY > Sexy::IMAGE_SEEDBANK->mWidth)
 		{
 			mBoard->mSeedBank->mY += 2;
 			if (mBoard->mSeedBank->mY > 0)
@@ -5039,7 +5040,7 @@ void Challenge::LastStandCompletedStage()
 
 void Challenge::WhackAZombieUpdate()
 {
-	if (mBoard->mSunMoney > 0 && mBoard->mTutorialState == TUTORIAL_OFF)
+	if (mBoard->CoopAnyPlayerHasSun(false) && mBoard->mTutorialState == TUTORIAL_OFF)
 	{
 		mBoard->SetTutorialState(TUTORIAL_WHACK_A_ZOMBIE_BEFORE_PICK_SEED);
 		mBoard->mTutorialTimer = 1500;

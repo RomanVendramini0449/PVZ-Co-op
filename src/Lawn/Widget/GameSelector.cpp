@@ -1332,9 +1332,12 @@ void GameSelector::DrawCoopButtonLabels(Graphics* g)
 		aLabel(mMinigameButton, "LEVEL SELECT", Color(255, 245, 200));
 	if (CoopDifficultyEnabled())
 	{
-		const bool aHard = Coop::Game::Get().GetNextDifficulty() == Coop::Difficulty::Hard;
-		aLabel(mPuzzleButton, aHard ? "DIFFICULTY: HARD" : "DIFFICULTY: NORMAL",
-			aHard ? Color(255, 160, 160) : Color(255, 245, 200));
+		const Coop::Difficulty aDifficulty = Coop::Game::Get().GetNextDifficulty();
+		std::string aName = Coop::GetDifficultyRules(aDifficulty).mName;
+		for (char& aChar : aName)
+			aChar = static_cast<char>(toupper(static_cast<unsigned char>(aChar)));
+		aLabel(mPuzzleButton, "DIFFICULTY: " + aName,
+			aDifficulty != Coop::Difficulty::Normal ? Color(255, 160, 160) : Color(255, 245, 200));
 	}
 }
 
@@ -1430,7 +1433,7 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 		else if (aHasLuca)
 		{
 			aTitle = "Luca vs. Roman";
-			aNote = "Boss fight. Luca, Jalapenos and Ice-shrooms";
+			aNote = "Boss fight with Luca. Win: $15,000";
 			aFill = Color(40, 30, 110, 235);
 		}
 		else
@@ -1624,8 +1627,8 @@ void GameSelector::ButtonDepress(int theId)
 		if (CoopDifficultyEnabled())
 		{
 			Coop::Game& aCoop = Coop::Game::Get();
-			aCoop.SetNextDifficulty(aCoop.GetNextDifficulty() == Coop::Difficulty::Hard
-				? Coop::Difficulty::Normal : Coop::Difficulty::Hard);
+			// Normal, Hard, Wild, Horde, Nightmare, and round again.
+			aCoop.SetNextDifficulty(Coop::GetNextDifficultyInCycle(aCoop.GetNextDifficulty()));
 			mApp->PlaySample(Sexy::SOUND_GRAVEBUTTON);
 			MarkDirty();
 			break;

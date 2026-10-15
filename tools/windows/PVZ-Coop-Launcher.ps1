@@ -22,6 +22,17 @@ $ExePath   = Join-Path $ScriptDir 'PvZ-Coop.exe'
 $ConfigPath = Join-Path $ScriptDir 'coop-launcher-settings.txt'
 
 # ---------------------------------------------------------------- settings --
+# The host's difficulty choices, in the order the game's own menu cycles
+# through them. Key is what --difficulty takes; the host can still change it
+# from the main menu between levels.
+$Difficulties = @(
+    @{ Key = 'normal';    Label = 'Normal' },
+    @{ Key = 'hard';      Label = 'Hard  (sun worth 15, zombies 1.2x tougher)' },
+    @{ Key = 'wild';      Label = 'Wild  (normal sun, zombies 1x to 2x tougher)' },
+    @{ Key = 'horde';     Label = 'Horde  (1.5x the zombies, 1x to 2x tougher)' },
+    @{ Key = 'nightmare'; Label = 'Nightmare  (all of it: Hard sun, Horde zombies)' }
+)
+
 # Remembered between runs so nobody re-types a path or an address every time.
 $Settings = @{ GameDir = ''; Mode = 'host'; Address = ''; Port = '1337'; Difficulty = 'normal' }
 
@@ -132,15 +143,49 @@ function Get-GameCandidates {
     return $ranked
 }
 
+# The folders the launcher itself is in: the one it sits in, the ones above
+# it, and wherever it was started from. Unzipping the mod straight into the
+# game folder (or a folder inside it) is the simplest setup there is, and it
+# should simply work.
+function Get-NearbyGameDir {
+    $starts = @($ScriptDir)
+    try { $starts += (Get-Location).Path } catch { }
+    foreach ($start in $starts) {
+        $dir = $start
+        for ($depth = 0; $dir -and $depth -lt 4; $depth++) {
+            if (Test-Path (Join-Path $dir 'main.pak')) { return $dir }
+            $dir = Split-Path -Parent $dir
+        }
+    }
+    return ''
+}
+
 function Find-GameDir {
     # Whatever worked last time wins, so a deliberate choice is never
     # overridden by detection.
     if ($Settings.GameDir -and (Test-Path (Join-Path $Settings.GameDir 'main.pak'))) {
         return $Settings.GameDir
     }
+    $nearby = Get-NearbyGameDir
+    if ($nearby) { return $nearby }
     $candidates = Get-GameCandidates
     if ($candidates.Count -gt 0) { return $candidates[0] }
     return ''
+}
+
+# The normal Windows "Open" window, pointed at the game's own files: pick
+# PlantsVsZombies.exe or main.pak and the folder they are in is the answer.
+# (The folder-only picker .NET offers is the old tree view, which is hard to
+# find anything in.)
+function Select-GameDir([string]$StartDir) {
+    $dlg = New-Object System.Windows.Forms.OpenFileDialog
+    $dlg.Title = 'Find Plants vs. Zombies: pick PlantsVsZombies.exe or main.pak in its folder'
+    $dlg.Filter = 'Plants vs. Zombies (PlantsVsZombies.exe, main.pak)|PlantsVsZombies.exe;main.pak;*.exe|All files (*.*)|*.*'
+    $dlg.CheckFileExists = $true
+    $dlg.Multiselect = $false
+    if ($StartDir -and (Test-Path $StartDir)) { $dlg.InitialDirectory = $StartDir }
+    if ($dlg.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return '' }
+    return (Split-Path -Parent $dlg.FileName)
 }
 
 # Start-Process joins an argument array with spaces and quotes nothing, so a
@@ -182,7 +227,7 @@ function Build-GameCommandLine {
         [bool]$IsHost,
         [string]$Address,
         [int]$Port,
-        [bool]$Hard
+        [string]$Difficulty = 'normal'
     )
 
     $argList = @('-resdir', $GameDir)
@@ -191,7 +236,7 @@ function Build-GameCommandLine {
         $argList += '--host'
         $argList += '--port'
         $argList += "$Port"
-        if ($Hard) { $argList += '--difficulty'; $argList += 'hard' }
+        if ($Difficulty -and $Difficulty -ne 'normal') { $argList += '--difficulty'; $argList += $Difficulty }
     } else {
         $target = $Address.Trim()
         # Accept a bare address or one that already carries a port.
@@ -221,28 +266,49 @@ if ($TestOnly) {
     Write-Host 'launcher command line test'
 
     Assert-Line 'host, path with spaces' `
-        (Build-GameCommandLine -GameDir 'G:\Steam\steamapps\common\Plants Vs Zombies' -IsHost $true -Address '' -Port 1337 -Hard $false) `
+        (Build-GameCommandLine -GameDir 'G:\Steam\steamapps\common\Plants Vs Zombies' -IsHost $true -Address '' -Port 1337) `
         '-resdir "G:\Steam\steamapps\common\Plants Vs Zombies" --host --port 1337'
 
     Assert-Line 'host, Program Files, hard' `
-        (Build-GameCommandLine -GameDir 'C:\Program Files (x86)\Steam\steamapps\common\Plants vs. Zombies GOTY' -IsHost $true -Address '' -Port 1337 -Hard $true) `
+        (Build-GameCommandLine -GameDir 'C:\Program Files (x86)\Steam\steamapps\common\Plants vs. Zombies GOTY' -IsHost $true -Address '' -Port 1337 -Difficulty 'hard') `
         '-resdir "C:\Program Files (x86)\Steam\steamapps\common\Plants vs. Zombies GOTY" --host --port 1337 --difficulty hard'
 
+    Assert-Line 'host, nightmare' `
+        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $true -Address '' -Port 1337 -Difficulty 'nightmare') `
+        '-resdir C:\pvz --host --port 1337 --difficulty nightmare'
+
+    Assert-Line 'join ignores the difficulty' `
+        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '192.168.2.40' -Port 1337 -Difficulty 'horde') `
+        '-resdir C:\pvz --join 192.168.2.40:1337'
+
     Assert-Line 'join, bare address gains the port' `
-        (Build-GameCommandLine -GameDir 'G:\Steam\steamapps\common\Plants Vs Zombies' -IsHost $false -Address '192.168.2.40' -Port 1337 -Hard $false) `
+        (Build-GameCommandLine -GameDir 'G:\Steam\steamapps\common\Plants Vs Zombies' -IsHost $false -Address '192.168.2.40' -Port 1337) `
         '-resdir "G:\Steam\steamapps\common\Plants Vs Zombies" --join 192.168.2.40:1337'
 
     Assert-Line 'join, address already has a port' `
-        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '10.0.0.5:1400' -Port 1337 -Hard $false) `
+        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '10.0.0.5:1400' -Port 1337) `
         '-resdir C:\pvz --join 10.0.0.5:1400'
 
     Assert-Line 'join, surrounding spaces trimmed' `
-        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '  192.168.2.40  ' -Port 1337 -Hard $false) `
+        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '  192.168.2.40  ' -Port 1337) `
         '-resdir C:\pvz --join 192.168.2.40:1337'
 
     Assert-Line 'trailing separator is escaped' `
-        (Build-GameCommandLine -GameDir 'D:\My Games\PvZ\' -IsHost $true -Address '' -Port 1337 -Hard $false) `
+        (Build-GameCommandLine -GameDir 'D:\My Games\PvZ\' -IsHost $true -Address '' -Port 1337) `
         '-resdir "D:\My Games\PvZ\\" --host --port 1337'
+
+    # The launcher finds a game it was unzipped into, or into a folder of.
+    $fakeGame = Join-Path ([System.IO.Path]::GetTempPath()) ("pvz-launcher-test-" + [guid]::NewGuid().ToString('N'))
+    $fakeMod = Join-Path $fakeGame 'PvZ-Coop'
+    New-Item -ItemType Directory -Path $fakeMod -Force | Out-Null
+    Set-Content -Path (Join-Path $fakeGame 'main.pak') -Value 'test'
+    $savedScriptDir = $ScriptDir
+    $script:ScriptDir = $fakeMod
+    Assert-Line 'finds the game in a parent folder' (Get-NearbyGameDir) $fakeGame
+    $script:ScriptDir = $fakeGame
+    Assert-Line 'finds the game in its own folder' (Get-NearbyGameDir) $fakeGame
+    $script:ScriptDir = $savedScriptDir
+    Remove-Item -Recurse -Force $fakeGame
 
     if ($failures -gt 0) {
         Write-Host ""
@@ -283,10 +349,14 @@ $btnBrowse.Text = 'Browse'
 $btnBrowse.Location = New-Object System.Drawing.Point(352, 31)
 $btnBrowse.Size = New-Object System.Drawing.Size(85, 24)
 $btnBrowse.Add_Click({
-    $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dlg.Description = 'Pick the folder containing main.pak'
-    if ($txtDir.Text -and (Test-Path $txtDir.Text)) { $dlg.SelectedPath = $txtDir.Text }
-    if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $txtDir.Text = $dlg.SelectedPath }
+    $picked = Select-GameDir $txtDir.Text
+    if (-not $picked) { return }
+    if (-not (Test-Path (Join-Path $picked 'main.pak'))) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "There is no main.pak next to that file.`r`n`r`nPick PlantsVsZombies.exe in your Plants vs. Zombies folder.",
+            'Co-op Launcher', 'OK', 'Warning') | Out-Null
+    }
+    $txtDir.Text = $picked
 })
 $form.Controls.Add($btnBrowse)
 
@@ -318,10 +388,9 @@ $grp.Controls.Add($lblDiff)
 
 $cmbDiff = New-Object System.Windows.Forms.ComboBox
 $cmbDiff.Location = New-Object System.Drawing.Point(104, 79)
-$cmbDiff.Size = New-Object System.Drawing.Size(150, 22)
+$cmbDiff.Size = New-Object System.Drawing.Size(300, 22)
 $cmbDiff.DropDownStyle = 'DropDownList'
-[void]$cmbDiff.Items.Add('Normal')
-[void]$cmbDiff.Items.Add('Hard  (half sun, tougher zombies)')
+foreach ($difficulty in $Difficulties) { [void]$cmbDiff.Items.Add($difficulty.Label) }
 $grp.Controls.Add($cmbDiff)
 
 $lblYourIp = New-Label 'Your address (tell your friend):' 34 112 380 18
@@ -398,10 +467,10 @@ function Update-Mode {
 
 function Update-DirState {
     if (-not $txtDir.Text) {
-        $lblDirState.Text = 'Pick the folder that contains main.pak.'
+        $lblDirState.Text = 'Could not find the game. Click Browse and pick PlantsVsZombies.exe.'
         $lblDirState.ForeColor = [System.Drawing.Color]::Firebrick
     } elseif (Test-Path (Join-Path $txtDir.Text 'main.pak')) {
-        $lblDirState.Text = 'Found main.pak.'
+        $lblDirState.Text = 'Found your game (main.pak is here).'
         $lblDirState.ForeColor = [System.Drawing.Color]::ForestGreen
     } else {
         $lblDirState.Text = 'No main.pak in that folder.'
@@ -421,7 +490,7 @@ $btnStart.Add_Click({
     }
     if (-not (Test-Path (Join-Path $txtDir.Text 'main.pak'))) {
         [System.Windows.Forms.MessageBox]::Show(
-            "No main.pak in that folder.`r`n`r`nPick your Plants vs. Zombies install folder.",
+            "No main.pak in that folder.`r`n`r`nClick Browse and pick PlantsVsZombies.exe in your Plants vs. Zombies folder.",
             'Co-op Launcher', 'OK', 'Error') | Out-Null
         return
     }
@@ -445,7 +514,7 @@ $btnStart.Add_Click({
         -IsHost $rbHost.Checked `
         -Address $txtAddr.Text `
         -Port $port `
-        -Hard ($cmbDiff.SelectedIndex -eq 1)
+        -Difficulty $Difficulties[[Math]::Max($cmbDiff.SelectedIndex, 0)].Key
 
     if ($rbHost.Checked) {
         $lblStatus.Text = "Starting as host on port $port." + [Environment]::NewLine +
@@ -459,7 +528,7 @@ $btnStart.Add_Click({
     $Settings.Mode = if ($rbHost.Checked) { 'host' } else { 'join' }
     $Settings.Address = $txtAddr.Text
     $Settings.Port = "$port"
-    $Settings.Difficulty = if ($cmbDiff.SelectedIndex -eq 1) { 'hard' } else { 'normal' }
+    $Settings.Difficulty = $Difficulties[[Math]::Max($cmbDiff.SelectedIndex, 0)].Key
     Save-Settings
 
     try {
@@ -474,7 +543,10 @@ $btnStart.Add_Click({
 
 # Restore the previous choices.
 if ($Settings.Mode -eq 'join') { $rbJoin.Checked = $true } else { $rbHost.Checked = $true }
-$cmbDiff.SelectedIndex = if ($Settings.Difficulty -eq 'hard') { 1 } else { 0 }
+$cmbDiff.SelectedIndex = 0
+for ($i = 0; $i -lt $Difficulties.Count; $i++) {
+    if ($Difficulties[$i].Key -eq $Settings.Difficulty) { $cmbDiff.SelectedIndex = $i }
+}
 Update-Mode
 Update-DirState
 

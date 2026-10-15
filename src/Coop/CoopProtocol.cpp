@@ -21,6 +21,8 @@
 
 #include "CoopProtocol.h"
 
+#include <cstring>
+
 namespace Coop
 {
 
@@ -40,6 +42,42 @@ const char* GetRejectReasonText(RejectReason theReason)
 	default:
 		return "Connection refused.";
 	}
+}
+
+static const DifficultyRules gDifficultyRules[DIFFICULTY_COUNT] = {
+	// name         key           summary                                                   sun   health    count
+	{ "Normal",    "normal",    "the game as it comes",                                      1, 1, 100, 100, 100 },
+	{ "Hard",      "hard",      "each sun worth 15, zombies 1.2x tougher",                   3, 5, 120, 120, 100 },
+	{ "Wild",      "wild",      "normal sun, every zombie 1x to 2x tougher",                 1, 1, 100, 200, 100 },
+	{ "Horde",     "horde",     "1.5x the zombies, each 1x to 2x tougher",                   1, 1, 100, 200, 150 },
+	{ "Nightmare", "nightmare", "sun worth 15, 1.5x the zombies, each 1.2x to 2x tougher",   3, 5, 120, 200, 150 },
+};
+
+const DifficultyRules& GetDifficultyRules(Difficulty theDifficulty)
+{
+	const int aIndex = static_cast<int>(theDifficulty);
+	if (aIndex < 0 || aIndex >= DIFFICULTY_COUNT)
+		return gDifficultyRules[0];
+	return gDifficultyRules[aIndex];
+}
+
+Difficulty GetNextDifficultyInCycle(Difficulty theDifficulty)
+{
+	const int aNext = (static_cast<int>(theDifficulty) + 1) % DIFFICULTY_COUNT;
+	return static_cast<Difficulty>(aNext);
+}
+
+bool ParseDifficulty(const char* theKey, Difficulty& theDifficultyOut)
+{
+	for (int i = 0; i < DIFFICULTY_COUNT; i++)
+	{
+		if (std::strcmp(theKey, gDifficultyRules[i].mKey) == 0)
+		{
+			theDifficultyOut = static_cast<Difficulty>(i);
+			return true;
+		}
+	}
+	return false;
 }
 
 } // namespace Coop

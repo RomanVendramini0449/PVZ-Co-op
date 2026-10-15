@@ -24,7 +24,8 @@ playable, including 1-1; it is the hand-holding that goes, not the levels.
 ## 2. Session lifecycle
 
 1. **Main menu** gains a **Host Game** button and a **Join Game** button.
-2. Host picks difficulty (Normal / Hard) and a port, then waits.
+2. Host picks difficulty (Normal / Hard / Wild / Horde / Nightmare, see §8) and
+   a port, then waits.
 3. Joiner enters `IP:port` and connects. No lobby server, no matchmaking, no NAT
    traversal — direct IP only.
 4. Once connected, both players see an **icon representing the other player** so
@@ -65,13 +66,32 @@ The game does **not** enforce agreement — you sort it out verbally. Host press
 ## 5. Shared vs. per-player state
 
 ### Shared (one copy, already single on `Board` — mostly free)
-- **Sun** (`Board::mSunMoney`) — one pool, both spend from it
 - **Money / coins** — one pool
 - **Store upgrades** — shared; bought once, both benefit
 - All zombies, plants, projectiles, grid items, lawnmowers, wave state
 - The chosen seed line-up (which seeds are in the bank)
 
 ### Per-player (needs splitting)
+- **Sun** — **not shared.** Each player has their own pool and their own
+  suns. Every sun the game makes is made once per player: a sunflower (whoever
+  planted it) pops one sun for each of you, the sky drops one for each of you,
+  each somewhere different. Only a sun's owner can collect it. The other
+  player's suns are drawn greyed out and see-through, and vanish when they pick
+  them up, so you can watch what they are doing without being able to take
+  it. Their total shows under the Menu button ("Partner's sun" / "Host's
+  sun"). Everyone starts a level with that level's starting sun.
+  - `Board::mSunMoney` is always the *active* player's sun --
+    `SetActivePlayer()` parks it in `mCoopSunMoney[]` and takes out the next
+    player's, exactly as `mSeedBank` swings -- so every existing call site
+    spends the sun of whoever is acting. Anything that must not depend on
+    which player is active (the checksum, the partner display) asks
+    `GetPlayerSunMoney(player)`.
+  - Copies are made in `Board::AddCoin` (every sun's way onto the board);
+    `Coin::mCoopOwner` says whose it is and `Coin::ScoreCoin` pays the owner,
+    not the active player (which is always player 0 in the simulation).
+  - Zombiquarium, Beghouled (both), the slot machine, I, Zombie and Last
+    Stand keep **one** pool: there sun is a score, a puzzle's purse or a
+    per-round budget rather than income (`Board::CoopModeSplitsSun`).
 - **Seed packet cooldowns** — **not shared.** Each player has their own
   cooldown on every packet. If you plant a Peashooter, your friend's Peashooter
   is still ready.
@@ -149,26 +169,37 @@ slightly behind.
 
 ## 8. Difficulty
 
-Host-set at session creation, locked for the whole session, identical on both
-machines (it is part of the simulation).
+Chosen by the host -- in the launcher, or with the main menu's difficulty
+button between levels -- and identical on both machines (it is part of the
+simulation). The table lives in `Coop::GetDifficultyRules()`.
 
-| | Normal | Hard |
-|---|---|---|
-| Sun from every source | ×1 | **×3/5** (a 25-sun is worth 15) |
-| Zombie strength | ×1 | **×1.5** |
+| | Sun from every source | Zombie toughness | Zombies |
+|---|---|---|---|
+| **Normal** | ×1 | ×1 | ×1 |
+| **Hard** | **×3/5** (a 25-sun is worth 15) | **×1.2** | ×1 |
+| **Wild** | ×1 | **1× to 2×**, rolled per zombie | ×1 |
+| **Horde** | ×1 | **1× to 2×**, rolled per zombie | **×1.5** |
+| **Nightmare** | **×3/5** | **1.2× to 2×**, rolled per zombie | **×1.5** |
 
 - **Sun ×3/5 is universal** — sunflowers, sky sun, Sun-shroom, Twin Sunflower,
   everything: a regular sun is worth 15, a small one 9, a large one 30.
-  Implemented at `Board::AddSunMoney()`, a single chokepoint with 4 call sites.
-  It was ×0.5 originally, but 25 / 2 rounds down to 12 in integer math, so
-  every sun lost half a point; 3/5 divides every sun value exactly.
-- **Zombies ×1.5 "stronger" means tougher**: 1.5× health, so they take 1.5×
-  more damage to kill. Applied at spawn to `mBodyHealth`, `mBodyMaxHealth`,
-  `mHelmHealth`, `mShieldHealth`, `mFlyingHealth` (all plain `int32_t`).
-- Both use **integer rational math** (`x * 3 / 5`, `x * 3 / 2`). No floats — a float
-  multiplier here could desync the two machines.
-- Level starting sun and any scripted grants get audited so Hard does not make a
-  level mathematically unwinnable.
+  Implemented in `Coin::GetSunValue()`, where a sun's value is decided, so a
+  sun is counted the same while it flies to the bank as when it lands. (It was
+  first cut on arrival, in `Board::AddSunMoney()`, while sun in flight was
+  counted at 25: packets lit up as affordable, then went dark when the sun
+  landed short.) 3/5 divides every sun value exactly; 1/2 lost half a point
+  to rounding on every 25-sun.
+- **Toughness** is health: applied at spawn to `mBodyHealth`, `mHelmHealth`,
+  `mShieldHealth`, `mFlyingHealth` before the maximums are taken. The rolled
+  modes draw each zombie's percentage from the gameplay generator, so both
+  machines roll the same. Bosses take the low end instead of a roll.
+- **×1.5 zombies**: after each wave is picked, half as many again are added,
+  each a copy of one already in the wave (never a second flag or boss). The
+  fraction carries to the next wave, so even one-zombie waves grow.
+- Everything is **integer rational math** (`x * 3 / 5`, `x * percent / 100`). No
+  floats — a float multiplier here could desync the two machines.
+- A level's starting sun is left alone, so the sun cut cannot make a level
+  unwinnable before it begins.
 
 ---
 
@@ -246,7 +277,15 @@ a lane, rolls a fireball or an iceball down it -- an Ice-shroom puts out fire, a
 Jalapeno in the lane melts ice -- and slides back to the middle, and now and
 then he calls up a couple of zombies. Plants only reach him from the three
 lanes he covers. He is Dr. Zomboss's zombie type underneath (health bar and
-balls included) with 60,000 health. His art is `assets/coop/roman.png`.
+balls included) with 60,000 health. Every win pays **$15,000**. His art is
+`assets/coop/roman.png`.
+
+**Yeti Spray** ($3,000 in Crazy Dave's shop) turns level 4-10 into a Yeti
+stampede, but only once bought: 50 Yetis on top of the level's own zombies,
+20 of them in the very first wave and the rest split between the flag waves
+(a full wave passes its share on to the next). Every loss on 4-10 cuts the
+count by a fifth for the next try; beating 4-10 resets it. Yetis still run off
+after a while if nobody stops them.
 
 ### 10.3b Delete All Saves
 

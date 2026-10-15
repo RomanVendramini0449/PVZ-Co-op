@@ -97,11 +97,14 @@ Board::Board(LawnApp* theApp)
 		mSeedBankStorage[aPlayer] = std::make_unique<SeedBank>();
 	}
 	mCoopPlayerCount = 1;
+	mActivePlayer = 0;
+	mCoopSplitSun = false;  // before any SetActivePlayer: nothing to swap yet
 	for (int aPlayer = 0; aPlayer < Coop::PLAYER_COUNT; aPlayer++)
 	{
 		mCoopCursorX[aPlayer] = 0;
 		mCoopCursorY[aPlayer] = 0;
 		mCoopCursorVisible[aPlayer] = false;
+		mCoopSunMoney[aPlayer] = 0;
 	}
 	// In co-op the board is two-player from construction, and the player it
 	// rests on is the local one: that is the seed bank and cursor this machine
@@ -654,6 +657,44 @@ void Board::PickZombieWaves()
 	ZombieType aIntroZombieType = GetIntroducedZombieType();
 	PVZP_ASSERT(mNumWaves <= MAX_ZOMBIE_WAVES);
 
+	// Yeti Spray (4-10, once bought): a horde of Yetis on top of everything
+	// else -- two fifths of them in the very first wave, the rest shared out
+	// between the flag waves. A wave that is already full passes its share on
+	// to the next (see the end of the loop).
+	int aYetiPlan[MAX_ZOMBIE_WAVES] = {};
+	const int aSprayYetis = mApp->YetiSprayYetiCount();
+	if (aSprayYetis > 0 && mNumWaves > 0)
+	{
+		const int aFirstWaveYetis = aSprayYetis * YETI_SPRAY_FIRST_WAVE_PERCENT / 100;
+		const int aRest = aSprayYetis - aFirstWaveYetis;
+		aYetiPlan[0] = aFirstWaveYetis;
+
+		int aFlagWaves = 0;
+		for (int aWave = 1; aWave < mNumWaves; aWave++)
+		{
+			if (IsFlagWave(aWave))
+				aFlagWaves++;
+		}
+		if (aFlagWaves == 0)
+		{
+			aYetiPlan[mNumWaves - 1] += aRest;
+		}
+		else
+		{
+			int aIndex = 0;
+			for (int aWave = 1; aWave < mNumWaves; aWave++)
+			{
+				if (!IsFlagWave(aWave))
+					continue;
+				aYetiPlan[aWave] = (aIndex + 1) * aRest / aFlagWaves - aIndex * aRest / aFlagWaves;
+				aIndex++;
+			}
+		}
+	}
+	int aYetisWaiting = 0;
+	// Horde and Nightmare's extra zombies still owed, in hundredths of one.
+	int aExtraZombieHundredths = 0;
+
 	for (int aWave = 0; aWave < mNumWaves; aWave++)
 	{
 		ZombiePickerInitForWave(&aZombiePicker);
@@ -819,18 +860,35 @@ void Board::PickZombieWaves()
 			PutZombieInWave(aZombieType, aWave, &aZombiePicker);
 		}
 
-		// Yeti Spray: the Yetis it draws, on top of everything else, spread
-		// evenly from the third wave to the last.
-		const int aSprayYetis = mApp->YetiSprayYetiCount();
-		const int aYetiWaves = mNumWaves - 2;
-		if (aSprayYetis > 0 && aYetiWaves > 0 && aWave >= 2)
+		// Co-op Horde and Nightmare: half as many zombies again, in the same
+		// mix -- each extra a copy of one the wave already has. What does not
+		// make a whole zombie carries to the next wave, so even the early
+		// one-zombie waves grow. The gameplay generator picks the copies, so
+		// both machines pick the same ones.
+		const int aCountPercent = Coop::Game::Get().GetRules().mZombieCountPercent;
+		const int aWaveSize = aZombiePicker.mZombieCount;
+		if (aCountPercent > 100 && aWaveSize > 0)
 		{
-			const int aIndex = aWave - 2;
-			const int aHere = (aIndex + 1) * aSprayYetis / aYetiWaves - aIndex * aSprayYetis / aYetiWaves;
-			for (int i = 0; i < aHere && aZombiePicker.mZombieCount < MAX_ZOMBIES_IN_WAVE; i++)
+			aExtraZombieHundredths += aWaveSize * (aCountPercent - 100);
+			const int aExtras = aExtraZombieHundredths / 100;
+			aExtraZombieHundredths %= 100;
+			for (int i = 0; i < aExtras && aZombiePicker.mZombieCount < MAX_ZOMBIES_IN_WAVE; i++)
 			{
-				PutZombieInWave(ZombieType::ZOMBIE_YETI, aWave, &aZombiePicker);
+				ZombieType aCopy = mZombiesInWave[aWave][Rand(aWaveSize)];
+				// One flag per wave, and only ever one boss.
+				if (aCopy == ZombieType::ZOMBIE_FLAG || aCopy == ZombieType::ZOMBIE_BOSS)
+					aCopy = ZombieType::ZOMBIE_NORMAL;
+				PutZombieInWave(aCopy, aWave, &aZombiePicker);
 			}
+		}
+
+		// Yeti Spray's Yetis for this wave, after the extras so the difficulty
+		// does not multiply them too.
+		aYetisWaiting += aYetiPlan[aWave];
+		while (aYetisWaiting > 0 && aZombiePicker.mZombieCount < MAX_ZOMBIES_IN_WAVE)
+		{
+			PutZombieInWave(ZombieType::ZOMBIE_YETI, aWave, &aZombiePicker);
+			aYetisWaiting--;
 		}
 	}
 }
@@ -1436,6 +1494,12 @@ void Board::InitLevel()
 	{
 		mSunMoney = 50;
 	}
+
+	// Co-op: each player starts with the level's sun, in a pool of their own
+	// unless this mode keeps one. Decided once, here, and fixed for the level:
+	// SetActivePlayer() swaps pools only while it is set.
+	mCoopSplitSun = mCoopPlayerCount > 1 && CoopModeSplitsSun();
+	SetEveryPlayerSunMoney(mSunMoney);
 
 	memset(mRowPickingArray, 0, sizeof(mRowPickingArray));
 	for (int aRow = 0; aRow < MAX_GRID_SIZE_Y; aRow++)
@@ -2079,8 +2143,31 @@ void Board::ClearAdvice(AdviceType theHelpIndex)
 
 Coin* Board::AddCoin(int theX, int theY, CoinType theCoinType, CoinMotion theCoinMotion)
 {
+	// Co-op with split sun: every sun is made once for each player, and only
+	// its owner can collect it (docs/SPEC.md section 5). Made here, where all
+	// sun enters the board, so sunflowers, Sun-shrooms, Luca and the rest need
+	// not know. Each copy starts its own motion -- a sunflower's two suns hop
+	// to different spots. The first is returned.
+	if (mCoopSplitSun && Coin::IsSun(theCoinType))
+	{
+		Coin* aFirst = nullptr;
+		for (int aPlayer = 0; aPlayer < mCoopPlayerCount; aPlayer++)
+		{
+			Coin* aCoin = AddCoinForPlayer(aPlayer, theX, theY, theCoinType, theCoinMotion);
+			if (aFirst == nullptr)
+				aFirst = aCoin;
+		}
+		return aFirst;
+	}
+
+	return AddCoinForPlayer(-1, theX, theY, theCoinType, theCoinMotion);
+}
+
+Coin* Board::AddCoinForPlayer(int thePlayer, int theX, int theY, CoinType theCoinType, CoinMotion theCoinMotion)
+{
 	Coin* aCoin = mCoins.DataArrayAlloc();
 	aCoin->CoinInitialize(theX, theY, theCoinType, theCoinMotion);
+	aCoin->mCoopOwner = thePlayer;
 	if (mApp->IsFirstTimeAdventureMode() && mLevel == 1)
 	{
 		DisplayAdvice("[ADVICE_CLICK_ON_SUN]", MessageStyle::MESSAGE_STYLE_TUTORIAL_LEVEL1_STAY, AdviceType::ADVICE_CLICK_ON_SUN);
@@ -3285,7 +3372,11 @@ uint32_t Board::ComputeCoopChecksum()
 	Coop::ChecksumBuilder aBuilder;
 
 	// Shared board state first: the things both players can see going wrong.
-	aBuilder.Add(mSunMoney);
+	// Every player's sun, by player: mSunMoney alone is whoever happens to be
+	// active, and the checksum is taken back on the local player -- a
+	// different one on each machine.
+	for (int aPlayer = 0; aPlayer < mCoopPlayerCount; aPlayer++)
+		aBuilder.Add(GetPlayerSunMoney(aPlayer));
 	aBuilder.Add(mMainCounter);
 
 	for (Zombie* aZombie : mZombies)
@@ -5522,6 +5613,13 @@ void Board::SetActivePlayer(int thePlayer)
 	if (thePlayer < 0 || thePlayer >= Coop::PLAYER_COUNT)
 		thePlayer = 0;
 
+	// The sun follows the player, as the seed bank does (mCoopSunMoney).
+	if (mCoopSplitSun && thePlayer != mActivePlayer)
+	{
+		mCoopSunMoney[mActivePlayer] = mSunMoney;
+		mSunMoney = mCoopSunMoney[thePlayer];
+	}
+
 	mActivePlayer = thePlayer;
 	mCursorObject = mCursorStorage[thePlayer].get();
 	mCursorPreview = mCursorPreviewStorage[thePlayer].get();
@@ -5759,6 +5857,13 @@ void Board::UpdateSunSpawning()
 	mNumSunsFallen++;
 	mSunCountDown = std::min(SUN_COUNTDOWN_MAX, SUN_COUNTDOWN + mNumSunsFallen * 10) + Rand(SUN_COUNTDOWN_RANGE);
 	CoinType aSunType = mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_SUNNY_DAY ? CoinType::COIN_LARGESUN : CoinType::COIN_SUN;
+	if (mCoopSplitSun)
+	{
+		// A sun from the sky for each player, each falling somewhere else.
+		for (int aPlayer = 0; aPlayer < mCoopPlayerCount; aPlayer++)
+			AddCoinForPlayer(aPlayer, RandRangeInt(100, 649), 60, aSunType, CoinMotion::COIN_MOTION_FROM_SKY);
+		return;
+	}
 	AddCoin(RandRangeInt(100, 649), 60, aSunType, CoinMotion::COIN_MOTION_FROM_SKY);
 }
 
@@ -6221,7 +6326,7 @@ void Board::UpdateGame()
 	// The bonus levels' "as much sun as you want": spent sun comes straight
 	// back. In the simulation, so both co-op machines agree on it.
 	if (HasUnlimitedSun())
-		mSunMoney = UNLIMITED_SUN;
+		SetEveryPlayerSunMoney(UNLIMITED_SUN);
 	UpdateSunSpawning();
 	UpdateZombieSpawning();
 	UpdateIce();
@@ -7829,6 +7934,8 @@ void Board::DrawTopRightUI(Graphics* g)
 	mMenuButton->Draw(g);
 	g->SetColorizeImages(false);
 
+	DrawCoopPartnerSun(g);
+
 	if (mStoreButton && mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_LAST_STAND)
 	{
 		if (mTutorialState == TutorialState::TUTORIAL_ZEN_GARDEN_VISIT_STORE)
@@ -7839,6 +7946,37 @@ void Board::DrawTopRightUI(Graphics* g)
 		mStoreButton->Draw(g);
 		g->SetColorizeImages(false);
 	}
+}
+
+// Split sun: the other player's sun, small, under the Menu button, so you can
+// see what they have to spend without asking. Their suns on the lawn are
+// greyed out (Coin::Draw); this is the total.
+void Board::DrawCoopPartnerSun(Graphics* g)
+{
+	if (!mCoopSplitSun || mApp->mGameScene != GameScenes::SCENE_PLAYING || HasConveyorBeltSeedBank())
+		return;
+
+	const int aPartner = (GetLocalCoopPlayer() + 1) % mCoopPlayerCount;
+	const std::string aLabel = aPartner == 0 ? "Host's sun" : "Partner's sun";
+	const std::string aAmount = std::to_string(std::max(GetPlayerSunMoney(aPartner), 0));
+
+	_Font* aLabelFont = FONT_BRIANNETOD12;
+	_Font* aAmountFont = FONT_CONTINUUMBOLD14;
+	const int aLabelWidth = aLabelFont->StringWidth(aLabel);
+	const int aAmountWidth = aAmountFont->StringWidth(aAmount);
+	const int aWidth = 8 + aLabelWidth + 8 + aAmountWidth + 8;
+	const int aHeight = 22;
+	const int aX = BOARD_WIDTH - 6 - aWidth;
+	const int aY = 38;  // just under the Menu button, above the top row
+
+	g->SetColor(Color(0, 0, 0, 150));
+	g->FillRect(aX, aY, aWidth, aHeight);
+	g->SetFont(aLabelFont);
+	g->SetColor(Color(255, 245, 200));
+	g->DrawString(aLabel, aX + 8, aY + 15);
+	g->SetFont(aAmountFont);
+	g->SetColor(Color(255, 230, 60));
+	g->DrawString(aAmount, aX + 8 + aLabelWidth + 8, aY + 16);
 }
 
 void Board::DrawUIBottom(Graphics* g)
@@ -9165,34 +9303,22 @@ void Board::KeyChar(char theChar)
 	}
 }
 
-void Board::AddSunMoney(int theAmount)
+// Hard and Nightmare's smaller sun is not applied here any more but where a
+// sun's value is decided, Coin::GetSunValue(); see there for why.
+void Board::AddSunMoney(int theAmount, int thePlayer)
 {
-	// Hard mode cuts sun from every source to three fifths (docs/SPEC.md
-	// section 8): a regular sun is worth 15 instead of 25, a small one 9, a
-	// large one 30.
-	//
-	// It was a half, and that lost sun: 25 / 2 is 12 in integer math, so every
-	// sun quietly paid half a point to rounding -- visible as the counter
-	// going up by 12. Three fifths divides every sun value the game has
-	// exactly (they are all multiples of 5), so nothing is lost.
-	//
-	// Here because this is the one chokepoint earned sun passes through --
-	// sunflowers, sky sun, Sun-shroom, Twin Sunflower all arrive via this
-	// function. A level's starting sun is assigned directly elsewhere and is
-	// deliberately left alone, so hard mode cannot make a level unwinnable
-	// before it begins.
-	//
-	// Integer math rather than a float multiplier: both machines must reach
-	// bit-identical results, and a float could differ in the last place.
-	if (theAmount > 0 && Coop::Game::Get().IsHardMode())
-		theAmount = theAmount * 3 / 5;
+	if (thePlayer < 0 || thePlayer >= mCoopPlayerCount)
+		thePlayer = mActivePlayer;
 
-	mSunMoney += theAmount;
-	mSunMoney = std::min(mSunMoney, 9990);
-	if (mSunMoney >= 8000)
+	int32_t& aSunMoney = PlayerSunMoney(thePlayer);
+	aSunMoney += theAmount;
+	aSunMoney = std::min(aSunMoney, 9990);
+	// The achievement is this machine's player's to earn, not the other's.
+	if (aSunMoney >= 8000 && (!mCoopSplitSun || thePlayer == GetLocalCoopPlayer()))
 		ReportAchievement::GiveAchievement(mApp, SunnyDays, true);
 }
 
+// The acting player's sun on its way to their bank: theirs to spend already.
 int Board::CountSunBeingCollected()
 {
 	int aCount = 0;
@@ -9200,12 +9326,65 @@ int Board::CountSunBeingCollected()
 	{
 		if (aCoin->mDead)
 			continue;
-		if (aCoin->mIsBeingCollected && aCoin->IsSun())
+		if (aCoin->mIsBeingCollected && aCoin->IsSun() && aCoin->BelongsTo(mActivePlayer))
 		{
 			aCount += aCoin->GetSunValue();
 		}
 	}
 	return aCount;
+}
+
+// Modes where sun is a score or a puzzle's purse, rather than income, keep one
+// pool: Zombiquarium is won on it, Beghouled and the slot machine pay out of
+// it, I, Zombie buys zombies with it, Last Stand hands out one budget a round.
+bool Board::CoopModeSplitsSun()
+{
+	const GameMode aGameMode = mApp->mGameMode;
+	return !(aGameMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIQUARIUM ||
+		aGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED ||
+		aGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED_TWIST ||
+		aGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND ||
+		mApp->IsSlotMachineLevel() ||
+		mApp->IsIZombieLevel());
+}
+
+int32_t& Board::PlayerSunMoney(int thePlayer)
+{
+	if (!mCoopSplitSun || thePlayer == mActivePlayer || thePlayer < 0 || thePlayer >= Coop::PLAYER_COUNT)
+		return mSunMoney;
+	return mCoopSunMoney[thePlayer];
+}
+
+int Board::GetPlayerSunMoney(int thePlayer) const
+{
+	if (!mCoopSplitSun || thePlayer == mActivePlayer || thePlayer < 0 || thePlayer >= Coop::PLAYER_COUNT)
+		return mSunMoney;
+	return mCoopSunMoney[thePlayer];
+}
+
+void Board::SetEveryPlayerSunMoney(int theAmount)
+{
+	mSunMoney = theAmount;
+	for (int aPlayer = 0; aPlayer < Coop::PLAYER_COUNT; aPlayer++)
+		mCoopSunMoney[aPlayer] = theAmount;
+}
+
+bool Board::CoopAnyPlayerHasSun(bool theCountInFlight)
+{
+	bool aAnySun = false;
+	ForEachCoopPlayer([&]()
+	{
+		if (mSunMoney + (theCountInFlight ? CountSunBeingCollected() : 0) > 0)
+			aAnySun = true;
+	});
+	return aAnySun;
+}
+
+int Board::GetLocalCoopPlayer() const
+{
+	if (mCoopPlayerCount <= 1)
+		return 0;
+	return Coop::Game::Get().GetLocalPlayerIndex();
 }
 
 int Board::CountCoinsBeingCollected()
@@ -9231,8 +9410,13 @@ bool Board::TakeSunMoney(int theAmount)
 		return true;
 	}
 
-	mApp->PlaySample(Sexy::SOUND_BUZZER);
-	mOutOfMoneyCounter = 70;
+	// Only for the player at this machine: the other's counter is not on
+	// this screen, and their buzzer is not this player's business.
+	if (IsLocalPlayerActing())
+	{
+		mApp->PlaySample(Sexy::SOUND_BUZZER);
+		mOutOfMoneyCounter = 70;
+	}
 	return false;
 }
 

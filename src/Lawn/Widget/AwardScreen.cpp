@@ -272,10 +272,11 @@ void AwardScreen::DrawBottom(Graphics* g, std::string_view theTitle, std::string
 	PvzpDrawStringWrapped(g, theMessage, Rect(285, 360, 230, 90), Sexy::FONT_BRIANNETOD16, Color(40, 50, 90), DS_ALIGN_CENTER_VERTICAL_MIDDLE);
 }
 
-// Gargantuar Onslaught pays $10,000 on top of whatever else it awards.
-void AwardScreen::DrawCoopPrizeLine(Graphics* g)
+// The bonus levels' prize money, under whatever else they award.
+void AwardScreen::DrawCoopPrizeLine(Graphics* g, int theCoins)
 {
-	PvzpDrawString(g, "+ $10,000 prize money!", BOARD_WIDTH / 2, 478, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);
+	const std::string aLine = "+ " + LawnApp::GetMoneyString(theCoins) + " prize money!";
+	PvzpDrawString(g, aLine, BOARD_WIDTH / 2, 478, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);
 }
 
 void AwardScreen::DrawAwardSeed(Graphics* g, SeedType theSeedType)
@@ -321,12 +322,13 @@ void AwardScreen::Draw(Graphics* g)
 	else if (mAwardType == AWARD_COOP_LUCA)
 	{
 		DrawAwardSeed(g, SEED_LUCA);
-		DrawCoopPrizeLine(g);
+		DrawCoopPrizeLine(g, ONSLAUGHT_PRIZE_COINS);
 	}
 	else if (mAwardType == AWARD_COOP_ROMAN_BEATEN)
 	{
 		DrawBottom(g, "Roman Defeated!", "Luca vs. Roman", "Luca has kept Roman at bay... for now.");
 		g->DrawImage(Sexy::IMAGE_TROPHY_HI_RES, BOARD_WIDTH / 2 - Sexy::IMAGE_TROPHY_HI_RES->mWidth / 2, 137);
+		DrawCoopPrizeLine(g, ROMAN_PRIZE_COINS);
 	}
 	else if (mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE)
 	{

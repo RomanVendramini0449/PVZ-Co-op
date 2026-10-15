@@ -121,11 +121,11 @@ void CoopOverlay::Draw(Graphics* g)
 	if (mApp->mBoard != nullptr)
 		return;  // a level being torn down or built; nothing useful to say
 
-	const bool aDifficultyHard = aCoop.IsFollower()
-		? mApp->mCoopShownDifficulty == Coop::Difficulty::Hard
-		: aCoop.GetNextDifficulty() == Coop::Difficulty::Hard;
+	const Coop::Difficulty aDifficulty = aCoop.IsFollower() ? mApp->mCoopShownDifficulty : aCoop.GetNextDifficulty();
+	const Coop::DifficultyRules& aRules = Coop::GetDifficultyRules(aDifficulty);
+	const bool aDifficultyHard = aDifficulty != Coop::Difficulty::Normal;
 	const std::string aDifficultyText = aDifficultyHard
-		? "Difficulty: HARD  (each sun worth 15, zombies 1.5x tougher)"
+		? std::string("Difficulty: ") + aRules.mName + "  (" + aRules.mSummary + ")"
 		: "Difficulty: Normal";
 
 	if (aCoop.IsFollower())
