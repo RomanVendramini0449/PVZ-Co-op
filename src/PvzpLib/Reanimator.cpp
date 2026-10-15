@@ -26,6 +26,7 @@
 #include "Attachment.h"
 #include "SexyAppBase.h"
 #include "../LawnApp.h"
+#include "../Lawn/CoopArt.h"
 #include "ReanimAtlas.h"
 #include "EffectSystem.h"
 #include "../GameConstants.h"
@@ -718,6 +719,22 @@ bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, [[maybe_unused]] int
 		aImage = aTrackInstance->mImageOverride;
 	}
 
+	// PvZ Co-op, Adventure Plus: a repainted part in place of the game's own,
+	// looked up by the part it replaces -- the track's override when it has
+	// one (a cracked helmet, a lost arm), else the frame's image. Drawn over
+	// the original's footprint, scaled to it if its size differs.
+	Image* aSubstitute = nullptr;
+	Image* aReplacedImage = aTrackInstance->mImageOverride != nullptr ? aTrackInstance->mImageOverride
+		: aAtlasImage != nullptr ? aAtlasImage->mOriginalImage : aImage;
+	if (aReplacedImage != nullptr && reinterpret_cast<uintptr_t>(aReplacedImage) > 1000)
+		aSubstitute = CoopArt::SubstituteZombiePart(aReplacedImage);
+	if (aSubstitute != nullptr)
+	{
+		aImage = aSubstitute;
+		aAtlasImage = nullptr;
+		aImageFrame = 0;
+	}
+
 	SexyMatrix3 aMatrix;
 	bool aFullScreen = false;
 	if (aPivotAtlasImage != nullptr)
@@ -750,6 +767,29 @@ bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, [[maybe_unused]] int
 		if (strcasecmp(mDefinition->mTracks.tracks[theTrackIndex].mName, "fullscreen"))  // no image and no text, and not the fullscreen track
 			return false;  // nothing to draw
 		aFullScreen = true;  // a screen-sized rect is filled later
+	}
+
+	if (aSubstitute != nullptr)
+	{
+		// The part's footprint: the original's size, which the pivot above
+		// was measured from. Squeeze the replacement into it.
+		float aWidth = static_cast<float>(aReplacedImage->GetCelWidth());
+		float aHeight = static_cast<float>(aReplacedImage->GetCelHeight());
+		if (aPivotAtlasImage != nullptr)
+		{
+			aWidth = static_cast<float>(aPivotAtlasImage->mWidth);
+			aHeight = static_cast<float>(aPivotAtlasImage->mHeight);
+		}
+		if (aSubstitute->mWidth != static_cast<int>(aWidth) || aSubstitute->mHeight != static_cast<int>(aHeight))
+		{
+			SexyMatrix3 aScale;
+			aScale.LoadIdentity();
+			aScale.m00 = aWidth / static_cast<float>(aSubstitute->mWidth);
+			aScale.m11 = aHeight / static_cast<float>(aSubstitute->mHeight);
+			SexyMatrix3 aScaled;
+			SexyMatrix3Multiply(aScaled, aMatrix, aScale);
+			aMatrix = aScaled;
+		}
 	}
 
 	if (mDefinition->mReanimAtlas != nullptr && aAtlasImage == nullptr)  // atlas exists but this track does not use it

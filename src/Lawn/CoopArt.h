@@ -80,6 +80,11 @@ namespace CoopArt
 	// Adventure Plus's own lawn, 1400x600 like the day lawn it replaces;
 	// nullptr until assets/coop/adventure_plus_background.png exists.
 	Sexy::Image* AdventurePlusBackground();
+
+	// Adventure Plus: the repainted zombie part (assets/coop/zombie-parts) to
+	// draw in place of theOriginal, or nullptr to draw it as it is. Always
+	// nullptr outside an Adventure Plus level, and cheap when there are none.
+	Sexy::Image* SubstituteZombiePart(Sexy::Image* theOriginal);
 }
 
 #endif

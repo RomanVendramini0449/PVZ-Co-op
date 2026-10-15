@@ -62,6 +62,36 @@ constexpr const int YETI_SPRAY_FIRST_WAVE_PERCENT = 40;  // 20 of 50
 constexpr const int YETI_SPRAY_LEVEL = 40;  // 4-10, the stormy night
 // Adventure Plus: its own run of levels, after the campaign.
 constexpr const int ADVENTURE_PLUS_LEVELS = 10;
+constexpr const int ADVENTURE_PLUS_BOWLING_LEVEL = 5;   // played as Wall-nut Bowling
+// In the bowling level a Football Zombie's helmet is set to this whatever
+// the difficulty: a ball takes 900 off a helmet, so two break it and the
+// third ball kills him -- always three balls.
+constexpr const int ADVENTURE_PLUS_BOWLING_FOOTBALL_HELM = 1500;
+
+// A zombie an Adventure Plus level sends on purpose, on top of its random
+// mix: mPerWave of them every mEvery waves from wave mFromWave (0-based), and
+// mPerFlagWave in each flag wave from then on.
+struct AdventurePlusFeature
+{
+	ZombieType mType;
+	int        mFromWave;
+	int        mEvery;
+	int        mPerWave;
+	int        mPerFlagWave;
+};
+
+struct AdventurePlusLevel
+{
+	const char*          mName;
+	ZombieType           mRoster[12];       // the random mix draws from these
+	int                  mRosterCount;
+	int                  mPointsBonus;      // extra zombie points every wave
+	AdventurePlusFeature mFeatures[3];
+	int                  mFeatureCount;
+};
+
+// theLevel is 1-10; anything else reads as level 1.
+const AdventurePlusLevel& GetAdventurePlusLevel(int theLevel);
 constexpr const int ROMAN_FIRST_COL = 6;
 constexpr const int ROMAN_CENTER_ROW = 2;
 constexpr const int ROMAN_HEALTH = 60000;               // one and a half Dr. Zombosses

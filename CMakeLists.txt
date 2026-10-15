@@ -87,6 +87,27 @@ foreach(aName IN LISTS COOP_ART_OPTIONAL)
 		string(APPEND aCoopArtText "extern const unsigned char gCoopArt_${aName}[] = { 0 };\nextern const std::size_t gCoopArt_${aName}_size = 0;\n")
 	endif()
 endforeach()
+# Adventure Plus zombie parts: repainted copies of the game's own zombie
+# parts, each named exactly like the part it replaces (see
+# art-templates/zombies/README.txt). Any number, including none.
+file(GLOB COOP_ZOMBIE_PARTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/coop/zombie-parts/*.png")
+list(SORT COOP_ZOMBIE_PARTS)
+set(aPartTable "")
+set(aPartIndex 0)
+foreach(aPath IN LISTS COOP_ZOMBIE_PARTS)
+	get_filename_component(aStem "${aPath}" NAME_WE)
+	file(READ "${aPath}" aHex HEX)
+	string(LENGTH "${aHex}" aHexLength)
+	math(EXPR aSize "${aHexLength} / 2")
+	string(REGEX REPLACE "(([0-9a-f][0-9a-f]){32})" "\\1\n" aHex "${aHex}")
+	string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," aBytes "${aHex}")
+	string(APPEND aCoopArtText "static const unsigned char gCoopZombiePart${aPartIndex}[] = {\n${aBytes}\n};\n")
+	string(APPEND aPartTable "\t{ \"${aStem}\", gCoopZombiePart${aPartIndex}, ${aSize} },\n")
+	math(EXPR aPartIndex "${aPartIndex} + 1")
+endforeach()
+string(APPEND aCoopArtText "struct CoopArtPart { const char* mName; const unsigned char* mData; std::size_t mSize; };\n")
+string(APPEND aCoopArtText "extern const CoopArtPart gCoopZombieParts[] = {\n${aPartTable}\t{ nullptr, nullptr, 0 }\n};\n")
+string(APPEND aCoopArtText "extern const int gCoopZombiePartCount = ${aPartIndex};\n")
 # Through a temporary and a copy, so an unchanged PNG does not touch the
 # generated file and force a recompile.
 file(WRITE "${COOP_ART_SOURCE}.tmp" "${aCoopArtText}")

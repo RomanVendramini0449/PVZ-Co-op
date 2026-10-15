@@ -2380,6 +2380,15 @@ void Challenge::InitZombieWaves()
 {
 	GameMode aGameMode = mApp->mGameMode;
 	bool* aList = mBoard->mZombieAllowed;
+	// Adventure Plus first: its bowling level would otherwise match the
+	// Wall-nut Bowling branch below and get that mode's list (or none).
+	if (aGameMode == GAMEMODE_COOP_ADVENTURE_PLUS)
+	{
+		const AdventurePlusLevel& aPlus = GetAdventurePlusLevel(mApp->mCoopPlusLevel);
+		for (int i = 0; i < aPlus.mRosterCount; i++)
+			aList[aPlus.mRoster[i]] = true;
+		return;
+	}
 	if (mApp->IsSurvivalMode())
 	{
 		if (mSurvivalStage == 0)
@@ -2577,18 +2586,6 @@ void Challenge::InitZombieWaves()
 		// No waves; these are what Roman calls up now and then.
 		aList[ZOMBIE_NORMAL] = true;
 		aList[ZOMBIE_TRAFFIC_CONE] = true;
-	}
-	else if (aGameMode == GAMEMODE_COOP_ADVENTURE_PLUS)
-	{
-		// Placeholder line-up until each level is designed: every level adds
-		// one zombie type to the last one's.
-		static const ZombieType kPlusRoster[] = {
-			ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_POLEVAULTER, ZOMBIE_PAIL, ZOMBIE_NEWSPAPER,
-			ZOMBIE_DOOR, ZOMBIE_FOOTBALL, ZOMBIE_DANCER, ZOMBIE_JACK_IN_THE_BOX, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR,
-		};
-		const int aTypes = std::clamp(mApp->mCoopPlusLevel + 1, 2, static_cast<int>(sizeof(kPlusRoster) / sizeof(kPlusRoster[0])));
-		for (int i = 0; i < aTypes; i++)
-			aList[kPlusRoster[i]] = true;
 	}
 	else if (aGameMode == GAMEMODE_COOP_SANDBOX)
 	{

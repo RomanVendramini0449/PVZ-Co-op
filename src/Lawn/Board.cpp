@@ -745,7 +745,7 @@ void Board::PickZombieWaves()
 		{
 			// Ramps faster than the campaign, and each level starts a little
 			// stronger than the last. (Placeholder until each level is designed.)
-			aZombiePoints = aWave / 2 + 1 + mApp->mCoopPlusLevel / 3;
+			aZombiePoints = aWave / 2 + 1 + GetAdventurePlusLevel(mApp->mCoopPlusLevel).mPointsBonus;
 		}
 		else
 		{
@@ -869,6 +869,26 @@ void Board::PickZombieWaves()
 			PutZombieInWave(aZombieType, aWave, &aZombiePicker);
 		}
 
+		// Adventure Plus: the zombies this level sends on purpose. Yeti Spray
+		// doubles Yeti Season's -- and the finale's -- Yetis.
+		if (mApp->IsAdventurePlusLevel())
+		{
+			const AdventurePlusLevel& aPlus = GetAdventurePlusLevel(mApp->mCoopPlusLevel);
+			const bool aSpray = mApp->mPlayerInfo && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_YETI_SPRAY] > 0;
+			for (int f = 0; f < aPlus.mFeatureCount; f++)
+			{
+				const AdventurePlusFeature& aFeature = aPlus.mFeatures[f];
+				if (aWave < aFeature.mFromWave)
+					continue;
+				int aCount = aIsFlagWave ? aFeature.mPerFlagWave
+					: ((aWave - aFeature.mFromWave) % std::max(aFeature.mEvery, 1) == 0 ? aFeature.mPerWave : 0);
+				if (aFeature.mType == ZombieType::ZOMBIE_YETI && aSpray)
+					aCount *= 2;
+				for (int i = 0; i < aCount && aZombiePicker.mZombieCount < MAX_ZOMBIES_IN_WAVE; i++)
+					PutZombieInWave(aFeature.mType, aWave, &aZombiePicker);
+			}
+		}
+
 		// Co-op Horde and Nightmare: half as many zombies again, in the same
 		// mix -- each extra a copy of one the wave already has. What does not
 		// make a whole zombie carries to the next wave, so even the early
@@ -900,6 +920,50 @@ void Board::PickZombieWaves()
 			aYetisWaiting--;
 		}
 	}
+}
+
+// The ten Adventure Plus levels (docs/SPEC.md 10.3). Harder than the
+// campaign's: bigger budgets, and each level leans on a zombie or two it sends
+// in numbers.
+static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
+	{ "Bucket Brigade",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL }, 3, 1,
+		{ { ZOMBIE_PAIL, 2, 1, 1, 4 } }, 1 },
+	{ "Fourth Down",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL }, 4, 1,
+		{ { ZOMBIE_FOOTBALL, 4, 2, 1, 3 }, { ZOMBIE_PAIL, 3, 2, 1, 2 } }, 2 },
+	{ "Up and Under",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_LADDER, ZOMBIE_DIGGER }, 5, 2,
+		{ { ZOMBIE_LADDER, 3, 1, 1, 3 }, { ZOMBIE_DIGGER, 5, 3, 1, 3 } }, 2 },
+	{ "Yeti Season",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_YETI }, 4, 1,
+		{ { ZOMBIE_YETI, 1, 2, 1, 4 } }, 1 },
+	{ "Gridiron Bowling",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL }, 5, 1,
+		{ { ZOMBIE_FOOTBALL, 3, 1, 1, 4 } }, 1 },
+	{ "Heavy Lifting",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR }, 5, 2,
+		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 1 }, { ZOMBIE_LADDER, 3, 2, 1, 2 }, { ZOMBIE_DIGGER, 4, 3, 1, 2 } }, 3 },
+	{ "Rush Hour",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_LADDER }, 7, 3,
+		{ { ZOMBIE_FOOTBALL, 3, 2, 1, 3 }, { ZOMBIE_POLEVAULTER, 2, 2, 1, 2 } }, 2 },
+	{ "Black Ice",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI }, 5, 3,
+		{ { ZOMBIE_ZAMBONI, 5, 3, 1, 2 }, { ZOMBIE_FOOTBALL, 4, 3, 1, 2 } }, 2 },
+	{ "Tunnel Vision",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_DIGGER, ZOMBIE_POGO, ZOMBIE_JACK_IN_THE_BOX }, 6, 3,
+		{ { ZOMBIE_DIGGER, 3, 1, 2, 4 }, { ZOMBIE_POGO, 5, 3, 1, 2 } }, 2 },
+	{ "Everything, Everywhere",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_DIGGER,
+		  ZOMBIE_ZAMBONI, ZOMBIE_YETI, ZOMBIE_GARGANTUAR }, 9, 4,
+		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 2 }, { ZOMBIE_FOOTBALL, 3, 2, 1, 3 }, { ZOMBIE_YETI, 5, 4, 1, 2 } }, 3 },
+};
+
+const AdventurePlusLevel& GetAdventurePlusLevel(int theLevel)
+{
+	if (theLevel < 1 || theLevel > ADVENTURE_PLUS_LEVELS)
+		theLevel = 1;
+	return gAdventurePlusLevels[theLevel - 1];
 }
 
 int Board::GetLevelRandSeed()
@@ -7437,7 +7501,7 @@ void Board::DrawLevel(Graphics* g)
 	{
 		aLevelStr = mApp->GetCurrentChallengeDef().mChallengeName;
 		if (mApp->IsAdventurePlusLevel())
-			aLevelStr = std::format("Adventure Plus {}", mApp->mCoopPlusLevel);
+			aLevelStr = std::format("Adventure Plus {}: {}", mApp->mCoopPlusLevel, GetAdventurePlusLevel(mApp->mCoopPlusLevel).mName);
 		if (mApp->IsSurvivalMode() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND)
 		{
 			int aFlags = GetSurvivalFlagsCompleted();

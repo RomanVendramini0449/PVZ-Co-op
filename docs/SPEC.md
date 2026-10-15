@@ -319,8 +319,19 @@ under the bonus levels, open from the start. Each is a 20-wave level on the
 day lawn's layout, drawn with `assets/coop/adventure_plus_background.png`
 when that file exists (1400x600, the day lawn's frame -- see
 `art-templates/adventure-plus/README.txt`) and the day lawn when it does not.
-For now each level adds one zombie type to the last one's and starts a little
-stronger; the real designs come later. A win drops a trophy, goes back to the
+Each level has a name, its own zombie mix and a zombie or two it sends in
+numbers (`gAdventurePlusLevels` in Board.cpp): 1 Bucket Brigade (buckets),
+2 Fourth Down (footballs), 3 Up and Under (ladders, diggers), 4 Yeti Season
+(Yetis; doubled with Yeti Spray), 5 Gridiron Bowling (Wall-nut Bowling with
+footballs that always take three balls), 6 Heavy Lifting (Gargantuars,
+ladders, diggers), 7 Rush Hour, 8 Black Ice (Zambonis), 9 Tunnel Vision
+(diggers, pogos), 10 Everything, Everywhere. Budgets are bigger than the
+campaign's.
+
+Zombie parts can be repainted for Adventure Plus only: PNGs in
+`assets/coop/zombie-parts/`, named like the part they replace, are drawn in
+its place by `Reanimation::DrawTrack` (via `CoopArt::SubstituteZombiePart`),
+so the game's own animations move them. See `art-templates/zombies/README.txt`. A win drops a trophy, goes back to the
 menu and marks the level gold on Level Select
 (`mPurchases[STORE_ITEM_ADVENTURE_PLUS_BEATEN]`, one bit per level). Which
 level is played travels in `LevelSetup::mPlusLevel`.

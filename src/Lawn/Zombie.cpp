@@ -911,6 +911,14 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 		mFlyingHealth = mFlyingHealth * aPercent / 100;
 	}
 
+	// Adventure Plus's bowling level: a Football Zombie always takes three
+	// balls, whatever the difficulty made of his helmet.
+	if (mZombieType == ZombieType::ZOMBIE_FOOTBALL && mApp->IsAdventurePlusLevel() &&
+		mApp->mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL)
+	{
+		mHelmHealth = ADVENTURE_PLUS_BOWLING_FOOTBALL_HELM;
+	}
+
 	mBodyMaxHealth = mBodyHealth;
 	mHelmMaxHealth = mHelmHealth;
 	mShieldMaxHealth = mShieldHealth;

@@ -3203,6 +3203,9 @@ bool LawnApp::IsWallnutBowlingLevel()
 	if (mGameMode == GameMode::GAMEMODE_CHALLENGE_WALLNUT_BOWLING || mGameMode == GameMode::GAMEMODE_CHALLENGE_WALLNUT_BOWLING_2)
 		return true;
 
+	if (IsAdventurePlusLevel() && mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL)
+		return true;
+
 	return IsAdventureMode() && mBoard->mLevel == 5;
 }
 

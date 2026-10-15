@@ -27,8 +27,12 @@
 #include "graphics/Graphics.h"
 #include "misc/SexyMatrix.h"
 
+#include "../PvzpLib/Definition.h"
+
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
+#include <unordered_map>
 
 using namespace Sexy;
 
@@ -51,6 +55,9 @@ extern const unsigned char gCoopArt_philippe_pepper[];
 extern const std::size_t gCoopArt_philippe_pepper_size;
 extern const unsigned char gCoopArt_adventure_plus_background[];
 extern const std::size_t gCoopArt_adventure_plus_background_size;
+struct CoopArtPart { const char* mName; const unsigned char* mData; std::size_t mSize; };
+extern const CoopArtPart gCoopZombieParts[];
+extern const int gCoopZombiePartCount;
 
 namespace
 {
@@ -285,6 +292,38 @@ Image* CoopArt::AdventurePlusBackground()
 {
 	LoadArt();
 	return gAdventurePlusBackground;
+}
+
+Image* CoopArt::SubstituteZombiePart(Image* theOriginal)
+{
+	if (gCoopZombiePartCount == 0 || gLawnApp == nullptr || !gLawnApp->IsAdventurePlusLevel() || gLawnApp->mBoard == nullptr)
+		return nullptr;
+
+	// Built on first use: each part file is named after the image it
+	// replaces ("Zombie_head.png" replaces IMAGE_REANIM_ZOMBIE_HEAD), so ask
+	// for that image the way the animations do, and remember the pair.
+	static std::unordered_map<Image*, Image*> sParts;
+	static bool sBuilt = false;
+	if (!sBuilt)
+	{
+		sBuilt = true;
+		for (int i = 0; i < gCoopZombiePartCount; i++)
+		{
+			const CoopArtPart& aPart = gCoopZombieParts[i];
+			std::string anId = "IMAGE_REANIM_";
+			for (const char* aChar = aPart.mName; *aChar; aChar++)
+				anId.push_back(static_cast<char>(toupper(static_cast<unsigned char>(*aChar))));
+			Image* anOriginal = nullptr;
+			if (!DefinitionLoadImage(&anOriginal, anId) || anOriginal == nullptr)
+				continue;
+			Image* aReplacement = gLawnApp->GetImageFromMemory(aPart.mData, aPart.mSize, std::string("coop/zombie-parts/") + aPart.mName);
+			if (aReplacement != nullptr)
+				sParts[anOriginal] = aReplacement;
+		}
+	}
+
+	const auto anIt = sParts.find(theOriginal);
+	return anIt == sParts.end() ? nullptr : anIt->second;
 }
 
 void CoopArt::DrawYetiSpray(Graphics* g, float theCenterX, float theBottomY, float theHeight)
