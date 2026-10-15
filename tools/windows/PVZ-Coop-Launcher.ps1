@@ -229,12 +229,16 @@ function Build-GameCommandLine {
         [bool]$IsHost,
         [string]$Address,
         [int]$Port,
-        [string]$Difficulty = 'normal'
+        [string]$Difficulty = 'normal',
+        [bool]$Solo = $false
     )
 
     $argList = @('-resdir', $GameDir)
 
-    if ($IsHost) {
+    if ($Solo) {
+        # Single player: no connection, just the difficulty.
+        if ($Difficulty -and $Difficulty -ne 'normal') { $argList += '--difficulty'; $argList += $Difficulty }
+    } elseif ($IsHost) {
         $argList += '--host'
         $argList += '--port'
         $argList += "$Port"
@@ -278,6 +282,14 @@ if ($TestOnly) {
     Assert-Line 'host, nightmare' `
         (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $true -Address '' -Port 1337 -Difficulty 'nightmare') `
         '-resdir C:\pvz --host --port 1337 --difficulty nightmare'
+
+    Assert-Line 'single player' `
+        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '' -Port 1337 -Difficulty 'normal' -Solo $true) `
+        '-resdir C:\pvz'
+
+    Assert-Line 'single player, inferno' `
+        (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '' -Port 1337 -Difficulty 'inferno' -Solo $true) `
+        '-resdir C:\pvz --difficulty inferno'
 
     Assert-Line 'join ignores the difficulty' `
         (Build-GameCommandLine -GameDir 'C:\pvz' -IsHost $false -Address '192.168.2.40' -Port 1337 -Difficulty 'horde') `
@@ -325,7 +337,7 @@ if ($TestOnly) {
 # ------------------------------------------------------------------- window --
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Plants vs. Zombies Co-op'
-$form.Size = New-Object System.Drawing.Size(470, 420)
+$form.Size = New-Object System.Drawing.Size(470, 444)
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
 $form.MaximizeBox = $false
@@ -370,7 +382,7 @@ $form.Controls.Add($lblDirState)
 $grp = New-Object System.Windows.Forms.GroupBox
 $grp.Text = 'How do you want to play?'
 $grp.Location = New-Object System.Drawing.Point(15, 84)
-$grp.Size = New-Object System.Drawing.Size(422, 186)
+$grp.Size = New-Object System.Drawing.Size(422, 210)
 
 $rbHost = New-Object System.Windows.Forms.RadioButton
 $rbHost.Text = 'Host a game  (your friend connects to you)'
@@ -384,65 +396,73 @@ $rbJoin.Location = New-Object System.Drawing.Point(14, 50)
 $rbJoin.Size = New-Object System.Drawing.Size(390, 22)
 $grp.Controls.Add($rbJoin)
 
+$rbSolo = New-Object System.Windows.Forms.RadioButton
+$rbSolo.Text = 'Play alone  (single player, no connection)'
+$rbSolo.Location = New-Object System.Drawing.Point(14, 74)
+$rbSolo.Size = New-Object System.Drawing.Size(390, 22)
+$grp.Controls.Add($rbSolo)
+
 # Host-only: difficulty, and this machine's addresses to read out.
-$lblDiff = New-Label 'Difficulty' 34 82 70 18
+$lblDiff = New-Label 'Difficulty' 34 106 70 18
 $grp.Controls.Add($lblDiff)
 
 $cmbDiff = New-Object System.Windows.Forms.ComboBox
-$cmbDiff.Location = New-Object System.Drawing.Point(104, 79)
+$cmbDiff.Location = New-Object System.Drawing.Point(104, 103)
 $cmbDiff.Size = New-Object System.Drawing.Size(300, 22)
 $cmbDiff.DropDownStyle = 'DropDownList'
 $cmbDiff.DropDownWidth = 400  # the longer descriptions, in full, when open
 foreach ($difficulty in $Difficulties) { [void]$cmbDiff.Items.Add($difficulty.Label) }
 $grp.Controls.Add($cmbDiff)
 
-$lblYourIp = New-Label 'Your address (tell your friend):' 34 112 380 18
+$lblYourIp = New-Label 'Your address (tell your friend):' 34 136 380 18
 $grp.Controls.Add($lblYourIp)
 
 $txtYourIp = New-Object System.Windows.Forms.TextBox
-$txtYourIp.Location = New-Object System.Drawing.Point(34, 132)
+$txtYourIp.Location = New-Object System.Drawing.Point(34, 156)
 $txtYourIp.Size = New-Object System.Drawing.Size(240, 22)
 $txtYourIp.ReadOnly = $true
 $grp.Controls.Add($txtYourIp)
 
 # Join-only: where to connect.
-$lblAddr = New-Label "Friend's address" 34 82 110 18
+$lblAddr = New-Label "Friend's address" 34 106 110 18
 $grp.Controls.Add($lblAddr)
 
 $txtAddr = New-Object System.Windows.Forms.TextBox
-$txtAddr.Location = New-Object System.Drawing.Point(144, 79)
+$txtAddr.Location = New-Object System.Drawing.Point(144, 103)
 $txtAddr.Size = New-Object System.Drawing.Size(200, 22)
 $txtAddr.Text = $Settings.Address
 $grp.Controls.Add($txtAddr)
 
-$lblAddrHint = New-Label 'Just the address, for example 192.168.2.40' 144 104 270 18
+$lblAddrHint = New-Label 'Just the address, for example 192.168.2.40' 144 128 270 18
 $lblAddrHint.ForeColor = [System.Drawing.Color]::DimGray
 $grp.Controls.Add($lblAddrHint)
 
 # Shared
-$grp.Controls.Add((New-Label 'Port' 34 156 40 18))
+$lblPort = New-Label 'Port' 34 180 40 18
+$grp.Controls.Add($lblPort)
 $txtPort = New-Object System.Windows.Forms.TextBox
-$txtPort.Location = New-Object System.Drawing.Point(74, 153)
+$txtPort.Location = New-Object System.Drawing.Point(74, 177)
 $txtPort.Size = New-Object System.Drawing.Size(70, 22)
 $txtPort.Text = $Settings.Port
 $grp.Controls.Add($txtPort)
 
-$grp.Controls.Add((New-Label 'Both players must use the same port.' 154 156 260 18))
+$lblPortHint = New-Label 'Both players must use the same port.' 154 180 260 18
+$grp.Controls.Add($lblPortHint)
 $form.Controls.Add($grp)
 
-$lblStatus = New-Label '' 15 278 422 40
+$lblStatus = New-Label '' 15 302 422 40
 $form.Controls.Add($lblStatus)
 
 $btnStart = New-Object System.Windows.Forms.Button
 $btnStart.Text = 'Start'
-$btnStart.Location = New-Object System.Drawing.Point(243, 325)
+$btnStart.Location = New-Object System.Drawing.Point(243, 349)
 $btnStart.Size = New-Object System.Drawing.Size(100, 32)
 $form.Controls.Add($btnStart)
 $form.AcceptButton = $btnStart
 
 $btnQuit = New-Object System.Windows.Forms.Button
 $btnQuit.Text = 'Close'
-$btnQuit.Location = New-Object System.Drawing.Point(351, 325)
+$btnQuit.Location = New-Object System.Drawing.Point(351, 349)
 $btnQuit.Size = New-Object System.Drawing.Size(86, 32)
 $btnQuit.Add_Click({ $form.Close() })
 $form.Controls.Add($btnQuit)
@@ -450,13 +470,19 @@ $form.Controls.Add($btnQuit)
 # ------------------------------------------------------------------- logic --
 function Update-Mode {
     $isHost = $rbHost.Checked
-    $lblDiff.Visible = $isHost
-    $cmbDiff.Visible = $isHost
+    $isSolo = $rbSolo.Checked
+    $isJoin = $rbJoin.Checked
+    # The difficulty is the host's to pick, or yours alone.
+    $lblDiff.Visible = $isHost -or $isSolo
+    $cmbDiff.Visible = $isHost -or $isSolo
     $lblYourIp.Visible = $isHost
     $txtYourIp.Visible = $isHost
-    $lblAddr.Visible = -not $isHost
-    $txtAddr.Visible = -not $isHost
-    $lblAddrHint.Visible = -not $isHost
+    $lblAddr.Visible = $isJoin
+    $txtAddr.Visible = $isJoin
+    $lblAddrHint.Visible = $isJoin
+    $lblPort.Visible = -not $isSolo
+    $txtPort.Visible = -not $isSolo
+    $lblPortHint.Visible = -not $isSolo
 
     if ($isHost) {
         $addresses = Get-LocalAddresses
@@ -482,6 +508,7 @@ function Update-DirState {
 }
 
 $rbHost.Add_CheckedChanged({ Update-Mode })
+$rbSolo.Add_CheckedChanged({ Update-Mode })
 $txtDir.Add_TextChanged({ Update-DirState })
 
 $btnStart.Add_Click({
@@ -499,14 +526,14 @@ $btnStart.Add_Click({
     }
 
     $port = 0
-    if (-not [int]::TryParse($txtPort.Text, [ref]$port) -or $port -lt 1 -or $port -gt 65535) {
+    if (-not $rbSolo.Checked -and (-not [int]::TryParse($txtPort.Text, [ref]$port) -or $port -lt 1 -or $port -gt 65535)) {
         [System.Windows.Forms.MessageBox]::Show(
             'The port must be a number between 1 and 65535.',
             'Co-op Launcher', 'OK', 'Error') | Out-Null
         return
     }
 
-    if (-not $rbHost.Checked -and -not $txtAddr.Text.Trim()) {
+    if ($rbJoin.Checked -and -not $txtAddr.Text.Trim()) {
         [System.Windows.Forms.MessageBox]::Show(
             "Enter your friend's address.", 'Co-op Launcher', 'OK', 'Error') | Out-Null
         return
@@ -517,9 +544,12 @@ $btnStart.Add_Click({
         -IsHost $rbHost.Checked `
         -Address $txtAddr.Text `
         -Port $port `
-        -Difficulty $Difficulties[[Math]::Max($cmbDiff.SelectedIndex, 0)].Key
+        -Difficulty $Difficulties[[Math]::Max($cmbDiff.SelectedIndex, 0)].Key `
+        -Solo $rbSolo.Checked
 
-    if ($rbHost.Checked) {
+    if ($rbSolo.Checked) {
+        $lblStatus.Text = 'Starting a single-player game.'
+    } elseif ($rbHost.Checked) {
         $lblStatus.Text = "Starting as host on port $port." + [Environment]::NewLine +
             'The console window waits for your friend; the game opens once they connect.'
     } else {
@@ -528,9 +558,9 @@ $btnStart.Add_Click({
     }
 
     $Settings.GameDir = $txtDir.Text
-    $Settings.Mode = if ($rbHost.Checked) { 'host' } else { 'join' }
+    $Settings.Mode = if ($rbHost.Checked) { 'host' } elseif ($rbSolo.Checked) { 'solo' } else { 'join' }
+    if (-not $rbSolo.Checked) { $Settings.Port = "$port" }
     $Settings.Address = $txtAddr.Text
-    $Settings.Port = "$port"
     $Settings.Difficulty = $Difficulties[[Math]::Max($cmbDiff.SelectedIndex, 0)].Key
     Save-Settings
 
@@ -545,7 +575,9 @@ $btnStart.Add_Click({
 })
 
 # Restore the previous choices.
-if ($Settings.Mode -eq 'join') { $rbJoin.Checked = $true } else { $rbHost.Checked = $true }
+if ($Settings.Mode -eq 'join') { $rbJoin.Checked = $true }
+elseif ($Settings.Mode -eq 'solo') { $rbSolo.Checked = $true }
+else { $rbHost.Checked = $true }
 $cmbDiff.SelectedIndex = 0
 for ($i = 0; $i -lt $Difficulties.Count; $i++) {
     if ($Difficulties[$i].Key -eq $Settings.Difficulty) { $cmbDiff.SelectedIndex = $i }

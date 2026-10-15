@@ -28,6 +28,7 @@ namespace Sexy
 	class Graphics;
 	class Image;
 }
+class Reanimation;
 
 // The mod's own art: the Luca plant and the cheese it shoots. The PNGs live in
 // assets/coop and are compiled into the executable (see CMakeLists.txt), so
@@ -86,6 +87,12 @@ namespace CoopArt
 	// draw in place of theOriginal, or nullptr to draw it as it is. Always
 	// nullptr outside an Adventure Plus level, and cheap when there are none.
 	Sexy::Image* SubstituteZombiePart(Sexy::Image* theOriginal);
+
+	// Adventure Plus's stand-in for Crazy Dave (assets/coop/
+	// adventure_plus_narrator.png); nullptr while there is none.
+	Sexy::Image* AdventurePlusNarrator();
+	// Draws it where Dave's (hidden) animation has him, bobbing while he talks.
+	void DrawNarrator(Sexy::Graphics* g, Reanimation* theDaveReanim, Sexy::Image* theImage, bool theTalking, unsigned int theCounter);
 }
 
 #endif

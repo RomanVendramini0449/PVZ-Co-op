@@ -93,7 +93,8 @@ public:
 	// Normal's rules (nothing changes) outside co-op.
 	const DifficultyRules& GetRules() const
 	{
-		return GetDifficultyRules(IsConnected() ? GetDifficulty() : Difficulty::Normal);
+		// Alone, the difficulty picked in the launcher or on the menu.
+		return GetDifficultyRules(IsConnected() ? GetDifficulty() : (mDifficultyOverridden ? mDifficulty : Difficulty::Normal));
 	}
 	// Host, between levels. Takes effect from the next level entered.
 	void SetNextDifficulty(Difficulty theDifficulty) { mDifficulty = theDifficulty; mDifficultyOverridden = true; }

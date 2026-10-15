@@ -140,7 +140,12 @@ bool EstablishSessionFromLaunchOptions()
 {
 	const LaunchOptions& aOptions = GetLaunchOptions();
 	if (!aOptions.mWantHost && !aOptions.mWantJoin)
+	{
+		// Single player: --difficulty still applies, to this one game.
+		if (aOptions.mDifficulty != Difficulty::Normal)
+			Game::Get().SetNextDifficulty(aOptions.mDifficulty);
 		return false;
+	}
 
 	Session& aSession = Game::Get().GetSession();
 

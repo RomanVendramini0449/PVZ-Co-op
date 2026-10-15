@@ -28,6 +28,8 @@
 #include "misc/SexyMatrix.h"
 
 #include "../PvzpLib/Definition.h"
+#include "../PvzpLib/Reanimator.h"
+#include <cmath>
 
 #include <algorithm>
 #include <cctype>
@@ -55,6 +57,8 @@ extern const unsigned char gCoopArt_philippe_pepper[];
 extern const std::size_t gCoopArt_philippe_pepper_size;
 extern const unsigned char gCoopArt_adventure_plus_background[];
 extern const std::size_t gCoopArt_adventure_plus_background_size;
+extern const unsigned char gCoopArt_adventure_plus_narrator[];
+extern const std::size_t gCoopArt_adventure_plus_narrator_size;
 extern const unsigned char gCoopArt_adventure_plus_night_background[];
 extern const std::size_t gCoopArt_adventure_plus_night_background_size;
 struct CoopArtPart { const char* mName; const unsigned char* mData; std::size_t mSize; };
@@ -85,6 +89,7 @@ namespace
 	Image* gPhilippePepperImage = nullptr;
 	Image* gAdventurePlusBackground = nullptr;
 	Image* gAdventurePlusNightBackground = nullptr;
+	Image* gAdventurePlusNarrator = nullptr;
 	bool   gLoaded = false;
 
 	// The arrow's tip, in the cursor art (assets/coop/cursor_*.png).
@@ -110,6 +115,11 @@ namespace
 		gCursorOutlineImage = gLawnApp->GetImageFromMemory(gCoopArt_cursor_outline, gCoopArt_cursor_outline_size, "coop/cursor_outline.png");
 		gKernelSquashImage = gLawnApp->GetImageFromMemory(gCoopArt_kernel_squash, gCoopArt_kernel_squash_size, "coop/kernel_squash.png");
 		gPhilippePepperImage = gLawnApp->GetImageFromMemory(gCoopArt_philippe_pepper, gCoopArt_philippe_pepper_size, "coop/philippe_pepper.png");
+		if (gCoopArt_adventure_plus_narrator_size > 0)
+		{
+			gAdventurePlusNarrator = gLawnApp->GetImageFromMemory(gCoopArt_adventure_plus_narrator,
+				gCoopArt_adventure_plus_narrator_size, "coop/adventure_plus_narrator.png");
+		}
 		if (gCoopArt_adventure_plus_night_background_size > 0)
 		{
 			gAdventurePlusNightBackground = gLawnApp->GetImageFromMemory(gCoopArt_adventure_plus_night_background,
@@ -333,6 +343,44 @@ Image* CoopArt::SubstituteZombiePart(Image* theOriginal)
 
 	const auto anIt = sParts.find(theOriginal);
 	return anIt == sParts.end() ? nullptr : anIt->second;
+}
+
+Image* CoopArt::AdventurePlusNarrator()
+{
+	LoadArt();
+	return gAdventurePlusNarrator;
+}
+
+void CoopArt::DrawNarrator(Graphics* g, Reanimation* theDaveReanim, Image* theImage, bool theTalking, unsigned int theCounter)
+{
+	// Dave's body, at rest, stands at x -56 in his animation; it starts far
+	// off to the left and slides in, and slides back out to leave. Following
+	// it moves the stand-in in and out on the same beats.
+	const int aBodyTrack = theDaveReanim->FindTrackIndex("Dave_body1");
+	if (aBodyTrack < 0)
+		return;
+	ReanimatorTransform aBody;
+	theDaveReanim->GetCurrentTransform(aBodyTrack, &aBody);
+	const float aSlide = aBody.mTransX + 56.0f;
+
+	// About Dave's size: standing on the bottom of the screen, left of the
+	// speech bubble.
+	constexpr float HEIGHT = 470.0f;
+	constexpr float CENTER_X = 150.0f;
+	const float aScale = HEIGHT / static_cast<float>(theImage->mHeight);
+	float aSquashX = 1.0f, aSquashY = 1.0f;
+	if (theTalking)
+	{
+		const float aWave = static_cast<float>(sin(theCounter * 0.35));
+		aSquashX = 1.0f + 0.012f * aWave;
+		aSquashY = 1.0f - 0.018f * aWave;
+	}
+	const float aWidth = theImage->mWidth * aScale * aSquashX;
+	const float aHeight = theImage->mHeight * aScale * aSquashY;
+
+	Graphics aG(*g);
+	aG.SetLinearBlend(true);
+	PvzpDrawImageScaledF(&aG, theImage, CENTER_X + aSlide - aWidth * 0.5f, 600.0f - aHeight, aScale * aSquashX, aScale * aSquashY);
 }
 
 void CoopArt::DrawYetiSpray(Graphics* g, float theCenterX, float theBottomY, float theHeight)

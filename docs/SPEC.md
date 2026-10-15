@@ -193,7 +193,8 @@ pointers on top of each other.
 
 Chosen by the host -- in the launcher, or with the main menu's difficulty
 button between levels -- and identical on both machines (it is part of the
-simulation). The table lives in `Coop::GetDifficultyRules()`.
+simulation). It works in single player too ("Play alone" in the launcher, or
+`--difficulty` with no `--host`/`--join`). The table lives in `Coop::GetDifficultyRules()`.
 
 | | Sun from every source | Zombie toughness | Zombies |
 |---|---|---|---|
@@ -330,6 +331,14 @@ Fortress Bowling (Wall-nut Bowling; footballs always take three balls),
 lawn until `adventure_plus_night_background.png` exists), for now a hard
 night level until the boss's art arrives. Budgets are bigger than the
 campaign's.
+
+Each level can open with a talk in Crazy Dave's style
+(`LawnApp::SetupAdventurePlusDialogue`, lines written into the string table
+as `CRAZY_DAVE_4000 + 100 * level + n`; level 1 has one, and a line can depend
+on the game, such as whether you own Luca). Skipped straight after a loss.
+`assets/coop/adventure_plus_narrator.png`, when it exists, stands in for Dave
+in these talks: his animation still runs unseen and the picture follows it in
+and out, bobbing as it talks.
 
 Zombie parts can be repainted for Adventure Plus only: PNGs in
 `assets/coop/zombie-parts/`, named like the part they replace, are drawn in

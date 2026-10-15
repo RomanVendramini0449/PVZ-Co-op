@@ -764,7 +764,13 @@ void CutScene::StartLevelIntro()
 		isRestart = true;
 	}
 
-	if (mApp->IsFirstTimeAdventureMode() && aLevel == 11)
+	if (mApp->IsAdventurePlusLevel())
+	{
+		// Every time, except straight after a loss.
+		if (!isRestart)
+			mCrazyDaveDialogStart = mApp->SetupAdventurePlusDialogue(mApp->mCoopPlusLevel);
+	}
+	else if (mApp->IsFirstTimeAdventureMode() && aLevel == 11)
 	{
 		mCrazyDaveDialogStart = 201;
 	}

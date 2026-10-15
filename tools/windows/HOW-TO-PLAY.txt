@@ -13,6 +13,9 @@ Both players need:
 
 2. Double-click PVZ-Coop-Launcher.bat.
 
+   To play on your own, pick "Play alone" instead; difficulty and every
+   bonus level work the same.
+
 3. One of you picks "Host a game" (and the difficulty), the other picks
    "Join a game" and types the host's address. Press Start on both.
    The host can change the difficulty later from the main menu's

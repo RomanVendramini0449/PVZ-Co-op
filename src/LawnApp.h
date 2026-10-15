@@ -394,6 +394,10 @@ public:
 	bool					IsCoopBonusLevel();
 	bool					IsCoopRomanLevel();
 	bool					IsAdventurePlusLevel();
+	// Adventure Plus: write this level's intro lines into the string table
+	// (as Crazy Dave messages from 4000 + 100 * level) and return the first
+	// one's number, or -1 if the level has none.
+	int						SetupAdventurePlusDialogue(int theLevel);
 	int						YetiSprayYetiCount();
 	bool					IsBossFightLevel();
 	static bool			IsEndlessIZombie(GameMode theGameMode);

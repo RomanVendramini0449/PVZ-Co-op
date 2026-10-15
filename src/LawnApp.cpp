@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <format>
 #include "LawnApp.h"
+#include "Lawn/CoopArt.h"
 #include "Coop/CoopGame.h"
 #include "Lawn/Widget/CoopOverlay.h"
 #include "Resources.h"
@@ -3100,6 +3101,46 @@ bool LawnApp::IsAdventurePlusLevel()
 	return mGameMode == GameMode::GAMEMODE_COOP_ADVENTURE_PLUS;
 }
 
+// Adventure Plus's intro talks. One line per click, in order; tags work as in
+// the game's own Crazy Dave lines ({SHAKE} shakes the bubble, {MOUTH_SMALL_OH}
+// and friends pick his mouth). Written into the string table just before the
+// level, so a line can depend on the game -- whether you have Luca, say. In
+// co-op both machines have the host's profile, so they write the same lines.
+int LawnApp::SetupAdventurePlusDialogue(int theLevel)
+{
+	std::vector<std::string> aLines;
+	const bool aHasLuca = mPlayerInfo && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] > 0;
+
+	if (theLevel == 1)
+	{
+		aLines = {
+			"Hey! HEY! I'm freakin' CRAZY!{SHAKE}",
+			"Look! 2Fort is under attack!",
+			"So you gotta fix it. You gotta FIX it!{SHAKE}",
+			"You gotta kill everything that tries to attack it, okay?",
+			"You'll need Luca for this one.",
+			"Yes, I mean THE Luca.",
+			"You're gonna need Luca.",
+			"So, get Luca first.",
+			aHasLuca
+				? "Oh, you already have Luca? Okay, you should be fine then. Should be A-okay!"
+				: "No Luca? Gargantuar Onslaught, on Level Select. Go get him! Or try without him. I'm not your mom.",
+			"Alright, good luck, buddy!",
+		};
+	}
+
+	if (aLines.empty())
+		return -1;
+
+	const int aStart = 4000 + 100 * theLevel + 1;
+	for (size_t i = 0; i < aLines.size(); i++)
+		mStringProperties.insert_or_assign(std::format("CRAZY_DAVE_{}", aStart + static_cast<int>(i)), aLines[i]);
+	// The talk ends where the lines run out: make sure nothing is left there
+	// from a longer version of this level's script.
+	mStringProperties.erase(std::format("CRAZY_DAVE_{}", aStart + static_cast<int>(aLines.size())));
+	return aStart;
+}
+
 bool LawnApp::IsCoopRomanLevel()
 {
 	return mGameMode == GameMode::GAMEMODE_COOP_ROMAN;
@@ -4073,6 +4114,14 @@ void LawnApp::DrawCrazyDave(Graphics* g)
 		{
 			PvzpDrawString(g, GetString("CLICK_TO_CONTINUE", "click to continue"), aPosX + 139, aPosY + 140, FONT_PICO129, Color::Black, DrawStringJustification::DS_ALIGN_CENTER);
 		}
+	}
+
+	// Adventure Plus can put someone else in Dave's place: his animation still
+	// runs, unseen, and the stand-in follows it in, talks and leaves with it.
+	if (Image* aStandIn = IsAdventurePlusLevel() ? CoopArt::AdventurePlusNarrator() : nullptr)
+	{
+		CoopArt::DrawNarrator(g, aCrazyDaveReanim, aStandIn, !mCrazyDaveMessageText.empty(), mAppCounter);
+		return;
 	}
 
 	aCrazyDaveReanim->Draw(g);

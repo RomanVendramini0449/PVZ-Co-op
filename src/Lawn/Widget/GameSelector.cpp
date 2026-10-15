@@ -1413,9 +1413,11 @@ void GameSelector::CoopLevelSelectClicked(int x, int y)
 		CoopStartLevel(aLevel);
 }
 
+// The host's choice in co-op; yours alone in single player. Never the
+// joining player's.
 bool GameSelector::CoopDifficultyEnabled() const
 {
-	return Coop::Game::Get().IsConnected() && Coop::Game::Get().IsHost();
+	return !Coop::Game::Get().IsFollower();
 }
 
 // The repurposed tombstones still carry their original art, so say what they
