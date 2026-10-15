@@ -55,6 +55,8 @@ extern const unsigned char gCoopArt_philippe_pepper[];
 extern const std::size_t gCoopArt_philippe_pepper_size;
 extern const unsigned char gCoopArt_adventure_plus_background[];
 extern const std::size_t gCoopArt_adventure_plus_background_size;
+extern const unsigned char gCoopArt_adventure_plus_night_background[];
+extern const std::size_t gCoopArt_adventure_plus_night_background_size;
 struct CoopArtPart { const char* mName; const unsigned char* mData; std::size_t mSize; };
 extern const CoopArtPart gCoopZombieParts[];
 extern const int gCoopZombiePartCount;
@@ -82,6 +84,7 @@ namespace
 	Image* gKernelSquashImage = nullptr;
 	Image* gPhilippePepperImage = nullptr;
 	Image* gAdventurePlusBackground = nullptr;
+	Image* gAdventurePlusNightBackground = nullptr;
 	bool   gLoaded = false;
 
 	// The arrow's tip, in the cursor art (assets/coop/cursor_*.png).
@@ -107,6 +110,11 @@ namespace
 		gCursorOutlineImage = gLawnApp->GetImageFromMemory(gCoopArt_cursor_outline, gCoopArt_cursor_outline_size, "coop/cursor_outline.png");
 		gKernelSquashImage = gLawnApp->GetImageFromMemory(gCoopArt_kernel_squash, gCoopArt_kernel_squash_size, "coop/kernel_squash.png");
 		gPhilippePepperImage = gLawnApp->GetImageFromMemory(gCoopArt_philippe_pepper, gCoopArt_philippe_pepper_size, "coop/philippe_pepper.png");
+		if (gCoopArt_adventure_plus_night_background_size > 0)
+		{
+			gAdventurePlusNightBackground = gLawnApp->GetImageFromMemory(gCoopArt_adventure_plus_night_background,
+				gCoopArt_adventure_plus_night_background_size, "coop/adventure_plus_night_background.png");
+		}
 		if (gCoopArt_adventure_plus_background_size > 0)
 		{
 			gAdventurePlusBackground = gLawnApp->GetImageFromMemory(gCoopArt_adventure_plus_background,
@@ -288,10 +296,11 @@ void CoopArt::DrawSkinIcon(Graphics* g, Skin theSkin, float theCenterX, float th
 	PvzpDrawImageScaledF(&aG, anImage, theCenterX - anImage->mWidth * aScale * 0.5f, theBottomY - theHeight, aScale, aScale);
 }
 
-Image* CoopArt::AdventurePlusBackground()
+Image* CoopArt::AdventurePlusBackground(bool theNight)
 {
 	LoadArt();
-	return gAdventurePlusBackground;
+	// No night picture yet: the game's own night lawn, not the day board.
+	return theNight ? gAdventurePlusNightBackground : gAdventurePlusBackground;
 }
 
 Image* CoopArt::SubstituteZombiePart(Image* theOriginal)

@@ -926,10 +926,10 @@ void Board::PickZombieWaves()
 // campaign's: bigger budgets, and each level leans on a zombie or two it sends
 // in numbers.
 static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
-	{ "Bucket Brigade",
+	{ "You're On Your Way to Dust Bowl",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL }, 3, 1,
 		{ { ZOMBIE_PAIL, 2, 1, 1, 4 } }, 1 },
-	{ "Fourth Down",
+	{ "Yummy, Yummy Brains",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL }, 4, 1,
 		{ { ZOMBIE_FOOTBALL, 4, 2, 1, 3 }, { ZOMBIE_PAIL, 3, 2, 1, 2 } }, 2 },
 	{ "Up and Under",
@@ -938,16 +938,16 @@ static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
 	{ "Yeti Season",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_YETI }, 4, 1,
 		{ { ZOMBIE_YETI, 1, 2, 1, 4 } }, 1 },
-	{ "Gridiron Bowling",
+	{ "Team Fortress Bowling",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL }, 5, 1,
 		{ { ZOMBIE_FOOTBALL, 3, 1, 1, 4 } }, 1 },
-	{ "Heavy Lifting",
+	{ "Heavy Weapons Guy",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR }, 5, 2,
 		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 1 }, { ZOMBIE_LADDER, 3, 2, 1, 2 }, { ZOMBIE_DIGGER, 4, 3, 1, 2 } }, 3 },
-	{ "Rush Hour",
+	{ "Red Spy in the Base",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_LADDER }, 7, 3,
 		{ { ZOMBIE_FOOTBALL, 3, 2, 1, 3 }, { ZOMBIE_POLEVAULTER, 2, 2, 1, 2 } }, 2 },
-	{ "Black Ice",
+	{ "The Robots Are Coming",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI }, 5, 3,
 		{ { ZOMBIE_ZAMBONI, 5, 3, 1, 2 }, { ZOMBIE_FOOTBALL, 4, 3, 1, 2 } }, 2 },
 	{ "Tunnel Vision",
@@ -957,6 +957,11 @@ static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_DIGGER,
 		  ZOMBIE_ZAMBONI, ZOMBIE_YETI, ZOMBIE_GARGANTUAR }, 9, 4,
 		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 2 }, { ZOMBIE_FOOTBALL, 3, 2, 1, 3 }, { ZOMBIE_YETI, 5, 4, 1, 2 } }, 3 },
+	// At night. A stand-in until the boss's art arrives: a hard night level
+	// that ends in Gargantuars.
+	{ "Boss Battle",
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_GARGANTUAR }, 6, 4,
+		{ { ZOMBIE_GARGANTUAR, 9, 5, 1, 3 }, { ZOMBIE_FOOTBALL, 3, 2, 1, 3 } }, 2 },
 };
 
 const AdventurePlusLevel& GetAdventurePlusLevel(int theLevel)
@@ -1096,10 +1101,14 @@ void Board::PickBackground()
 	case GameMode::GAMEMODE_CHALLENGE_SQUIRREL:
 	case GameMode::GAMEMODE_COOP_ONSLAUGHT:
 	case GameMode::GAMEMODE_COOP_ROMAN:
-	// Adventure Plus plays on the day lawn's layout, under its own picture
-	// when there is one (DrawBackdrop).
-	case GameMode::GAMEMODE_COOP_ADVENTURE_PLUS:
 		mBackground = BackgroundType::BACKGROUND_1_DAY;
+		break;
+
+	// Adventure Plus plays on the day lawn's layout, under its own picture
+	// when there is one (DrawBackdrop) -- and its boss battle at night, so
+	// no sun falls and mushrooms are awake.
+	case GameMode::GAMEMODE_COOP_ADVENTURE_PLUS:
+		mBackground = mApp->mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL ? BackgroundType::BACKGROUND_2_NIGHT : BackgroundType::BACKGROUND_1_DAY;
 		break;
 
 	case GameMode::GAMEMODE_SURVIVAL_NORMAL_STAGE_2:
@@ -6711,7 +6720,7 @@ void Board::DrawBackdrop(Graphics* g)
 		Rect aSrcRect(232, 0, aWidth, Sexy::IMAGE_BACKGROUND1->GetHeight());
 		g->DrawImage(Sexy::IMAGE_BACKGROUND1, 232 - BOARD_OFFSET, 0, aSrcRect);
 	}
-	else if (Image* aPlusImage = mApp->IsAdventurePlusLevel() ? CoopArt::AdventurePlusBackground() : nullptr)
+	else if (Image* aPlusImage = mApp->IsAdventurePlusLevel() ? CoopArt::AdventurePlusBackground(mBackground == BackgroundType::BACKGROUND_2_NIGHT) : nullptr)
 	{
 		// The same 1400x600 frame as the day lawn, so the grid still fits.
 		g->DrawImage(aPlusImage, -BOARD_OFFSET, 0);
@@ -7501,7 +7510,7 @@ void Board::DrawLevel(Graphics* g)
 	{
 		aLevelStr = mApp->GetCurrentChallengeDef().mChallengeName;
 		if (mApp->IsAdventurePlusLevel())
-			aLevelStr = std::format("Adventure Plus {}: {}", mApp->mCoopPlusLevel, GetAdventurePlusLevel(mApp->mCoopPlusLevel).mName);
+			aLevelStr = std::format("Plus {}: {}", mApp->mCoopPlusLevel, GetAdventurePlusLevel(mApp->mCoopPlusLevel).mName);
 		if (mApp->IsSurvivalMode() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND)
 		{
 			int aFlags = GetSurvivalFlagsCompleted();

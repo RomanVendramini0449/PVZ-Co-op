@@ -61,7 +61,9 @@ constexpr const int YETI_SPRAY_YETIS = 50;
 constexpr const int YETI_SPRAY_FIRST_WAVE_PERCENT = 40;  // 20 of 50
 constexpr const int YETI_SPRAY_LEVEL = 40;  // 4-10, the stormy night
 // Adventure Plus: its own run of levels, after the campaign.
-constexpr const int ADVENTURE_PLUS_LEVELS = 10;
+constexpr const int ADVENTURE_PLUS_LEVELS = 11;
+// The last one is a boss battle at night (the boss itself is still to come).
+constexpr const int ADVENTURE_PLUS_BOSS_LEVEL = 11;
 constexpr const int ADVENTURE_PLUS_BOWLING_LEVEL = 5;   // played as Wall-nut Bowling
 // In the bowling level a Football Zombie's helmet is set to this whatever
 // the difficulty: a ball takes 900 off a helmet, so two break it and the

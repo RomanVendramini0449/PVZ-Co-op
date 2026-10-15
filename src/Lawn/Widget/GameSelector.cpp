@@ -1569,7 +1569,7 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 	// Adventure Plus: ten levels past the campaign. Beaten ones are gold.
 	g->SetFont(Sexy::FONT_BRIANNETOD12);
 	g->SetColor(Color(200, 200, 190));
-	g->DrawString("Adventure Plus (its own ten levels; your campaign is left alone):",
+	g->DrawString("Adventure Plus (its own levels; +11 is the boss; your campaign is left alone):",
 		kLevelSelectX, kPlusY - 8);
 	const uint32_t aPlusBeaten = mApp->mPlayerInfo ? mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_ADVENTURE_PLUS_BEATEN] : 0;
 	for (int aCol = 0; aCol < ADVENTURE_PLUS_LEVELS; aCol++)

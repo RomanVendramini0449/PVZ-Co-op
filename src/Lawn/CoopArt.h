@@ -78,8 +78,9 @@ namespace CoopArt
 	void DrawSkinIcon(Sexy::Graphics* g, Skin theSkin, float theCenterX, float theBottomY, float theHeight);
 
 	// Adventure Plus's own lawn, 1400x600 like the day lawn it replaces;
-	// nullptr until assets/coop/adventure_plus_background.png exists.
-	Sexy::Image* AdventurePlusBackground();
+	// nullptr until assets/coop/adventure_plus_background.png exists. The
+	// night one (the boss battle) is adventure_plus_night_background.png.
+	Sexy::Image* AdventurePlusBackground(bool theNight);
 
 	// Adventure Plus: the repainted zombie part (assets/coop/zombie-parts) to
 	// draw in place of theOriginal, or nullptr to draw it as it is. Always

@@ -314,18 +314,21 @@ stampede, but only once bought: 50 Yetis on top of the level's own zombies,
 count by a fifth for the next try; beating 4-10 resets it. Yetis still run off
 after a while if nobody stops them.
 
-**Adventure Plus** (`GAMEMODE_COOP_ADVENTURE_PLUS`), a row of ten levels
+**Adventure Plus** (`GAMEMODE_COOP_ADVENTURE_PLUS`), a row of eleven levels
 under the bonus levels, open from the start. Each is a 20-wave level on the
 day lawn's layout, drawn with `assets/coop/adventure_plus_background.png`
 when that file exists (1400x600, the day lawn's frame -- see
 `art-templates/adventure-plus/README.txt`) and the day lawn when it does not.
 Each level has a name, its own zombie mix and a zombie or two it sends in
-numbers (`gAdventurePlusLevels` in Board.cpp): 1 Bucket Brigade (buckets),
-2 Fourth Down (footballs), 3 Up and Under (ladders, diggers), 4 Yeti Season
-(Yetis; doubled with Yeti Spray), 5 Gridiron Bowling (Wall-nut Bowling with
-footballs that always take three balls), 6 Heavy Lifting (Gargantuars,
-ladders, diggers), 7 Rush Hour, 8 Black Ice (Zambonis), 9 Tunnel Vision
-(diggers, pogos), 10 Everything, Everywhere. Budgets are bigger than the
+numbers (`gAdventurePlusLevels` in Board.cpp): 1 You're On Your Way to Dust
+Bowl (buckets), 2 Yummy, Yummy Brains (footballs, buckets), 3 Up and Under
+(ladders, diggers), 4 Yeti Season (Yetis; doubled with Yeti Spray), 5 Team
+Fortress Bowling (Wall-nut Bowling; footballs always take three balls),
+6 Heavy Weapons Guy (Gargantuars, ladders, diggers), 7 Red Spy in the Base,
+8 The Robots Are Coming (Zambonis), 9 Tunnel Vision (diggers, pogos),
+10 Everything, Everywhere, and 11 Boss Battle -- at night (the game's night
+lawn until `adventure_plus_night_background.png` exists), for now a hard
+night level until the boss's art arrives. Budgets are bigger than the
 campaign's.
 
 Zombie parts can be repainted for Adventure Plus only: PNGs in
