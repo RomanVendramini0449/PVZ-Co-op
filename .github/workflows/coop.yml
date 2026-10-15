@@ -142,6 +142,7 @@ jobs:
           # tests needs a command line at all.
           cp tools/windows/*.bat dist/
           cp tools/windows/*.ps1 dist/
+          cp tools/windows/HOW-TO-PLAY.txt dist/
 
       - name: Verify the netcode in the Windows build
         shell: msys2 {0}
