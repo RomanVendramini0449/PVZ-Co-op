@@ -447,6 +447,14 @@ void CoopArt::PlayPackedSound(const char* theName)
 		gLawnApp->PlaySample(anIt->second);
 }
 
+bool CoopArt::PlayPackedSoundIfAny(const char* theName)
+{
+	if (FindPacked(theName) == nullptr)
+		return false;
+	PlayPackedSound(theName);
+	return true;
+}
+
 const unsigned char* CoopArt::PackedData(const char* theName, std::size_t& theSizeOut)
 {
 	const CoopPackedFile* aFile = FindPacked(theName);

@@ -2468,7 +2468,9 @@ void Plant::UpdateBowling()
 		if (mSeedType == SeedType::SEED_EXPLODE_O_NUT)
 		{
 			mApp->PlayFoley(FoleyType::FOLEY_CHERRYBOMB);
-			mApp->PlaySample(SOUND_BOWLINGIMPACT2);
+			// TF2 bowling: the crit rocket's own blast, if there is one.
+			if (!(mApp->IsAdventurePlusLevel() && CoopArt::PlayPackedSoundIfAny("rocket_crit_explode")))
+				mApp->PlaySample(SOUND_BOWLINGIMPACT2);
 
 			int aDamageRangeFlags = GetDamageRangeFlags(PlantWeapon::WEAPON_PRIMARY) | 32U;
 			mBoard->KillAllZombiesInRadius(mRow, aPosX, aPosY, 90, 1, true, aDamageRangeFlags);
@@ -2480,7 +2482,9 @@ void Plant::UpdateBowling()
 			return;
 		}
 
-		mApp->PlayFoley(FoleyType::FOLEY_BOWLINGIMPACT);
+		// TF2 bowling: a rocket's own hit, if there is one.
+		if (!(mApp->IsAdventurePlusLevel() && CoopArt::PlayPackedSoundIfAny("rocket_hit")))
+			mApp->PlayFoley(FoleyType::FOLEY_BOWLINGIMPACT);
 		mBoard->ShakeBoard(1, -2);
 
 		if (mSeedType == SeedType::SEED_GIANT_WALLNUT)

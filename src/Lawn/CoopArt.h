@@ -126,6 +126,8 @@ namespace CoopArt
 	// colour and colourise state apply, so it can be tinted or faded.
 	void DrawSheetFrame(Sexy::Graphics* g, const char* theSheet, int theFrame, float theX, float theY,
 		float theScale = 1.0f, bool theFlip = false, float theRotation = 0.0f);
+	// Plays a packed sound if the game has it; false if not (play another).
+	bool PlayPackedSoundIfAny(const char* theName);
 	// Plays a packed sound ("grs_shoot", "legend_explode"...).
 	void PlayPackedSound(const char* theName);
 	// The packed music track's bytes, for Music to load; nullptr if absent.

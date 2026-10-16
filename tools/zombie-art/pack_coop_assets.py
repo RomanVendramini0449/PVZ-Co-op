@@ -78,6 +78,8 @@ SOUNDS = {
     # x1.6 (COOP_MUSIC_BOOST) past that cap: it comes out about 8 dB over the
     # final boss's tune.
     'rocket_spawn':       ('newsoundsandsongs/rocket_spawn_sound.wav', -18.0, 'cherry bomb launch'),
+    'rocket_hit':         ('newsoundsandsongs/rocket_hit.wav', -20.0, 'bowling impact'),         # skipped until it exists
+    'rocket_crit_explode': ('newsoundsandsongs/rocket_crit_explode.wav', -13.5, 'an explosion'),  # skipped until it exists
     'soldier_hit':        ('newsoundsandsongs/soldier_hit_sound.wav', -22.0, 'a zombie chomp'),
     'spy_hit':            ('newsoundsandsongs/spy_hit_sound.wav', -22.0, 'a zombie chomp'),
     'spy_uncloak':        ('newsoundsandsongs/uncloak_spyspawn.wav', -20.0, 'a zombie rising'),
