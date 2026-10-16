@@ -23,6 +23,15 @@ if ! command -v cmake >/dev/null 2>&1 || ! command -v g++ >/dev/null 2>&1; then
     exit 1
 fi
 
+# New or changed Adventure Plus art and sounds (assets/coop/<name>/ folders,
+# newsoundsandsongs) are packed into the game first, whenever any is newer
+# than the last pack. Needs Python (Pillow) and ffmpeg.
+FFMPEG_BIN="/c/ffmpeg/bin"
+if [ -n "$(find assets/coop -newer src/Lawn/CoopPackedData.cpp \( -name '*.png' -o -name '*.wav' -o -name '*.mp3' \)         -not -path '*/packed/*' -not -path '*/zombie-parts/*' -not -path '*/dave-parts/*' -not -path '*/headwear-originals/*' -print -quit)" ]; then
+    echo "== Packing new art and sounds =="
+    PATH="$FFMPEG_BIN:$PATH" python tools/zombie-art/pack_coop_assets.py
+fi
+
 if [ "${1:-}" = "dev" ]; then
     echo "== Dev build (build/) =="
     [ -f build/build.ninja ] || cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
