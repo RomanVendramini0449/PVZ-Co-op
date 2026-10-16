@@ -305,7 +305,7 @@ a lane, rolls a fireball or an iceball down it -- an Ice-shroom puts out fire, a
 Jalapeno in the lane melts ice -- and slides back to the middle, and now and
 then he calls up a couple of zombies. Plants only reach him from the three
 lanes he covers. He is Dr. Zomboss's zombie type underneath (health bar and
-balls included) with 60,000 health. Every win pays **$15,000**. His art is
+balls included) with 60,000 health. Every win pays **$5,000**. His art is
 `assets/coop/roman.png`.
 
 **Yeti Spray** ($3,000 in Crazy Dave's shop) turns level 4-10 into a Yeti

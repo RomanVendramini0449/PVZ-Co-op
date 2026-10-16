@@ -1552,7 +1552,7 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 		else if (aHasLuca)
 		{
 			aTitle = "Luca vs. Roman";
-			aNote = "Boss fight with Luca. Win: $15,000";
+			aNote = "Boss fight with Luca. Win: $5,000";
 			aFill = Color(40, 30, 110, 235);
 		}
 		else

@@ -2021,7 +2021,7 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 	}
 	else if (mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
 	{
-		// $15,000 for keeping Roman at bay, every time.
+		// $5,000 for keeping Roman at bay, every time.
 		mPlayerInfo->AddCoins(ROMAN_PRIZE_COINS);
 	}
 	else if (mGameMode == GameMode::GAMEMODE_COOP_SANDBOX)
