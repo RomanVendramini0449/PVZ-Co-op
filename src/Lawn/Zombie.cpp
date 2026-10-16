@@ -911,6 +911,15 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 		mFlyingHealth = mFlyingHealth * aPercent / 100;
 	}
 
+	// Adventure Plus is tougher across the board (bosses have their own).
+	if (mApp->IsAdventurePlusLevel() && mZombieType != ZombieType::ZOMBIE_BOSS)
+	{
+		mBodyHealth = mBodyHealth * ADVENTURE_PLUS_HEALTH_PERCENT / 100;
+		mHelmHealth = mHelmHealth * ADVENTURE_PLUS_HEALTH_PERCENT / 100;
+		mShieldHealth = mShieldHealth * ADVENTURE_PLUS_HEALTH_PERCENT / 100;
+		mFlyingHealth = mFlyingHealth * ADVENTURE_PLUS_HEALTH_PERCENT / 100;
+	}
+
 	// Adventure Plus's bowling level: a Football Zombie always takes three
 	// balls, whatever the difficulty made of his helmet.
 	if (mZombieType == ZombieType::ZOMBIE_FOOTBALL && mApp->IsAdventurePlusLevel() &&

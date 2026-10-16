@@ -592,7 +592,7 @@ Sexy::Color LawnApp::CoopPlayerColor(int thePlayer)
 	// Not picked yet: blue for the host, orange for the player who joins,
 	// so the two are told apart from the start.
 	if (aColor == 0)
-		aColor = thePlayer == 0 ? COOP_PLAYER_COLORS[0] : COOP_PLAYER_COLORS[1];
+		aColor = thePlayer == 0 ? COOP_DEFAULT_HOST_COLOR : COOP_DEFAULT_JOIN_COLOR;
 	return Sexy::Color((aColor >> 16) & 0xFF, (aColor >> 8) & 0xFF, aColor & 0xFF);
 }
 

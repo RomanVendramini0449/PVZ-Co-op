@@ -59,12 +59,16 @@ namespace Sexy
 	class ButtonWidget;
 };
 
-// The colours a co-op player can pick on the main menu (0x00RRGGBB). Bright
-// enough to read as text on the menu and to spot as a cursor on any lawn.
-// The first two are the defaults for the host and the joining player.
+// The colours a co-op player can pick on the main menu (0x00RRGGBB): red,
+// green, blue and yellow first, then the rest. Bright enough to read as text
+// on the menu and to spot as a cursor on any lawn.
 constexpr uint32_t COOP_PLAYER_COLORS[] = {
-	0x50C8FF, 0xFFA03C, 0x78E65A, 0xFF6482, 0xC88CFF, 0xFFE650, 0x46E6D2, 0xFFFFFF,
+	0xFF4848, 0x48D848, 0x4888FF, 0xFFE040,
+	0xFFA03C, 0xB478FF, 0x40E0E0, 0xFF78C8, 0x50C8FF, 0xFFFFFF,
 };
+// Until a player picks: light blue for the host, orange for the one who joins.
+constexpr uint32_t COOP_DEFAULT_HOST_COLOR = 0x50C8FF;
+constexpr uint32_t COOP_DEFAULT_JOIN_COLOR = 0xFFA03C;
 constexpr int NUM_COOP_PLAYER_COLORS = static_cast<int>(sizeof(COOP_PLAYER_COLORS) / sizeof(COOP_PLAYER_COLORS[0]));
 
 using namespace Sexy;

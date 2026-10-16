@@ -107,9 +107,10 @@ namespace
 	class ColorPickerWidget : public Widget
 	{
 	public:
-		static constexpr int SWATCH = 14;
+		static constexpr int SWATCH = 15;
 		static constexpr int GAP = 4;
-		static constexpr int LABEL_WIDTH = 72;
+		static constexpr int PAD = 6;
+		static constexpr int LABEL_HEIGHT = 18;
 
 		explicit ColorPickerWidget(LawnApp* theApp) : mApp(theApp)
 		{
@@ -117,16 +118,17 @@ namespace
 			mHasTransparencies = true;
 			mDoFinger = true;
 		}
-		static int WidthNeeded() { return LABEL_WIDTH + NUM_COOP_PLAYER_COLORS * (SWATCH + GAP) + 6; }
+		static int WidthNeeded() { return 2 * PAD + NUM_COOP_PLAYER_COLORS * (SWATCH + GAP) - GAP; }
+		static int HeightNeeded() { return LABEL_HEIGHT + SWATCH + 2 * PAD; }
+		int SwatchLeft(int i) const { return PAD + i * (SWATCH + GAP); }
+		int SwatchTop() const { return LABEL_HEIGHT + PAD - 2; }
 		int SwatchAt(int x, int y) const
 		{
-			const int aTop = (mHeight - SWATCH) / 2;
-			if (y < aTop - 2 || y >= aTop + SWATCH + 2)
+			if (y < SwatchTop() - 3 || y >= SwatchTop() + SWATCH + 3)
 				return -1;
 			for (int i = 0; i < NUM_COOP_PLAYER_COLORS; i++)
 			{
-				const int aLeft = LABEL_WIDTH + i * (SWATCH + GAP);
-				if (x >= aLeft - 2 && x < aLeft + SWATCH + 2)
+				if (x >= SwatchLeft(i) - 2 && x < SwatchLeft(i) + SWATCH + 2)
 					return i;
 			}
 			return -1;
@@ -138,18 +140,20 @@ namespace
 			g->SetColor(Color(0, 0, 0, 160));
 			g->DrawRect(0, 0, mWidth - 1, mHeight - 1);
 
+			// The label on a row of its own, in the colour it sets.
 			_Font* aFont = Sexy::FONT_BRIANNETOD12;
 			const Color aMine = mApp->CoopPlayerColor(Coop::Game::Get().IsConnected() ? Coop::Game::Get().GetLocalPlayerIndex() : 0);
+			const std::string aLabel = "Your colour";
 			g->SetFont(aFont);
 			g->SetColor(aMine);
-			g->DrawString("Your colour", 8, mHeight / 2 + aFont->GetAscent() / 2 - 1);
+			g->DrawString(aLabel, (mWidth - aFont->StringWidth(aLabel)) / 2, PAD + aFont->GetAscent() - 2);
 
-			const int aTop = (mHeight - SWATCH) / 2;
 			for (int i = 0; i < NUM_COOP_PLAYER_COLORS; i++)
 			{
 				const uint32_t aValue = COOP_PLAYER_COLORS[i];
 				const Color aColor((aValue >> 16) & 0xFF, (aValue >> 8) & 0xFF, aValue & 0xFF);
-				const int aLeft = LABEL_WIDTH + i * (SWATCH + GAP);
+				const int aLeft = SwatchLeft(i);
+				const int aTop = SwatchTop();
 				const bool aPicked = aColor.mRed == aMine.mRed && aColor.mGreen == aMine.mGreen && aColor.mBlue == aMine.mBlue;
 				if (aPicked || i == mHover)
 				{
@@ -498,7 +502,7 @@ GameSelector::GameSelector(LawnApp* theApp)
 	// Under it, right-aligned to the same edge. Everyone gets this one, the
 	// joining player included: a colour is nobody's progress.
 	mCoopColorPicker = new ColorPickerWidget(theApp);
-	mCoopColorPicker->Resize(792 - ColorPickerWidget::WidthNeeded(), 34, ColorPickerWidget::WidthNeeded(), 22);
+	mCoopColorPicker->Resize(792 - ColorPickerWidget::WidthNeeded(), 34, ColorPickerWidget::WidthNeeded(), ColorPickerWidget::HeightNeeded());
 	AddWidget(mCoopColorPicker);
 	AddWidget(mOverlayWidget);
 
@@ -1499,7 +1503,7 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 
 	g->SetFont(Sexy::FONT_BRIANNETOD12);
 	g->SetColor(Color(200, 200, 190));
-	g->DrawString("Seeds and upgrades are granted to match. This changes your saved progress.",
+	g->DrawString("Seeds and upgrades are granted to match.",
 		kLevelSelectX, kLevelSelectY - 20);
 
 	for (int aRow = 0; aRow < kLevelRows; aRow++)
@@ -1524,7 +1528,7 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 	// progress alone.
 	g->SetFont(Sexy::FONT_BRIANNETOD12);
 	g->SetColor(Color(200, 200, 190));
-	g->DrawString("Bonus levels (not part of the campaign; your progress is left alone):",
+	g->DrawString("Bonus levels",
 		kLevelSelectX, kBonusY - 8);
 
 	const bool aHasLuca = mApp->mPlayerInfo && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] > 0;
@@ -1571,7 +1575,7 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 	// Adventure Plus: ten levels past the campaign. Beaten ones are gold.
 	g->SetFont(Sexy::FONT_BRIANNETOD12);
 	g->SetColor(Color(200, 200, 190));
-	g->DrawString("Adventure Plus (its own levels; +11 is the boss; your campaign is left alone):",
+	g->DrawString("Adventure Plus",
 		kLevelSelectX, kPlusY - 8);
 	const uint32_t aPlusBeaten = mApp->mPlayerInfo ? mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_ADVENTURE_PLUS_BEATEN] : 0;
 	for (int aCol = 0; aCol < ADVENTURE_PLUS_LEVELS; aCol++)
@@ -1581,7 +1585,7 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 		g->SetColor(aBeaten ? Color(150, 115, 25, 235) : Color(70, 40, 90, 235));
 		g->FillRect(aX + 2, kPlusY + 2, kLevelCellW - 4, kLevelCellH - 4);
 		char aLabel[16];
-		snprintf(aLabel, sizeof(aLabel), "+%d", aCol + 1);
+		snprintf(aLabel, sizeof(aLabel), "%d", aCol + 1);
 		g->SetColor(Color(255, 245, 200));
 		g->DrawString(aLabel, aX + 16, kPlusY + kLevelCellH - 12);
 	}

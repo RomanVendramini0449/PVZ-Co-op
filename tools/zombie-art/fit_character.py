@@ -172,8 +172,32 @@ def main(cfg_path, char_path, dave_dir, pak, parts_out, preview_out):
     for lcfg, rgba in zip(layer_cfgs, layer_arrays):
         lmasks, lsource = assign(lcfg, rgba, H, W)
         for part, m in lmasks.items():
-            masks[part] = m
-            sources[part] = lsource[part]
+            if part in masks:
+                # Several layers can feed one part (a torso and the arm that
+                # stays on it): the later laid over the earlier, properly
+                # blended, then any hairline gap where two soft edges met
+                # filled -- otherwise the seam shows as a thin line.
+                lower = sources[part].copy()
+                lower[..., 3] = (lower[..., 3] * masks[part]).astype(np.uint8)
+                upper = lsource[part].copy()
+                upper[..., 3] = (upper[..., 3] * m).astype(np.uint8)
+                over = Image.fromarray(lower)
+                over.alpha_composite(Image.fromarray(upper))
+                merged = np.array(over)
+                union = merged[..., 3] > 128
+                closed = cv2.morphologyEx(union.astype(np.uint8), cv2.MORPH_CLOSE,
+                                          cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))) > 0
+                seam = closed & (merged[..., 3] < 250)
+                if seam.any():
+                    bgr = cv2.cvtColor(np.ascontiguousarray(merged[..., :3]), cv2.COLOR_RGB2BGR)
+                    fixed = cv2.cvtColor(cv2.inpaint(bgr, seam.astype(np.uint8) * 255, 3, cv2.INPAINT_TELEA), cv2.COLOR_BGR2RGB)
+                    merged[seam, :3] = fixed[seam]
+                    merged[seam, 3] = 255
+                sources[part] = merged
+                masks[part] = masks[part] | m | seam
+            else:
+                masks[part] = m
+                sources[part] = lsource[part]
 
     os.makedirs(parts_out, exist_ok=True)
     for f in os.listdir(parts_out):

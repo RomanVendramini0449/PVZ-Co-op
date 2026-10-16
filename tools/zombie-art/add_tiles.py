@@ -54,7 +54,7 @@ def main(src, dst, night):
     # Two kinds of ground, alternating, plus a little drift per tile.
     parity = np.where((row + col) % 2 == 0, 1.0, -1.0).astype(np.float32)
     drift = rng.normal(0, 0.012, (ROWS, COLS)).astype(np.float32)
-    strength = 0.048 if not night else 0.042
+    strength = 0.095 if not night else 0.085
     light = np.where(inside, parity * strength + drift[row, col], 0).astype(np.float32)
     warm = np.where(inside, parity, 0).astype(np.float32)
     light = blur(light, FEATHER)

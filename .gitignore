@@ -460,3 +460,5 @@ build-*/
 # Art templates extracted from the game files: local reference only.
 art-templates/
 test-saves/
+desktop.ini
+PvZ-Coop-dist*.zip

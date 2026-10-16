@@ -743,9 +743,9 @@ void Board::PickZombieWaves()
 		}
 		else if (mApp->IsAdventurePlusLevel())
 		{
-			// Ramps faster than the campaign, and each level starts a little
-			// stronger than the last. (Placeholder until each level is designed.)
-			aZombiePoints = aWave / 2 + 1 + GetAdventurePlusLevel(mApp->mCoopPlusLevel).mPointsBonus;
+			// Adventure Plus assumes you own everything, so it ramps much
+			// faster than the campaign, and each level starts stronger.
+			aZombiePoints = aWave * 2 / 3 + 2 + GetAdventurePlusLevel(mApp->mCoopPlusLevel).mPointsBonus;
 		}
 		else
 		{
@@ -7510,7 +7510,7 @@ void Board::DrawLevel(Graphics* g)
 	{
 		aLevelStr = mApp->GetCurrentChallengeDef().mChallengeName;
 		if (mApp->IsAdventurePlusLevel())
-			aLevelStr = std::format("Plus {}: {}", mApp->mCoopPlusLevel, GetAdventurePlusLevel(mApp->mCoopPlusLevel).mName);
+			aLevelStr = GetAdventurePlusLevel(mApp->mCoopPlusLevel).mName;
 		if (mApp->IsSurvivalMode() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND)
 		{
 			int aFlags = GetSurvivalFlagsCompleted();

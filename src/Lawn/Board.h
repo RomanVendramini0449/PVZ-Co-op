@@ -69,6 +69,9 @@ constexpr const int ADVENTURE_PLUS_BOWLING_LEVEL = 5;   // played as Wall-nut Bo
 // the difficulty: a ball takes 900 off a helmet, so two break it and the
 // third ball kills him -- always three balls.
 constexpr const int ADVENTURE_PLUS_BOWLING_FOOTBALL_HELM = 1500;
+// Every Adventure Plus zombie is this much tougher (percent), on top of the
+// difficulty: the mode assumes a full set of plants and upgrades.
+constexpr const int ADVENTURE_PLUS_HEALTH_PERCENT = 125;
 
 // A zombie an Adventure Plus level sends on purpose, on top of its random
 // mix: mPerWave of them every mEvery waves from wave mFromWave (0-based), and
