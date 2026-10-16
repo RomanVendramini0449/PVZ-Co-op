@@ -29,27 +29,72 @@ static const unsigned char gPacked8[] = {
 #embed "../../assets/coop/packed/heavy.png"
 };
 static const unsigned char gPacked9[] = {
-#embed "../../assets/coop/packed/noah.png"
+#embed "../../assets/coop/packed/sentry_idle.png"
 };
 static const unsigned char gPacked10[] = {
-#embed "../../assets/coop/packed/grs.png"
+#embed "../../assets/coop/packed/sentry_fire.png"
 };
 static const unsigned char gPacked11[] = {
-#embed "../../assets/coop/packed/goblin_projectile.png"
+#embed "../../assets/coop/packed/spy_walk.png"
 };
 static const unsigned char gPacked12[] = {
-#embed "../../assets/coop/packed/grs_shoot.ogg"
+#embed "../../assets/coop/packed/spy_attack.png"
 };
 static const unsigned char gPacked13[] = {
-#embed "../../assets/coop/packed/legend_charge.ogg"
+#embed "../../assets/coop/packed/spy_idle.png"
 };
 static const unsigned char gPacked14[] = {
-#embed "../../assets/coop/packed/legend_explode.ogg"
+#embed "../../assets/coop/packed/soldier_walk.png"
 };
 static const unsigned char gPacked15[] = {
-#embed "../../assets/coop/packed/legend_shoot.ogg"
+#embed "../../assets/coop/packed/soldier_attack.png"
 };
 static const unsigned char gPacked16[] = {
+#embed "../../assets/coop/packed/soldier_idle.png"
+};
+static const unsigned char gPacked17[] = {
+#embed "../../assets/coop/packed/rocket_normal.png"
+};
+static const unsigned char gPacked18[] = {
+#embed "../../assets/coop/packed/rocket_crit.png"
+};
+static const unsigned char gPacked19[] = {
+#embed "../../assets/coop/packed/noah.png"
+};
+static const unsigned char gPacked20[] = {
+#embed "../../assets/coop/packed/grs.png"
+};
+static const unsigned char gPacked21[] = {
+#embed "../../assets/coop/packed/goblin_projectile.png"
+};
+static const unsigned char gPacked22[] = {
+#embed "../../assets/coop/packed/sentry_projectile.png"
+};
+static const unsigned char gPacked23[] = {
+#embed "../../assets/coop/packed/grs_shoot.ogg"
+};
+static const unsigned char gPacked24[] = {
+#embed "../../assets/coop/packed/legend_charge.ogg"
+};
+static const unsigned char gPacked25[] = {
+#embed "../../assets/coop/packed/legend_explode.ogg"
+};
+static const unsigned char gPacked26[] = {
+#embed "../../assets/coop/packed/legend_shoot.ogg"
+};
+static const unsigned char gPacked27[] = {
+#embed "../../assets/coop/packed/rocket_spawn.ogg"
+};
+static const unsigned char gPacked28[] = {
+#embed "../../assets/coop/packed/soldier_hit.ogg"
+};
+static const unsigned char gPacked29[] = {
+#embed "../../assets/coop/packed/spy_hit.ogg"
+};
+static const unsigned char gPacked30[] = {
+#embed "../../assets/coop/packed/spy_uncloak.ogg"
+};
+static const unsigned char gPacked31[] = {
 #embed "../../assets/coop/packed/legend_boss_music.ogg"
 };
 
@@ -63,14 +108,29 @@ const CoopPackedFile gCoopPackedFiles[] = {
 	{ "demo_bomb", gPacked6, sizeof(gPacked6) },
 	{ "tank", gPacked7, sizeof(gPacked7) },
 	{ "heavy", gPacked8, sizeof(gPacked8) },
-	{ "noah", gPacked9, sizeof(gPacked9) },
-	{ "grs", gPacked10, sizeof(gPacked10) },
-	{ "goblin_projectile", gPacked11, sizeof(gPacked11) },
-	{ "grs_shoot", gPacked12, sizeof(gPacked12) },
-	{ "legend_charge", gPacked13, sizeof(gPacked13) },
-	{ "legend_explode", gPacked14, sizeof(gPacked14) },
-	{ "legend_shoot", gPacked15, sizeof(gPacked15) },
-	{ "legend_boss_music", gPacked16, sizeof(gPacked16) },
+	{ "sentry_idle", gPacked9, sizeof(gPacked9) },
+	{ "sentry_fire", gPacked10, sizeof(gPacked10) },
+	{ "spy_walk", gPacked11, sizeof(gPacked11) },
+	{ "spy_attack", gPacked12, sizeof(gPacked12) },
+	{ "spy_idle", gPacked13, sizeof(gPacked13) },
+	{ "soldier_walk", gPacked14, sizeof(gPacked14) },
+	{ "soldier_attack", gPacked15, sizeof(gPacked15) },
+	{ "soldier_idle", gPacked16, sizeof(gPacked16) },
+	{ "rocket_normal", gPacked17, sizeof(gPacked17) },
+	{ "rocket_crit", gPacked18, sizeof(gPacked18) },
+	{ "noah", gPacked19, sizeof(gPacked19) },
+	{ "grs", gPacked20, sizeof(gPacked20) },
+	{ "goblin_projectile", gPacked21, sizeof(gPacked21) },
+	{ "sentry_projectile", gPacked22, sizeof(gPacked22) },
+	{ "grs_shoot", gPacked23, sizeof(gPacked23) },
+	{ "legend_charge", gPacked24, sizeof(gPacked24) },
+	{ "legend_explode", gPacked25, sizeof(gPacked25) },
+	{ "legend_shoot", gPacked26, sizeof(gPacked26) },
+	{ "rocket_spawn", gPacked27, sizeof(gPacked27) },
+	{ "soldier_hit", gPacked28, sizeof(gPacked28) },
+	{ "spy_hit", gPacked29, sizeof(gPacked29) },
+	{ "spy_uncloak", gPacked30, sizeof(gPacked30) },
+	{ "legend_boss_music", gPacked31, sizeof(gPacked31) },
 	{ nullptr, nullptr, 0 },
 };
 
@@ -84,5 +144,15 @@ const CoopSheetMeta gCoopSheetMetas[] = {
 	{ "demo_bomb", 67, 32, 4, 4, 0.1600f, 42, 144, 261, 243 },
 	{ "tank", 175, 146, 16, 16, 0.4200f, 56, 104, 264, 452 },
 	{ "heavy", 90, 143, 28, 28, 0.2800f, 81, 0, 241, 510 },
+	{ "sentry_idle", 63, 80, 1, 1, 0.1802f, 76, 54, 280, 498 },
+	{ "sentry_fire", 74, 80, 4, 4, 0.1802f, 76, 54, 280, 498 },
+	{ "spy_walk", 94, 151, 8, 8, 0.3598f, 136, 55, 284, 483 },
+	{ "spy_attack", 99, 172, 11, 11, 0.3598f, 157, 5, 284, 483 },
+	{ "spy_idle", 80, 150, 17, 17, 0.3598f, 147, 65, 284, 483 },
+	{ "soldier_walk", 86, 171, 9, 9, 0.3525f, 179, 5, 233, 493 },
+	{ "soldier_attack", 130, 170, 10, 10, 0.3525f, 43, 11, 233, 493 },
+	{ "soldier_idle", 79, 171, 21, 21, 0.3525f, 193, 9, 233, 493 },
+	{ "rocket_normal", 98, 17, 1, 1, 0.2239f, 38, 206, 246, 310 },
+	{ "rocket_crit", 103, 30, 20, 20, 0.2239f, 15, 176, 246, 310 },
 	{ nullptr, 0, 0, 0, 0, 0.0f, 0, 0, 0, 0 },
 };

@@ -945,41 +945,49 @@ void Board::PickZombieWaves()
 // campaign's: bigger budgets, and each level leans on a zombie or two it sends
 // in numbers.
 static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
+	// Soldiers turn up from the start and come thick from level 4; Spies
+	// first on level 3, the Engineer's sentry level, then here and there,
+	// and in numbers on level 7, the other sentry level.
 	{ "You're On Your Way to Dust Bowl",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_COOP_SOLDIER }, 4, 0,
 		{ { ZOMBIE_PAIL, 3, 2, 1, 2 }, { ZOMBIE_COOP_HEAVY, 12, 7, 1, 1 } }, 2 },
 	{ "Yummy, Yummy Brains",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_COOP_SOLDIER }, 5, 0,
 		{ { ZOMBIE_FOOTBALL, 5, 3, 1, 2 }, { ZOMBIE_PAIL, 3, 3, 1, 1 }, { ZOMBIE_COOP_HEAVY, 6, 4, 1, 1 } }, 3 },
+	// The Engineer's sentry to protect (Challenge::UpdateEngineerSentry).
 	{ "Up and Under",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_COOP_SOLDIER }, 6, 1,
-		{ { ZOMBIE_LADDER, 4, 2, 1, 2 }, { ZOMBIE_DIGGER, 6, 4, 1, 2 }, { ZOMBIE_COOP_HEAVY, 7, 4, 1, 1 } }, 3 },
+		{ { ZOMBIE_LADDER, 4, 2, 1, 2 }, { ZOMBIE_DIGGER, 7, 5, 1, 1 }, { ZOMBIE_COOP_HEAVY, 7, 4, 1, 1 }, { ZOMBIE_COOP_SPY, 4, 4, 1, 1 } }, 4 },
+	// At night, in a storm.
 	{ "Yeti Season",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_YETI }, 4, 0,
-		{ { ZOMBIE_YETI, 2, 3, 1, 2 }, { ZOMBIE_COOP_HEAVY, 8, 5, 1, 1 } }, 2 },
-	// Footballs only come on purpose here: each one takes three balls. And
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_YETI, ZOMBIE_COOP_SOLDIER }, 5, 0,
+		{ { ZOMBIE_YETI, 2, 3, 1, 2 }, { ZOMBIE_COOP_HEAVY, 8, 5, 1, 1 }, { ZOMBIE_COOP_SOLDIER, 5, 4, 1, 1 } }, 3 },
+	// Footballs only come on purpose here: each one takes three rockets. And
 	// one Gargantuar, in the final wave.
 	{ "Team Fortress Bowling",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_NEWSPAPER }, 4, 0,
 		{ { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_GARGANTUAR, 19, 1, 0, 1 } }, 2 },
 	{ "Heavy Weapons Guy",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_SOLDIER }, 7, 1,
-		{ { ZOMBIE_GARGANTUAR, 9, 5, 1, 1 }, { ZOMBIE_LADDER, 4, 3, 1, 1 }, { ZOMBIE_COOP_HEAVY, 4, 3, 1, 2 } }, 3 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_SOLDIER,
+		  ZOMBIE_COOP_SPY }, 8, 1,
+		{ { ZOMBIE_GARGANTUAR, 9, 5, 1, 1 }, { ZOMBIE_LADDER, 4, 3, 1, 1 }, { ZOMBIE_COOP_HEAVY, 4, 3, 1, 2 }, { ZOMBIE_COOP_SOLDIER, 5, 3, 1, 1 } }, 4 },
+	// The Spies' level, and the Engineer's sentry again.
 	{ "Red Spy in the Base",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_COOP_HEAVY,
-		  ZOMBIE_COOP_SOLDIER }, 9, 1,
-		// Red Spy in the Base: the Spies' level.
-		{ { ZOMBIE_FOOTBALL, 5, 3, 1, 2 }, { ZOMBIE_COOP_SPY, 5, 3, 1, 2 }, { ZOMBIE_COOP_TANK, 10, 6, 1, 1 } }, 3 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_COOP_HEAVY,
+		  ZOMBIE_COOP_SOLDIER, ZOMBIE_COOP_SPY }, 9, 1,
+		{ { ZOMBIE_COOP_SPY, 3, 2, 1, 3 }, { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 10, 6, 1, 1 }, { ZOMBIE_COOP_SOLDIER, 4, 3, 1, 1 } }, 4 },
 	{ "The Robots Are Coming",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI, ZOMBIE_COOP_TANK, ZOMBIE_COOP_SOLDIER }, 7, 1,
-		{ { ZOMBIE_ZAMBONI, 7, 4, 1, 1 }, { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 8, 5, 1, 1 } }, 3 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI, ZOMBIE_COOP_TANK, ZOMBIE_COOP_SOLDIER, ZOMBIE_COOP_SPY }, 8, 1,
+		{ { ZOMBIE_ZAMBONI, 7, 4, 1, 1 }, { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 8, 5, 1, 1 }, { ZOMBIE_COOP_SOLDIER, 4, 3, 1, 1 } }, 4 },
 	{ "Tunnel Vision",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_DIGGER, ZOMBIE_POGO, ZOMBIE_JACK_IN_THE_BOX, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_SPY }, 8, 1,
-		{ { ZOMBIE_DIGGER, 4, 2, 1, 2 }, { ZOMBIE_POGO, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 10, 6, 1, 1 } }, 3 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_DIGGER, ZOMBIE_POGO, ZOMBIE_JACK_IN_THE_BOX, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_SPY,
+		  ZOMBIE_COOP_SOLDIER }, 9, 1,
+		{ { ZOMBIE_DIGGER, 4, 2, 1, 2 }, { ZOMBIE_POGO, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 10, 6, 1, 1 }, { ZOMBIE_COOP_SOLDIER, 5, 4, 1, 1 } }, 4 },
+	// At night.
 	{ "Everything, Everywhere",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_DIGGER,
-		  ZOMBIE_ZAMBONI, ZOMBIE_YETI, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_TANK, ZOMBIE_COOP_SPY }, 12, 2,
-		{ { ZOMBIE_GARGANTUAR, 10, 5, 1, 1 }, { ZOMBIE_COOP_HEAVY, 5, 3, 1, 2 }, { ZOMBIE_COOP_TANK, 8, 5, 1, 1 } }, 3 },
+		  ZOMBIE_ZAMBONI, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_TANK, ZOMBIE_COOP_SPY, ZOMBIE_COOP_SOLDIER }, 12, 1,
+		{ { ZOMBIE_GARGANTUAR, 10, 5, 1, 1 }, { ZOMBIE_COOP_HEAVY, 5, 3, 1, 2 }, { ZOMBIE_COOP_TANK, 8, 5, 1, 1 }, { ZOMBIE_COOP_SOLDIER, 3, 3, 1, 2 } }, 4 },
 	// At night, in the rain: the Legendary Demoman (CoopDemoman.cpp). No
 	// waves -- he sends his own -- so the roster is only for the street.
 	{ "Legendary Demoman",
@@ -1131,7 +1139,9 @@ void Board::PickBackground()
 	// when there is one (DrawBackdrop) -- and its boss battle at night, so
 	// no sun falls and mushrooms are awake.
 	case GameMode::GAMEMODE_COOP_ADVENTURE_PLUS:
-		mBackground = mApp->mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL ? BackgroundType::BACKGROUND_2_NIGHT : BackgroundType::BACKGROUND_1_DAY;
+		// At night: Yeti Season, Everything Everywhere, and the boss.
+		mBackground = (mApp->mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL || mApp->mCoopPlusLevel == ADVENTURE_PLUS_YETI_LEVEL ||
+			mApp->mCoopPlusLevel == ADVENTURE_PLUS_EVERYTHING_LEVEL) ? BackgroundType::BACKGROUND_2_NIGHT : BackgroundType::BACKGROUND_1_DAY;
 		break;
 
 	case GameMode::GAMEMODE_SURVIVAL_NORMAL_STAGE_2:
@@ -4519,6 +4529,8 @@ void Board::MouseDownWithPlant(int x, int y, int theClickCount)
 Plant* Board::ToolHitTestHelper(const HitResult* theHitResult)
 {
 	Plant* aPlant = (Plant*)theHitResult->mObject;
+	if (mChallenge->IsEngineerSentry(aPlant))
+		return nullptr;  // the Engineer's: the shovel leaves it be
 	return (aPlant->mSeedType != SeedType::SEED_GRAVEBUSTER || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN) ? aPlant : nullptr;
 }
 
@@ -5813,6 +5825,16 @@ void Board::ZombiesWon(Zombie* theZombie)
 	SurvivalSaveScore();
 
 	std::string aGameOverMsg;
+	if (mApp->IsPlusSentryLevel() && mChallenge->mCoopSentryLostCounter == 0)
+	{
+		mApp->mMusic->StopAllMusic();
+		StopAllZombieSounds();
+		mApp->PlaySample(Sexy::SOUND_LOSEMUSIC);
+		GameOverDialog* aDialog = new GameOverDialog("The Engineer's sentry was destroyed!", false);
+		mApp->AddDialog(Dialogs::DIALOG_GAME_OVER, aDialog);
+		mApp->mWidgetManager->SetFocus(aDialog);
+		return;
+	}
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIQUARIUM)
 	{
 		aGameOverMsg = "[ZOMBIQUARIUM_DEATH_MESSAGE]";
@@ -5916,7 +5938,9 @@ bool Board::HasLevelAwardDropped()
 
 void Board::UpdateSunSpawning()
 {
-	if (StageIsNight() ||
+	// Adventure Plus's night levels keep the sky's sun: they are balanced
+	// for it.
+	if ((StageIsNight() && !mApp->IsAdventurePlusLevel()) ||
 		HasLevelAwardDropped() ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_RAINING_SEEDS ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ICE ||
@@ -9716,7 +9740,7 @@ bool Board::StageHasGraveStones()
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND ||
 		mApp->IsIZombieLevel() ||
 		mApp->IsScaryPotterLevel() ||
-		mApp->IsLegendaryDemomanLevel())
+		mApp->IsAdventurePlusLevel())  // its night levels have no graves
 		return false;
 
 	return mBackground == BackgroundType::BACKGROUND_2_NIGHT;

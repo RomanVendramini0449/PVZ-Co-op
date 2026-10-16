@@ -3189,10 +3189,9 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 	else if (theLevel == 3)
 	{
 		aLines = {
-			"Neighbor! The zombies found ladders!",
-			"And shovels! They're coming over AND under!",
-			"{MOUTH_BIG_OH}Who sells shovels to zombies?! That's MY job!",
-			"Keep something looking behind you. Trust me.",
+			"Look, buddy. You're not an engineer...",
+			"...but you gotta protect his sentry, okay?",
+			"Good luck, brochacho!",
 		};
 	}
 
@@ -3288,6 +3287,11 @@ bool LawnApp::IsCoopRomanLevel()
 bool LawnApp::IsLegendaryDemomanLevel()
 {
 	return IsAdventurePlusLevel() && mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL;
+}
+
+bool LawnApp::IsPlusSentryLevel()
+{
+	return IsAdventurePlusLevel() && (mCoopPlusLevel == ADVENTURE_PLUS_SENTRY_LEVEL || mCoopPlusLevel == ADVENTURE_PLUS_SENTRY_LEVEL_2);
 }
 
 bool LawnApp::IsPlusStormLevel()

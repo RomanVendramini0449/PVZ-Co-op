@@ -210,6 +210,10 @@ void LawnMower::Update()
 			continue;
 		if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS)
 			continue;
+		// The Spy comes up right by the mower and walks away from it: it
+		// neither starts for him nor runs him down.
+		if (aZombie->mCoopKind == CoopZombieKind::COOP_KIND_SPY)
+			continue;
 
 		if (aZombie->mRow - mRow)
 			continue;

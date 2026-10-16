@@ -112,7 +112,7 @@ constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_NOAH,              .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_STARFRUIT,     .mPacketIndex = 30, .mSeedCost = 175, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "NOAH" },
 	// The Sentry Turret: a Cattail underneath -- it aims and fires as one,
 	// homing spikes at whatever is nearest, anywhere -- but on dry land.
-	{ .mSeedType = SeedType::SEED_SENTRY,            .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_CATTAIL,       .mPacketIndex = 27, .mSeedCost = 225, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "SENTRY" }
+	{ .mSeedType = SeedType::SEED_SENTRY,            .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_CATTAIL,       .mPacketIndex = 27, .mSeedCost = 300, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 200,  .mPlantName = "SENTRY" }
 };
 
 Plant::Plant()
@@ -185,6 +185,8 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 
 		if (mApp->IsWallnutBowlingLevel() && aBodyReanim->TrackExists("_ground"))
 		{
+			if (mApp->IsAdventurePlusLevel() && IsOnBoard())
+				CoopArt::PlayPackedSound("rocket_spawn");  // a rocket, not a Wall-nut (DrawPlusRocket)
 			aBodyReanim->SetFramesForLayer("_ground");
 			if (mSeedType == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_EXPLODE_O_NUT)
 				aBodyReanim->mAnimRate = RandRangeFloat(12.0f, 18.0f);
@@ -2428,6 +2430,13 @@ void Plant::UpdateBowling()
 			Die();
 	}
 
+	// Adventure Plus: the rockets leave a smoke trail.
+	if (mApp->IsAdventurePlusLevel() && mBoard->mMainCounter % 5 == 0)
+	{
+		mApp->AddPvzpParticle(mX + 8.0f, mY + 46.0f, Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0),
+			ParticleEffect::PARTICLE_PUFFSHROOM_TRAIL);
+	}
+
 	if (mState == PlantState::STATE_BOWLING_UP)
 	{
 		mY -= 2;
@@ -4104,6 +4113,11 @@ void Plant::Draw(Graphics* g)
 		{
 			DrawSentry(g, aOffsetX, aOffsetY);
 		}
+		else if (DrawPlusRocket(g, mSeedType, aOffsetX, aOffsetY, IsOnBoard() ? mState : PlantState::STATE_NOTREADY,
+			IsOnBoard() ? mBoard->mMainCounter : mApp->mAppCounter, 1.0f))
+		{
+			// Adventure Plus bowling: a rocket in place of the Wall-nut.
+		}
 		else if (DrawShopSkin(g, aOffsetX, aOffsetY))
 		{
 			// Kernel or Philippe, bought from Crazy Dave, in place of the plant.
@@ -4226,6 +4240,31 @@ static bool GetShopSkin(SeedType theSeedType, CoopArt::Skin& theSkinOut)
 // still runs, unseen, so nothing about how it plays changes. Kernel crouches,
 // stretches as he leaps and lands flat; Philippe swells and glows as his fuse
 // burns down. Everything here is drawing only.
+// Adventure Plus bowling (TF2 bowling): Wall-nuts are rockets -- the
+// Explode-o-nut a crit rocket, the giant one twice the size -- pointing the
+// way they roll. They bounce and blow up just as the nuts do. False when it
+// is not that, or the art is missing: draw the plant as usual.
+bool Plant::DrawPlusRocket(Graphics* g, SeedType theSeedType, float theX, float theY, PlantState theState, uint32_t theCounter, float theScale)
+{
+	if (!gLawnApp->IsAdventurePlusLevel() || !gLawnApp->IsWallnutBowlingLevel())
+		return false;
+	if (theSeedType != SeedType::SEED_WALLNUT && theSeedType != SeedType::SEED_EXPLODE_O_NUT && theSeedType != SeedType::SEED_GIANT_WALLNUT)
+		return false;
+	const char* aSheet = theSeedType == SeedType::SEED_EXPLODE_O_NUT ? "rocket_crit" : "rocket_normal";
+	if (CoopArt::SheetFrames(aSheet) <= 0)
+		return false;
+	const float aScale = theScale * (theSeedType == SeedType::SEED_GIANT_WALLNUT ? 2.0f : 1.0f);
+	const float aTurn = theState == PlantState::STATE_BOWLING_UP ? -0.45f : theState == PlantState::STATE_BOWLING_DOWN ? 0.45f : 0.0f;
+	Graphics aG(*g);
+	aG.SetColorizeImages(true);
+	aG.SetColor(Color::White);
+	// The packed ground point is the rocket's bottom middle: drop it by half
+	// its height so it is centred in the plant's square.
+	CoopArt::DrawSheetFrame(&aG, aSheet, static_cast<int>(theCounter / 4), theX + 40.0f * theScale, theY + 40.0f * theScale + 15.0f * aScale,
+		aScale, false, aTurn);
+	return true;
+}
+
 // The Sentry Turret's own animations (assets/coop/sentry, packed): idling,
 // and its firing animation each time it shoots. The Cattail underneath does
 // the aiming and firing.
@@ -4398,6 +4437,10 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
 		{
 			CoopArt::DrawPhotoPlant(&aSeedG, aSeedType == SeedType::SEED_GRS ? "grs" : "noah",
 				thePosX + aOffsetX, thePosY + aOffsetY, aSeedG.mScaleX, aSeedG.mScaleY);
+		}
+		else if (DrawPlusRocket(&aSeedG, aSeedType, thePosX + aOffsetX, thePosY + aOffsetY, PlantState::STATE_NOTREADY, gLawnApp->mAppCounter, aSeedG.mScaleX))
+		{
+			// Its packet, and in hand: the rocket too.
 		}
 		else if (aSeedType == SeedType::SEED_SENTRY && CoopArt::SheetFrames("sentry_idle") > 0)
 		{
@@ -5025,6 +5068,11 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 	else if (mSeedType == SeedType::SEED_CATTAIL || mSeedType == SeedType::SEED_SENTRY)
 	{
 		aProjectile->mCoopSentry = mSeedType == SeedType::SEED_SENTRY;  // drawn as its own shot
+		if (aProjectile->mCoopSentry)
+		{
+			aProjectile->mVelX = 3.0f;  // a bullet: quicker, and it turns less (Projectile::UpdateNormalMotion)
+			CoopArt::PlayPackedSound("turret_fire");
+		}
 		aProjectile->mVelX = 2.0f;
 		aProjectile->mMotionType = ProjectileMotion::MOTION_HOMING;
 		aProjectile->mTargetZombieID = mBoard->ZombieGetID(theTargetZombie);
@@ -5072,6 +5120,16 @@ Zombie* Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon)
 			}
 		}
 
+		if (mSeedType == SeedType::SEED_SENTRY)
+		{
+			// The Sentry Turret only sees forward: within 60 degrees of
+			// straight ahead (tan 60 = 1.73), never behind it.
+			const Rect aTargetRect = aZombie->GetZombieRect();
+			const float aDX = aTargetRect.mX + aTargetRect.mWidth * 0.5f - (mX + 40.0f);
+			const float aDY = aTargetRect.mY + aTargetRect.mHeight * 0.5f - (mY + 40.0f);
+			if (aDX <= 0.0f || std::abs(aDY) > aDX * 1.732f)
+				continue;
+		}
 		if (mSeedType != SeedType::SEED_CATTAIL && mSeedType != SeedType::SEED_SENTRY)
 		{
 			if (mSeedType == SeedType::SEED_GLOOMSHROOM)
@@ -5201,6 +5259,13 @@ int Plant::DistanceToClosestZombie()
 
 void Plant::Die()
 {
+	if (!mDead && mSeedType == SeedType::SEED_SENTRY && IsOnBoard() && mApp->mGameScene == GameScenes::SCENE_PLAYING)
+	{
+		// A Sentry Turret goes up when it is destroyed -- harmlessly.
+		mApp->AddPvzpParticle(mX + 40.0f, mY + 40.0f, static_cast<int>(RenderLayer::RENDER_LAYER_TOP), ParticleEffect::PARTICLE_POWIE);
+		mApp->PlayFoley(FoleyType::FOLEY_CHERRYBOMB);
+	}
+
 	if (IsOnBoard() && mSeedType == SeedType::SEED_TANGLEKELP)
 	{
 		Zombie* aZombie = mBoard->ZombieTryToGet(mTargetZombieID);

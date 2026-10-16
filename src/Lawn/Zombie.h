@@ -60,7 +60,8 @@ enum ZombieParts : int32_t
 constexpr int COOP_TANK_HEALTH = 1800;
 constexpr int COOP_HEAVY_HEALTH = 1300;
 constexpr int COOP_SPY_HEALTH = 500;            // a Digger has 270 and a 100 hard hat
-constexpr int COOP_SOLDIER_HEALTH = 500;        // body; plus the bucket's 1100: a Buckethead's 1370 and a bit
+constexpr int COOP_SOLDIER_HEALTH = 300;        // body; with his 700 helmet, 1000: between a Conehead (640) and a Buckethead (1370)
+constexpr int COOP_SOLDIER_HELMET = 700;
 constexpr int COOP_HEAVY_STILL_FRAME = 5;       // of his dance: standing upright
 constexpr float COOP_TANK_ANIM_RATE = 1.2f;     // tread cycles per Zomboni cycle (was 2)
 constexpr float COOP_HEAVY_DANCE_RATE = 0.6f;   // whole dances per Football Zombie stride
@@ -462,6 +463,7 @@ public:
 	void                            CoopTankBlast();
 	void                            CoopTankDetonate();
 	bool                            DrawCoopKind(Graphics* g);  // false: no art yet, draw the zombie underneath
+	void                            PlayCoopChomp(int theFoley);  // a FoleyType
 	ZombieType                      GetCoopDisplayType();       // what the street names it
 	void                            BossSetupReanim();
 	void                            MowDown();

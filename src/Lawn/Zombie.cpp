@@ -116,7 +116,7 @@ constinit const ZombieDefinition gZombieDefs[NUM_ZOMBIE_TYPES] = {
 	{ .mZombieType = ZOMBIE_COOP_TANK, .mReanimationType = REANIM_ZOMBIE_ZAMBONI, .mZombieValue = 7, .mStartingLevel = 99, .mFirstAllowedWave = 6, .mPickWeight = 1500, .mZombieName = "TANK" },
 	{ .mZombieType = ZOMBIE_COOP_HEAVY, .mReanimationType = REANIM_ZOMBIE_FOOTBALL, .mZombieValue = 5, .mStartingLevel = 99, .mFirstAllowedWave = 3, .mPickWeight = 2000, .mZombieName = "HEAVY_WEAPONS_GUY" },
 	{ .mZombieType = ZOMBIE_COOP_SPY, .mReanimationType = REANIM_DIGGER, .mZombieValue = 4, .mStartingLevel = 99, .mFirstAllowedWave = 6, .mPickWeight = 1000, .mZombieName = "SPY" },
-	{ .mZombieType = ZOMBIE_COOP_SOLDIER, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 4, .mStartingLevel = 99, .mFirstAllowedWave = 2, .mPickWeight = 2500, .mZombieName = "SOLDIER" },
+	{ .mZombieType = ZOMBIE_COOP_SOLDIER, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 99, .mFirstAllowedWave = 2, .mPickWeight = 4000, .mZombieName = "SOLDIER" },
 };
 
 static ZombieType gBossZombieList[] = {
@@ -941,6 +941,7 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 	else if (mCoopKind == CoopZombieKind::COOP_KIND_SOLDIER)
 	{
 		mBodyHealth = COOP_SOLDIER_HEALTH;
+		mHelmHealth = COOP_SOLDIER_HELMET;
 	}
 
 	UpdateAnimSpeed();
@@ -2828,7 +2829,9 @@ void Zombie::UpdateZombieDigger()
 			StopZombieSound();
 
 			// The Spy has been walking all along, cloaked: he just appears.
-			if (mCoopKind != CoopZombieKind::COOP_KIND_SPY)
+			if (mCoopKind == CoopZombieKind::COOP_KIND_SPY)
+				CoopArt::PlayPackedSound("spy_uncloak");
+			else
 			{
 				mApp->PlayFoley(FoleyType::FOLEY_DIRT_RISE);
 				mApp->AddPvzpParticle(mPosX + 60.0f, mPosY + 118.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_DIGGER_RISE);
@@ -4989,11 +4992,11 @@ void Zombie::AnimateChewSound()
 		{
 			if (aPlant->mSeedType == SeedType::SEED_WALLNUT || aPlant->mSeedType == SeedType::SEED_TALLNUT || aPlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
 			{
-				mApp->PlayFoley(FoleyType::FOLEY_CHOMP_SOFT);
+				PlayCoopChomp(FoleyType::FOLEY_CHOMP_SOFT);
 			}
 			else
 			{
-				mApp->PlayFoley(FoleyType::FOLEY_CHOMP);
+				PlayCoopChomp(FoleyType::FOLEY_CHOMP);
 			}
 		}
 	}
@@ -5001,13 +5004,24 @@ void Zombie::AnimateChewSound()
 	{
 		if (mMindControlled)
 		{
-			mApp->PlayFoley(FoleyType::FOLEY_CHOMP_SOFT);
+			PlayCoopChomp(FoleyType::FOLEY_CHOMP_SOFT);
 		}
 		else
 		{
-			mApp->PlayFoley(FoleyType::FOLEY_CHOMP);
+			PlayCoopChomp(FoleyType::FOLEY_CHOMP);
 		}
 	}
+}
+
+// A bite, or the Spy's knife and the Soldier's shovel: their own sounds.
+void Zombie::PlayCoopChomp(int theFoley)
+{
+	if (mCoopKind == CoopZombieKind::COOP_KIND_SPY)
+		CoopArt::PlayPackedSound("spy_hit");
+	else if (mCoopKind == CoopZombieKind::COOP_KIND_SOLDIER)
+		CoopArt::PlayPackedSound("soldier_hit");
+	else
+		mApp->PlayFoley(static_cast<FoleyType>(theFoley));
 }
 
 void Zombie::AnimateChewEffect()
@@ -7247,7 +7261,8 @@ void Zombie::EatPlant(Plant* thePlant)
 		}
 	}
 
-	thePlant->mPlantHealth -= DAMAGE_PER_EAT;
+	// A Spy's knife: a quarter more than a bite.
+	thePlant->mPlantHealth -= mCoopKind == CoopZombieKind::COOP_KIND_SPY ? DAMAGE_PER_EAT * 5 / 4 : DAMAGE_PER_EAT;
 	thePlant->mRecentlyEatenCountdown = 50;
 	if (mApp->IsIZombieLevel() && mJustGotShotCounter < -500)
 	{
@@ -11287,6 +11302,8 @@ bool Zombie::DrawCoopKind(Graphics* g)
 	const bool aTank = mCoopKind == CoopZombieKind::COOP_KIND_TANK;
 	const char* aSheet = "heavy";
 	const char* anAttack = nullptr;   // drawn while eating, if there is one
+	const char* anIdle = nullptr;     // drawn standing still (on the street before the level), if there is one
+	bool anArtFacesRight = false;     // the art is drawn facing right, not left
 	float aScale = 1.0f;
 	float aRate = 1.0f;               // animation cycles per cycle of the zombie underneath
 	int aStillFrame = 0;
@@ -11307,10 +11324,13 @@ bool Zombie::DrawCoopKind(Graphics* g)
 	case CoopZombieKind::COOP_KIND_SPY:
 		aSheet = "spy_walk";
 		anAttack = "spy_attack";
+		anIdle = "spy_idle";
+		anArtFacesRight = true;  // he only ever comes at you from the left
 		break;
 	case CoopZombieKind::COOP_KIND_SOLDIER:
 		aSheet = "soldier_walk";
 		anAttack = "soldier_attack";
+		anIdle = "soldier_idle";
 		break;
 	default:
 		return false;
@@ -11335,7 +11355,16 @@ bool Zombie::DrawCoopKind(Graphics* g)
 	const bool aStill = !IsOnBoard() || (mIsEating && !anAttacking) || mIceTrapCounter > 0 || mButteredCounter > 0 ||
 		mZombiePhase == ZombiePhase::PHASE_DIGGER_STUNNED || (aTank && mVelX <= 0.0f);
 	if (aStill)
+	{
 		aFrame = aStillFrame % aFrames;
+		if (anIdle && CoopArt::SheetFrames(anIdle) > 0 && !(mIsEating && anAttacking))
+		{
+			// Standing: his own idle, breathing on the street, held when frozen.
+			aSheet = anIdle;
+			const int anIdleFrames = CoopArt::SheetFrames(anIdle);
+			aFrame = (mIceTrapCounter > 0 || mButteredCounter > 0) ? 0 : static_cast<int>(mZombieAge / 6) % anIdleFrames;
+		}
+	}
 
 	// Ground point, in this zombie's own drawing space.
 	float aX = aTank ? 76.0f : 70.0f;
@@ -11349,10 +11378,10 @@ bool Zombie::DrawCoopKind(Graphics* g)
 	// uncloaks where he comes up, behind your plants.
 	if (mCoopKind == CoopZombieKind::COOP_KIND_SPY)
 	{
-		aY = 118.0f - mAltitude;  // where the Digger would be, he stands on the ground
+		// Standing on the ground, wherever the Digger underneath would be.
 		if (mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING || mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING_PAUSE_WITHOUT_AXE)
 		{
-			aAlpha = aAlpha * (24 + static_cast<int>(14.0 * sin(mZombieAge * 0.13))) / 255;
+			return true;  // cloaked: not there at all
 		}
 		else if (mZombiePhase == ZombiePhase::PHASE_DIGGER_RISING || mZombiePhase == ZombiePhase::PHASE_DIGGER_RISE_WITHOUT_AXE)
 		{
@@ -11364,8 +11393,9 @@ bool Zombie::DrawCoopKind(Graphics* g)
 			}
 			else
 			{
+				// Fading in, facing the way he is about to walk.
 				aFrame = 0;
-				aAlpha = aAlpha * (24 + static_cast<int>(231 * aUncloak)) / 255;
+				aAlpha = aAlpha * static_cast<int>(255 * aUncloak) / 255;
 			}
 		}
 	}
@@ -11400,9 +11430,11 @@ bool Zombie::DrawCoopKind(Graphics* g)
 		aG.SetColor(Color(255, 255, 255, aAlpha));
 	}
 
-	// Facing right when walking back the other way (the Spy, behind your
-	// plants) or hypnotised -- but not both.
-	const bool aFlip = mMindControlled != IsWalkingBackwards();
+	// Facing right when walking back the other way: the Spy behind your
+	// plants, anyone hypnotised (IsWalkingBackwards covers both). Art drawn
+	// facing right (the Spy's) is mirrored the other way round, so on the
+	// street before the level he faces the lawn like everyone else.
+	const bool aFlip = IsWalkingBackwards() != anArtFacesRight;
 	if (aFlip)
 		aX = (aTank ? 153.0f : 120.0f) - aX;
 	CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX, aY, aScale, aFlip, aFlip ? -aRotation : aRotation);

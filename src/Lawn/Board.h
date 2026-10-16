@@ -64,8 +64,18 @@ constexpr const int YETI_SPRAY_LEVEL = 40;  // 4-10, the stormy night
 constexpr const int ADVENTURE_PLUS_LEVELS = 11;
 // The last one is a boss battle at night (the boss itself is still to come).
 constexpr const int ADVENTURE_PLUS_BOSS_LEVEL = 11;
-constexpr const int ADVENTURE_PLUS_SENTRY_LEVEL = 7;         // beating it wins the Sentry Turret
-constexpr const int ADVENTURE_PLUS_YETI_LEVEL = 4;           // Yeti Season: dark, foggy, stormy
+constexpr const int ADVENTURE_PLUS_SENTRY_LEVEL = 3;         // protect the Engineer's sentry; beating it wins the Sentry Turret
+constexpr const int ADVENTURE_PLUS_SENTRY_LEVEL_2 = 7;       // and again, after bowling: Red Spy in the Base
+
+// Where the Engineer's sentry stands: column 3, row 4 on level 3 (counting
+// from 1, from the top left); column 3, row 2 on level 7.
+inline void GetPlusSentrySquare(int theLevel, int& theCol, int& theRow)
+{
+	theCol = 2;
+	theRow = theLevel == ADVENTURE_PLUS_SENTRY_LEVEL_2 ? 1 : 3;
+}
+constexpr const int ADVENTURE_PLUS_YETI_LEVEL = 4;
+constexpr const int ADVENTURE_PLUS_EVERYTHING_LEVEL = 10;           // Yeti Season: dark, foggy, stormy
 constexpr const int ADVENTURE_PLUS_BOWLING_LEVEL = 5;   // played as Wall-nut Bowling
 // In the bowling level a Football Zombie's helmet is set to this whatever
 // the difficulty: a ball takes 900 off a helmet, so two break it and the
@@ -93,7 +103,7 @@ struct AdventurePlusLevel
 	ZombieType           mRoster[12];       // the random mix draws from these
 	int                  mRosterCount;
 	int                  mPointsBonus;      // extra zombie points every wave
-	AdventurePlusFeature mFeatures[3];
+	AdventurePlusFeature mFeatures[4];
 	int                  mFeatureCount;
 };
 

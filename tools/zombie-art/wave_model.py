@@ -11,6 +11,7 @@ Z = {
     'DIG': (4, 10, 1000, 370), 'POGO': (4, 10, 1000, 770), 'YETI': (4, 1, 1, 1350),
     'LADDER': (4, 10, 1000, 1000), 'GARG': (10, 15, 1500, 3000),
     'TANK': (7, 6, 1500, 1800), 'HEAVY': (5, 3, 2000, 1300),
+    'SOLDIER': (3, 2, 4000, 1000), 'SPY': (4, 6, 1000, 500),
 }
 FLAGS = {9, 19}
 
@@ -26,6 +27,19 @@ OLD = [
     ('9 Tunnel Vision', ['NORMAL','CONE','PAIL','DIG','POGO','JACK','HEAVY'], 3, [('DIG',3,1,2,4),('POGO',5,3,1,2)]),
     ('10 Everything', ['NORMAL','CONE','PAIL','FOOT','LADDER','DIG','ZAMB','YETI','GARG','HEAVY','TANK'], 4, [('GARG',9,4,1,2),('HEAVY',3,2,1,3),('TANK',6,4,1,2)]),
 ]
+NEW_PREV2 = [
+    ('1 Dust Bowl', ['NORMAL','CONE','PAIL'], 0, [('PAIL',3,2,1,2),('HEAVY',12,7,1,1)]),
+    ('2 Yummy', ['NORMAL','CONE','PAIL','FOOT'], 0, [('FOOT',5,3,1,2),('PAIL',3,3,1,1),('HEAVY',6,4,1,1)]),
+    ('3 Up and Under', ['NORMAL','CONE','PAIL','LADDER','DIG'], 1, [('LADDER',4,2,1,2),('DIG',6,4,1,2),('HEAVY',7,4,1,1)]),
+    ('4 Yeti Season', ['NORMAL','CONE','PAIL','YETI'], 0, [('YETI',2,3,1,2),('HEAVY',8,5,1,1)]),
+    ('5 Bowling', ['NORMAL','CONE','PAIL','NEWS'], 0, [('FOOT',6,4,1,1),('GARG',19,1,0,1)]),
+    ('6 Heavy Weapons Guy', ['NORMAL','CONE','LADDER','DIG','GARG','HEAVY'], 1, [('GARG',9,5,1,1),('LADDER',4,3,1,1),('HEAVY',4,3,1,2)]),
+    ('7 Red Spy', ['NORMAL','CONE','PAIL','POLE','NEWS','FOOT','LADDER','HEAVY'], 1, [('FOOT',5,3,1,2),('POLE',3,3,1,2),('TANK',10,6,1,1)]),
+    ('8 Robots', ['NORMAL','CONE','PAIL','FOOT','ZAMB','TANK'], 1, [('ZAMB',7,4,1,1),('FOOT',6,4,1,1),('TANK',8,5,1,1)]),
+    ('9 Tunnel Vision', ['NORMAL','CONE','PAIL','DIG','POGO','JACK','HEAVY'], 1, [('DIG',4,2,1,2),('POGO',6,4,1,1),('TANK',10,6,1,1)]),
+    ('10 Everything', ['NORMAL','CONE','PAIL','FOOT','LADDER','DIG','ZAMB','YETI','GARG','HEAVY','TANK'], 2, [('GARG',10,5,1,1),('HEAVY',5,3,1,2),('TANK',8,5,1,1)]),
+]
+
 NEW_PREV = [
     ('1 Dust Bowl', ['NORMAL','CONE','PAIL'], 0, [('PAIL',3,2,1,2)]),
     ('2 Yummy', ['NORMAL','CONE','PAIL','FOOT'], 0, [('FOOT',5,3,1,2),('PAIL',3,3,1,1),('HEAVY',9,9,1,1)]),
@@ -40,16 +54,16 @@ NEW_PREV = [
 ]
 
 NEW = [
-    ('1 Dust Bowl', ['NORMAL','CONE','PAIL'], 0, [('PAIL',3,2,1,2),('HEAVY',12,7,1,1)]),
-    ('2 Yummy', ['NORMAL','CONE','PAIL','FOOT'], 0, [('FOOT',5,3,1,2),('PAIL',3,3,1,1),('HEAVY',6,4,1,1)]),
-    ('3 Up and Under', ['NORMAL','CONE','PAIL','LADDER','DIG'], 1, [('LADDER',4,2,1,2),('DIG',6,4,1,2),('HEAVY',7,4,1,1)]),
-    ('4 Yeti Season', ['NORMAL','CONE','PAIL','YETI'], 0, [('YETI',2,3,1,2),('HEAVY',8,5,1,1)]),
+    ('1 Dust Bowl', ['NORMAL','CONE','PAIL','SOLDIER'], 0, [('PAIL',3,2,1,2),('HEAVY',12,7,1,1)]),
+    ('2 Yummy', ['NORMAL','CONE','PAIL','FOOT','SOLDIER'], 0, [('FOOT',5,3,1,2),('PAIL',3,3,1,1),('HEAVY',6,4,1,1)]),
+    ('3 Up and Under', ['NORMAL','CONE','PAIL','LADDER','DIG','SOLDIER'], 1, [('LADDER',4,2,1,2),('DIG',7,5,1,1),('HEAVY',7,4,1,1),('SPY',4,4,1,1)]),
+    ('4 Yeti Season', ['NORMAL','CONE','PAIL','YETI','SOLDIER'], 0, [('YETI',2,3,1,2),('HEAVY',8,5,1,1),('SOLDIER',5,4,1,1)]),
     ('5 Bowling', ['NORMAL','CONE','PAIL','NEWS'], 0, [('FOOT',6,4,1,1),('GARG',19,1,0,1)]),
-    ('6 Heavy Weapons Guy', ['NORMAL','CONE','LADDER','DIG','GARG','HEAVY'], 1, [('GARG',9,5,1,1),('LADDER',4,3,1,1),('HEAVY',4,3,1,2)]),
-    ('7 Red Spy', ['NORMAL','CONE','PAIL','POLE','NEWS','FOOT','LADDER','HEAVY'], 1, [('FOOT',5,3,1,2),('POLE',3,3,1,2),('TANK',10,6,1,1)]),
-    ('8 Robots', ['NORMAL','CONE','PAIL','FOOT','ZAMB','TANK'], 1, [('ZAMB',7,4,1,1),('FOOT',6,4,1,1),('TANK',8,5,1,1)]),
-    ('9 Tunnel Vision', ['NORMAL','CONE','PAIL','DIG','POGO','JACK','HEAVY'], 1, [('DIG',4,2,1,2),('POGO',6,4,1,1),('TANK',10,6,1,1)]),
-    ('10 Everything', ['NORMAL','CONE','PAIL','FOOT','LADDER','DIG','ZAMB','YETI','GARG','HEAVY','TANK'], 2, [('GARG',10,5,1,1),('HEAVY',5,3,1,2),('TANK',8,5,1,1)]),
+    ('6 Heavy Weapons Guy', ['NORMAL','CONE','LADDER','DIG','GARG','HEAVY','SOLDIER','SPY'], 1, [('GARG',9,5,1,1),('LADDER',4,3,1,1),('HEAVY',4,3,1,2),('SOLDIER',5,3,1,1)]),
+    ('7 Red Spy', ['NORMAL','CONE','PAIL','POLE','NEWS','FOOT','HEAVY','SOLDIER','SPY'], 1, [('SPY',3,2,1,3),('FOOT',6,4,1,1),('TANK',10,6,1,1),('SOLDIER',4,3,1,1)]),
+    ('8 Robots', ['NORMAL','CONE','PAIL','FOOT','ZAMB','TANK','SOLDIER','SPY'], 1, [('ZAMB',7,4,1,1),('FOOT',6,4,1,1),('TANK',8,5,1,1),('SOLDIER',4,3,1,1)]),
+    ('9 Tunnel Vision', ['NORMAL','CONE','PAIL','DIG','POGO','JACK','HEAVY','SPY','SOLDIER'], 1, [('DIG',4,2,1,2),('POGO',6,4,1,1),('TANK',10,6,1,1),('SOLDIER',5,4,1,1)]),
+    ('10 Everything', ['NORMAL','CONE','PAIL','FOOT','LADDER','DIG','ZAMB','GARG','HEAVY','TANK','SPY','SOLDIER'], 1, [('GARG',10,5,1,1),('HEAVY',5,3,1,2),('TANK',8,5,1,1),('SOLDIER',3,3,1,2)]),
 ]
 
 
@@ -96,8 +110,8 @@ def run(levels, rule, pct):
     return out
 
 
-old = run(NEW_PREV, 'new', 110)
-new = run(NEW, 'new', 110)
+old = run(NEW_PREV2, 'new', 100)
+new = run(NEW, 'new', 100)
 camp = [sum(wave_hp(['NORMAL','CONE','PAIL','FOOT'], 0, [], w, 'camp', random.Random(w)) for _ in range(1)) / 270 for w in range(20)]
 print('before = last round, after = with the extra TF2 enemies')
 for name in old:

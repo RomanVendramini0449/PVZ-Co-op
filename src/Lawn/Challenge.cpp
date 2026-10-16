@@ -68,7 +68,7 @@ constexpr const int STORM_FLASH_TIME = 150;
 constexpr const int DEMO_THUNDER_FLASH_TICKS = 60;
 constexpr const float DEMO_RAIN_VOLUME = 0.35f;  // of the music's volume
 constexpr const float YETI_RAIN_VOLUME = 0.6f;
-constexpr const int YETI_DARKNESS = 150;          // Yeti Season's gloom, of 255
+constexpr const int YETI_DARKNESS = 110;          // Yeti Season's gloom, of 255 (on the night lawn)
 constexpr const int YETI_FOG = 90;                // its fog at the right edge, of 255
 
 Challenge::Challenge()
@@ -211,6 +211,16 @@ void Challenge::StartLevel()
 	if (mApp->IsLegendaryDemomanLevel())
 	{
 		mBoard->AddZombieInRow(ZOMBIE_BOSS, 2, 0);
+	}
+	if (mApp->IsPlusSentryLevel())
+	{
+		// The Engineer's Sentry Turret, already built when play begins.
+		int aCol, aRow;
+		GetPlusSentrySquare(mApp->mCoopPlusLevel, aCol, aRow);
+		if (Plant* aSentry = mBoard->AddPlant(aCol, aRow, SEED_SENTRY))
+			mCoopSentryID = static_cast<PlantID>(mBoard->mPlants.DataArrayGetID(aSentry));
+		mCoopSentryLostCounter = -1;
+		mBoard->DisplayAdvice("Protect the Engineer's sentry!", MESSAGE_STYLE_HINT_LONG, ADVICE_NONE);
 	}
 	if (mApp->IsWhackAZombieLevel())
 	{
@@ -2020,6 +2030,8 @@ void Challenge::Update()
 		UpdateStormyNight();
 	if (mApp->IsPlusStormLevel() && !mBoard->mPaused)
 		UpdateDemomanStorm();
+	if (mApp->IsPlusSentryLevel() && !mBoard->mPaused && mApp->mGameScene == SCENE_PLAYING)
+		UpdateEngineerSentry();
 
 	if (mBoard->mPaused)
 	{
@@ -2968,6 +2980,28 @@ void Challenge::UpdateDemomanStorm()
 		mApp->PlayFoley(FoleyType::FOLEY_THUNDER);
 	if (mChallengeStateCounter <= 0)
 		mChallengeStateCounter = DEMO_THUNDER_FLASH_TICKS + RandRangeInt(600, 1400);
+}
+
+// The Engineer's sentry gone, the level is lost -- a moment after it blows
+// up (Plant::Die), so that can be seen.
+void Challenge::UpdateEngineerSentry()
+{
+	if (mCoopSentryLostCounter > 0)
+	{
+		if (--mCoopSentryLostCounter == 0)
+			mBoard->ZombiesWon(nullptr);
+		return;
+	}
+	if (mCoopSentryID == PlantID::PLANTID_NULL || mBoard->HasLevelAwardDropped() || mCoopSentryLostCounter == 0)
+		return;
+	Plant* aSentry = mBoard->mPlants.DataArrayTryToGet(static_cast<unsigned int>(mCoopSentryID));
+	if (aSentry == nullptr || aSentry->mDead || aSentry->mSquished)
+		mCoopSentryLostCounter = 150;
+}
+
+bool Challenge::IsEngineerSentry(Plant* thePlant)
+{
+	return mCoopSentryID != PlantID::PLANTID_NULL && thePlant && mBoard->mPlants.DataArrayTryToGet(static_cast<unsigned int>(mCoopSentryID)) == thePlant;
 }
 
 void Challenge::DrawDemomanStorm(Graphics* g)

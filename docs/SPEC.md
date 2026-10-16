@@ -349,14 +349,32 @@ animations instead of its reanimation:
 - **Heavy Weapons Guy** (on the Football Zombie, dancing): as fast, no helmet,
   1,300 health, eats the same, drawn a fifth bigger. He has no death animation
   of his own: he topples over backwards, bounces once and fades.
-Two more, whose art goes in `assets/coop/spy` and `assets/coop/soldier`
-(drawn as the zombie underneath until it does):
-- **Spy** (on the Digger): walks in cloaked -- a faint shimmer, untouchable --
-  and uncloaks at the far left of the lawn, attacking your plants from behind.
-  500 health. In numbers in Red Spy in the Base; also in 9 and 10.
-- **Soldier** (on the Buckethead, the bucket his helmet): walks at you and
-  swings a shovel while eating. 500 body plus the bucket's 1,100. In most
-  levels.
+Two more, drawn from `assets/coop/spy` and `assets/coop/soldier` (each
+about the Heavy's size, with their own hit sounds):
+- **Spy** (on the Digger): crosses the lawn cloaked -- unseen, untouchable --
+  then fades in at the far left with his uncloak sound and walks right,
+  stabbing plants from behind a quarter harder than a Digger bites. 500
+  health. Lawn mowers ignore him. First on level 3, in numbers on level 7,
+  sparse in 6, 8, 9 and 10.
+- **Soldier** (on the Buckethead, his helmet the bucket): walks at you and
+  swings his shovel while eating. 1,000 health (300 body, 700 helmet),
+  between a Conehead and a Buckethead. In most levels, more from level 4.
+
+**Protect the Engineer's sentry** (levels 3 and 7): the Engineer's Sentry
+Turret stands built at column 3, row 4 (level 7: column 3, row 2). It cannot
+be dug up; if it is destroyed it blows up (harmlessly) and the level is lost.
+Beating level 3 wins the Sentry Turret: 300 sun, a quarter slower than a
+Cattail, about a Peashooter's size, firing bullets that home only within 60
+degrees of straight ahead and fly on straight past that. Every Sentry Turret
+blows up harmlessly when destroyed.
+
+**TF2 bowling**: the Wall-nuts are rockets (the Explode-o-nut a crit rocket),
+with a smoke trail and a launch sound; they bounce and blow up as the nuts do.
+
+Yeti Season and Everything, Everywhere are at night (no graves, and the sky
+still drops sun); the boss level too. Repainted headwear in
+`assets/coop/headwear-originals` replaces the game's in Adventure Plus.
+
 Heavies turn up in every level but bowling and the boss (a few early on, in
 numbers in 6 and 10); tanks in 7, 8, 9 and 10. Bowling ends with one
 Gargantuar in its final wave.

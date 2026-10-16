@@ -1,8 +1,10 @@
 Zombie headwear, as the game draws it
 =====================================
 
-These are copies of the game's own head pieces, for repainting. Nothing in
-this folder is used by the game: it is only for you to work from.
+Your repainted head pieces: every PNG directly in this folder replaces the
+game's piece of the same name in Adventure Plus (CMakeLists.txt reads them,
+with assets/coop/zombie-parts). The game's own are kept in save/, which the
+game does not read -- copy one back here to undo a change.
 
   zombie_cone1/2/3              Conehead: whole, dented, nearly gone
   zombie_bucket1/2/3            Buckethead: the same three stages

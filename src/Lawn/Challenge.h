@@ -141,6 +141,11 @@ public:
 	void                    DrawStormNight(Graphics* g);
 	void                    UpdateStormyNight();
 	void                    UpdateDemomanStorm();
+	void                    UpdateEngineerSentry();
+	bool                    IsEngineerSentry(Plant* thePlant);
+	// Adventure Plus's sentry levels: the Engineer's Sentry Turret to protect.
+	PlantID                 mCoopSentryID = PlantID::PLANTID_NULL;
+	int32_t                 mCoopSentryLostCounter = -1;  // counting down to the loss once it is gone
 	void                    DrawDemomanStorm(Graphics* g);
 	void                    InitLevel();
 	void                    SpawnZombieWave();
