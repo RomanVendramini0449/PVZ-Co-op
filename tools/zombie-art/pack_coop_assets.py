@@ -51,7 +51,10 @@ SOUNDS = {
     'legend_charge':      ('newsoundsandsongs/legend_boss_charge.wav', -19.0, 'gargantuar thump'),
     'legend_explode':     ('newsoundsandsongs/legend_explode.wav', -13.5, 'explosion / doom-shroom'),
     'legend_shoot':       ('newsoundsandsongs/legend_shoot.wav', -18.0, 'cherry bomb launch'),
-    'legend_boss_music':  ('newsoundsandsongs/legend_boss_music.mp3', -24.5, 'mainmusic.mo3'),
+    # The final boss's tune (mainmusic.mo3 from order 0x9E) as the game plays
+    # it: SDL-Mixer-X gives a tracker stream at full volume +6 dB of master
+    # gain, which a plain recording does not get, so it is matched here.
+    'legend_boss_music':  ('newsoundsandsongs/legend_boss_music.mp3', -16.2, 'Brainiac Maniac, in game'),
 }
 
 
