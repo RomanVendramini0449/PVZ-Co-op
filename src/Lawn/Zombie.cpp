@@ -114,7 +114,7 @@ constinit const ZombieDefinition gZombieDefs[NUM_ZOMBIE_TYPES] = {
 	{ .mZombieType = ZOMBIE_TALLNUT_HEAD, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 4, .mStartingLevel = 99, .mFirstAllowedWave = 10, .mPickWeight = 2000, .mZombieName = "ZOMBIE" },
 	{ .mZombieType = ZOMBIE_REDEYE_GARGANTUAR, .mReanimationType = REANIM_GARGANTUAR, .mZombieValue = 10, .mStartingLevel = 48, .mFirstAllowedWave = 15, .mPickWeight = 6000, .mZombieName = "REDEYED_GARGANTUAR" },
 	{ .mZombieType = ZOMBIE_COOP_TANK, .mReanimationType = REANIM_ZOMBIE_ZAMBONI, .mZombieValue = 7, .mStartingLevel = 99, .mFirstAllowedWave = 6, .mPickWeight = 1500, .mZombieName = "TANK" },
-	{ .mZombieType = ZOMBIE_COOP_HEAVY, .mReanimationType = REANIM_ZOMBIE_FOOTBALL, .mZombieValue = 5, .mStartingLevel = 99, .mFirstAllowedWave = 3, .mPickWeight = 2000, .mZombieName = "HEAVY" },
+	{ .mZombieType = ZOMBIE_COOP_HEAVY, .mReanimationType = REANIM_ZOMBIE_FOOTBALL, .mZombieValue = 5, .mStartingLevel = 99, .mFirstAllowedWave = 3, .mPickWeight = 2000, .mZombieName = "HEAVY_WEAPONS_GUY" },
 };
 
 static ZombieType gBossZombieList[] = {
@@ -11221,6 +11221,7 @@ void Zombie::DrawCoopKind(Graphics* g)
 {
 	const bool aTank = mCoopKind == CoopZombieKind::COOP_KIND_TANK;
 	const char* aSheet = aTank ? "tank" : "heavy";
+	const float aScale = aTank ? 1.0f : 1.2f;  // the Heavy is a big man
 	const int aFrames = CoopArt::SheetFrames(aSheet);
 	if (aFrames <= 0)
 		return;
@@ -11270,14 +11271,14 @@ void Zombie::DrawCoopKind(Graphics* g)
 	const bool aFlip = mMindControlled;
 	if (aFlip)
 		aX = (aTank ? 153.0f : 120.0f) - aX;
-	CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX, aY, 1.0f, aFlip, aFlip ? -aRotation : aRotation);
+	CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX, aY, aScale, aFlip, aFlip ? -aRotation : aRotation);
 
 	// A hit flashes white, the way a zombie does.
 	if (mJustGotShotCounter > 0 && !aBurned)
 	{
 		aG.SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
 		aG.SetColor(Color(255, 255, 255, std::min(mJustGotShotCounter * 10, 120) * aAlpha / 255));
-		CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX, aY, 1.0f, aFlip, aFlip ? -aRotation : aRotation);
+		CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX, aY, aScale, aFlip, aFlip ? -aRotation : aRotation);
 	}
 }
 

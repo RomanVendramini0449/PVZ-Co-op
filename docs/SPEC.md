@@ -330,6 +330,14 @@ Fortress Bowling (Wall-nut Bowling; footballs always take three balls),
 10 Everything, Everywhere, and 11 Legendary Demoman (below). Budgets are
 bigger than the campaign's, and zombies have a quarter more health.
 
+Zombie budgets follow the campaign's replay formula (2/5 of a point a wave)
+plus a small per-level bonus and the zombies each level sends on purpose:
+about one and a half to two and a half times a replayed campaign level, and
+zombies have a tenth more health. Bowling follows the campaign's own bowling
+budget, stretched over 20 waves; its footballs come only on purpose (six in
+all, three balls each). The arithmetic is in
+`tools/zombie-art/wave_model.py`.
+
 Two enemies of its own, spawned as `ZOMBIE_COOP_TANK` / `ZOMBIE_COOP_HEAVY`
 and turned into the zombie each is built on, with `Zombie::mCoopKind` saying
 what it really is (so they keep that zombie's rules), drawn from packed
@@ -338,9 +346,9 @@ animations instead of its reanimation:
   ice, has 1,800 health, and blows up when beaten. If it reaches the end of its
   lane it blows itself up instead of getting in: the lane's lawn mower goes, and
   every plant within one square of it.
-- **Dancing Heavy** (on the Football Zombie): as fast, no helmet, 1,300 health,
-  eats the same. He has no death animation of his own: he topples over
-  backwards, bounces once and fades.
+- **Heavy Weapons Guy** (on the Football Zombie, dancing): as fast, no helmet,
+  1,300 health, eats the same, drawn a fifth bigger. He has no death animation
+  of his own: he topples over backwards, bounces once and fades.
 The Heavy turns up from level 2 (a few) and in 6, 7, 9 and 10; the tank in 8
 and 10.
 
@@ -352,15 +360,20 @@ the Starfruit's five directions, firing goblin heads).
 **Level 11, Legendary Demoman** (`CoopDemoman.cpp`): a boss fight at night in
 the rain, with thunder. Dave's talk ends with a Bungee Zombie taking him, his
 name replaces Ready-Set-Plant, and his own music plays. The conveyor brings
-Luca (no sun here), Noah, GRS, Jalapenos and Ice-shrooms. He holds a 3x3 block
-on the right, where nothing can be planted, has 120,000 health (twice
-Roman's), and between rests he lobs bombs at plants (3-5, later 6-8; each
-destroys the plant it lands on), hops into the lawn and flattens a 3x3
-square, charges down a lane and comes back in from the right, and late in the
-fight throws a doom grenade that wipes a 6x6 square after a fuse. An
-Ice-shroom freezes him in place and freezes his bombs in the air so they burst
-harmlessly. Dancing Heavies come in every so often; at half health he calls
-in two 4,000-health tanks and waits for them. He topples over and blows up.
+Luca (no sun here), Noah, GRS, Jalapenos and Ice-shrooms. He stands in a 3x3
+block on the right and flattens anything planted under him; everywhere else
+can be planted, his other lanes' columns included. He has 40,000 health
+(tuned so the belt's plant every 4 s outpaces what he destroys), rests 6.5-9.5 s
+between attacks (4.5-7 s below half health), and every attack is marked on the
+lawn first:
+- bombs: 3 (later 4-5), most at random squares, one in four at a plant;
+- a hop onto a marked 3x3, which he flattens, then back;
+- a charge down a marked lane, off the left edge and back in from the right;
+- below half health, a doom grenade that wipes the marked 5x5 after a fuse.
+An Ice-shroom freezes him in place (an attack he is winding up waits) and
+freezes his bombs, which burst harmlessly. A light Heavy Weapons Guy (900)
+comes every 18-26 s; at half health he calls in two 2,500-health tanks and
+waits for them. He topples over and blows up.
 
 Losing in Adventure Plus has no house to walk into: the left side of the lawn
 blows up, lane by lane and then all at once, and the game is over.

@@ -2310,9 +2310,16 @@ void Challenge::PlantAdded(Plant* thePlant)
 
 PlantingReason Challenge::CanPlantAt(int theGridX, int theGridY, SeedType theSeedType)
 {
-	if ((mApp->IsCoopRomanLevel() || mApp->IsLegendaryDemomanLevel()) && theGridX >= ROMAN_FIRST_COL)
+	if (mApp->IsCoopRomanLevel() && theGridX >= ROMAN_FIRST_COL)
 	{
-		return PLANTING_NOT_HERE;  // the boss's ground
+		return PLANTING_NOT_HERE;  // Roman's ground
+	}
+	if (mApp->IsLegendaryDemomanLevel())
+	{
+		// Anywhere but under the Demoman himself.
+		Zombie* aBoss = mBoard->GetBossZombie();
+		if (aBoss && aBoss->IsCoopDemoman() && aBoss->CoopDemoBlocksSquare(theGridX, theGridY))
+			return PLANTING_NOT_HERE;
 	}
 	if (mApp->IsWallnutBowlingLevel())
 	{

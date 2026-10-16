@@ -893,6 +893,11 @@ bool Plant::FindStarFruitTarget()
 		{
 			if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && !aZombie->IsCoopBoss() && mPlantCol >= 5)
 				return true;
+			// Roman and the Demoman are three lanes tall: within a lane of
+			// those, the diagonal shots reach him.
+			if (aZombie->IsCoopBoss() && std::abs(aZombie->RowDeviationFrom(mRow)) <= 1 &&
+				aZombieRect.mX + aZombieRect.mWidth / 2 > aCenterStarX)
+				return true;
 
 			if (aZombie->mRow == mRow)
 			{

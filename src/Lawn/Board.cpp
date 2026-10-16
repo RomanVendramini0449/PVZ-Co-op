@@ -755,9 +755,16 @@ void Board::PickZombieWaves()
 		}
 		else if (mApp->IsAdventurePlusLevel())
 		{
-			// Adventure Plus assumes you own everything, so it ramps much
-			// faster than the campaign, and each level starts stronger.
-			aZombiePoints = aWave * 2 / 3 + 2 + GetAdventurePlusLevel(mApp->mCoopPlusLevel).mPointsBonus;
+			// Adventure Plus: the campaign's replay budget (a finished
+			// adventure's 2/5 a wave), plus each level's bonus and the zombies
+			// it sends on purpose -- about one and a half to two and a half
+			// times a replayed campaign level. Bowling multiplies by four
+			// below, so it follows the campaign's own bowling budget instead,
+			// stretched over twice the waves.
+			if (mApp->IsWallnutBowlingLevel())
+				aZombiePoints = aWave / 5 + 1;
+			else
+				aZombiePoints = aWave * 2 / 5 + 1 + GetAdventurePlusLevel(mApp->mCoopPlusLevel).mPointsBonus;
 		}
 		else
 		{
@@ -939,36 +946,37 @@ void Board::PickZombieWaves()
 // in numbers.
 static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
 	{ "You're On Your Way to Dust Bowl",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL }, 3, 1,
-		{ { ZOMBIE_PAIL, 2, 1, 1, 4 } }, 1 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL }, 3, 0,
+		{ { ZOMBIE_PAIL, 3, 2, 1, 2 } }, 1 },
 	{ "Yummy, Yummy Brains",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL }, 4, 1,
-		{ { ZOMBIE_FOOTBALL, 4, 2, 1, 3 }, { ZOMBIE_PAIL, 3, 2, 1, 2 }, { ZOMBIE_COOP_HEAVY, 9, 9, 1, 1 } }, 3 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL }, 4, 0,
+		{ { ZOMBIE_FOOTBALL, 5, 3, 1, 2 }, { ZOMBIE_PAIL, 3, 3, 1, 1 }, { ZOMBIE_COOP_HEAVY, 9, 9, 1, 1 } }, 3 },
 	{ "Up and Under",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_LADDER, ZOMBIE_DIGGER }, 5, 2,
-		{ { ZOMBIE_LADDER, 3, 1, 1, 3 }, { ZOMBIE_DIGGER, 5, 3, 1, 3 } }, 2 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_LADDER, ZOMBIE_DIGGER }, 5, 1,
+		{ { ZOMBIE_LADDER, 4, 2, 1, 2 }, { ZOMBIE_DIGGER, 6, 4, 1, 2 } }, 2 },
 	{ "Yeti Season",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_YETI }, 4, 1,
-		{ { ZOMBIE_YETI, 1, 2, 1, 4 } }, 1 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_YETI }, 4, 0,
+		{ { ZOMBIE_YETI, 2, 3, 1, 2 } }, 1 },
+	// Footballs only come on purpose here: each one takes three balls.
 	{ "Team Fortress Bowling",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL }, 5, 1,
-		{ { ZOMBIE_FOOTBALL, 3, 1, 1, 4 } }, 1 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_NEWSPAPER }, 4, 0,
+		{ { ZOMBIE_FOOTBALL, 6, 4, 1, 1 } }, 1 },
 	{ "Heavy Weapons Guy",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY }, 6, 2,
-		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 1 }, { ZOMBIE_LADDER, 3, 2, 1, 2 }, { ZOMBIE_COOP_HEAVY, 3, 2, 1, 3 } }, 3 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY }, 6, 1,
+		{ { ZOMBIE_GARGANTUAR, 9, 5, 1, 1 }, { ZOMBIE_LADDER, 4, 3, 1, 1 }, { ZOMBIE_COOP_HEAVY, 4, 3, 1, 2 } }, 3 },
 	{ "Red Spy in the Base",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_COOP_HEAVY }, 8, 3,
-		{ { ZOMBIE_FOOTBALL, 3, 2, 1, 3 }, { ZOMBIE_POLEVAULTER, 2, 2, 1, 2 } }, 2 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_COOP_HEAVY }, 8, 1,
+		{ { ZOMBIE_FOOTBALL, 5, 3, 1, 2 }, { ZOMBIE_POLEVAULTER, 3, 3, 1, 2 } }, 2 },
 	{ "The Robots Are Coming",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI, ZOMBIE_COOP_TANK }, 6, 3,
-		{ { ZOMBIE_ZAMBONI, 5, 3, 1, 2 }, { ZOMBIE_FOOTBALL, 4, 3, 1, 2 }, { ZOMBIE_COOP_TANK, 6, 4, 1, 2 } }, 3 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI, ZOMBIE_COOP_TANK }, 6, 1,
+		{ { ZOMBIE_ZAMBONI, 7, 4, 1, 1 }, { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 8, 5, 1, 1 } }, 3 },
 	{ "Tunnel Vision",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_DIGGER, ZOMBIE_POGO, ZOMBIE_JACK_IN_THE_BOX, ZOMBIE_COOP_HEAVY }, 7, 3,
-		{ { ZOMBIE_DIGGER, 3, 1, 2, 4 }, { ZOMBIE_POGO, 5, 3, 1, 2 } }, 2 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_DIGGER, ZOMBIE_POGO, ZOMBIE_JACK_IN_THE_BOX, ZOMBIE_COOP_HEAVY }, 7, 1,
+		{ { ZOMBIE_DIGGER, 4, 2, 1, 2 }, { ZOMBIE_POGO, 6, 4, 1, 1 } }, 2 },
 	{ "Everything, Everywhere",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_DIGGER,
-		  ZOMBIE_ZAMBONI, ZOMBIE_YETI, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_TANK }, 11, 4,
-		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 2 }, { ZOMBIE_COOP_HEAVY, 3, 2, 1, 3 }, { ZOMBIE_COOP_TANK, 6, 4, 1, 2 } }, 3 },
+		  ZOMBIE_ZAMBONI, ZOMBIE_YETI, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_TANK }, 11, 2,
+		{ { ZOMBIE_GARGANTUAR, 10, 5, 1, 1 }, { ZOMBIE_COOP_HEAVY, 5, 3, 1, 2 }, { ZOMBIE_COOP_TANK, 8, 5, 1, 1 } }, 3 },
 	// At night, in the rain: the Legendary Demoman (CoopDemoman.cpp). No
 	// waves -- he sends his own -- so the roster is only for the street.
 	{ "Legendary Demoman",

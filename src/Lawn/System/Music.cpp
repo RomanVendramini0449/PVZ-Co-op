@@ -277,6 +277,11 @@ void Music::PlayFromOffset(MusicFile theMusicFile, int theOffset, double theVolu
 	{
 		bool aNoLoop = theMusicFile == MusicFile::MUSIC_FILE_CREDITS_ZOMBIES_ON_YOUR_LAWN;
 		mMusicInterface->PlayMusic(theMusicFile, theOffset, aNoLoop);
+		// Its own volume to the full, as a tracker tune's is set below; left
+		// alone it starts at the music slider's level, which the slider then
+		// applies again on top, and a quiet recording all but vanishes.
+		aMusicInfo->mVolume = aMusicInfo->mVolumeCap * theVolume;
+		Mix_VolumeMusicStream(aMusicInfo->mHMusic, static_cast<int>(aMusicInfo->mVolume * 128));
 	}
 	else
 	{

@@ -3157,7 +3157,7 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 		aLines = {
 			"Something's different this time, neighbor.",
 			"I can feel it in my bones.",
-			"{SHAKE}...",
+			"{NO_SOUND}...",
 			"Did you hear something?",
 		};
 	}

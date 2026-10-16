@@ -10,19 +10,25 @@
 //
 // He is a ZOMBIE_BOSS like Dr. Zomboss and Roman, so the boss health bar,
 // the award drop and the "everyone else dies with him" ending all come for
-// free; what he does is his own. He stands on the right in a 3x3 block, the
-// way Roman does, and between rests he
-//   - lobs a volley of bombs at the plants, each one taking out the plant it
-//     lands on (3-5 bombs, 6-8 once he is down to half health);
-//   - hops into the lawn, flattens a 3x3 square, and hops back;
-//   - charges down one lane, flattening it, runs off the left edge and
-//     strolls back in from the right;
+// free; what he does is his own. He stands on the right in a 3x3 block,
+// flattening whatever is planted under him, and between rests he
+//   - lobs a volley of bombs, mostly at random squares (3, then 4-5 once he
+//     is down to half health); each takes out whatever it lands on;
+//   - marks a 3x3 square, hops onto it, flattens it, and hops back;
+//   - marks a lane, charges down it flattening it, runs off the left edge
+//     and strolls back in from the right;
 //   - late in the fight, throws a doom grenade: it lands, fizzes, and wipes
-//     out a 6x6 square.
-// An Ice-shroom freezes him where he stands (a volley he has started still
-// comes) and freezes every bomb in the air, which then bursts harmlessly.
-// Dancing Heavies come along every so often, and at half health he calls in
-// two armoured tanks and waits for them to do their job.
+//     out the 5x5 square it marks.
+// Every attack is marked on the lawn before it lands. An Ice-shroom freezes
+// him where he stands -- an attack he is winding up waits, though a volley
+// he has started still comes -- and freezes every bomb out, which then bursts
+// harmlessly. Heavy Weapons Guys come along every so often, and at half
+// health he calls in two tanks and waits for them to do their job.
+//
+// Balance (single player; co-op's two half-rate belts deliver the same): the
+// belt brings a plant about every 4 s, so he is tuned to destroy well under
+// that -- an attack every 8-12 s, around 1.5-3 plants each -- and his health
+// is about four minutes of a typical lawn's fire.
 //
 // Everything here runs on the gameplay generator, so both co-op players see
 // the same fight; drawing uses none.
@@ -41,6 +47,7 @@
 #include "graphics/Graphics.h"
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 using namespace Sexy;
 
@@ -52,10 +59,11 @@ namespace
 		LD_IDLE,
 		LD_MOVE,           // sliding up or down to the row his next attack needs
 		LD_SHOOT,          // a bomb volley, one throw at a time
+		LD_HOP_AIM,        // the square he will land on is marked
 		LD_HOP_OUT,
 		LD_HOP_LANDED,
 		LD_HOP_BACK,
-		LD_CHARGE_WINDUP,
+		LD_CHARGE_WINDUP,  // the lane is marked
 		LD_CHARGE,
 		LD_CHARGE_RETURN,  // walking back in from the right after a charge
 		LD_DOOM,           // throwing the doom grenade
@@ -71,15 +79,22 @@ namespace
 		ACTION_DOOM,
 	};
 
+	constexpr float SCALE = 1.15f;              // his art, a bit over his 3x3 block
 	constexpr int   HOME_COL = 7;               // the middle of his block: columns 6-8
 	constexpr int   CENTER_ROW = 2;
+	constexpr float BLOCK_HALF_WIDTH = 100.0f;  // a column's middle this close to him is under him
 	constexpr int   ENTER_TICKS = 290;          // his spawn animation, 58 frames at 20 a second
+	constexpr int   REST_MIN_TICKS = 650;       // between attacks
+	constexpr int   REST_MAX_TICKS = 950;
+	constexpr int   LATE_REST_MIN_TICKS = 450;  // once he is down to half
+	constexpr int   LATE_REST_MAX_TICKS = 700;
 	constexpr int   SHOOT_TICKS = 50;           // one throw
 	constexpr int   SHOOT_RELEASE_TICK = 28;    // the bomb leaves his hand
+	constexpr int   HOP_AIM_TICKS = 140;
 	constexpr int   HOP_TICKS = 110;
 	constexpr int   HOP_LANDED_TICKS = 130;
 	constexpr float HOP_HEIGHT = 230.0f;
-	constexpr int   WINDUP_TICKS = 80;
+	constexpr int   WINDUP_TICKS = 140;
 	constexpr float CHARGE_SPEED = 5.0f;        // pixels a tick
 	constexpr float RETURN_SPEED = 2.5f;
 	constexpr float MOVE_SPEED = 2.5f;
@@ -87,19 +102,21 @@ namespace
 	constexpr int   DYING_FALL_START = 160;
 	constexpr int   DYING_FALL_TICKS = 70;
 	constexpr int   DYING_BOOM = DYING_FALL_START + DYING_FALL_TICKS;
-	constexpr int   BOMB_MIN_FLIGHT = 95;
-	constexpr int   BOMB_MAX_FLIGHT = 125;
+	constexpr int   BOMB_MIN_FLIGHT = 100;
+	constexpr int   BOMB_MAX_FLIGHT = 130;
 	constexpr float BOMB_ARC = 170.0f;
+	constexpr int   BOMB_AIMED_ONE_IN = 4;      // one bomb in four goes for a plant; the rest land anywhere
 	constexpr int   DOOM_FLIGHT = 160;
 	constexpr float DOOM_ARC = 260.0f;
-	constexpr int   DOOM_FUSE = 260;            // on the ground, fizzing, before it goes off
-	constexpr int   DOOM_COOLDOWN = 3500;
+	constexpr int   DOOM_FUSE = 320;            // on the ground, fizzing, before it goes off
+	constexpr int   DOOM_REACH = 2;             // squares each way: a 5x5
+	constexpr int   DOOM_COOLDOWN = 4500;
 	constexpr int   BOMB_FROZEN_TICKS = 70;
-	constexpr int   FIRST_SUMMON_TICKS = 1200;
-	constexpr int   SUMMON_MIN_TICKS = 1500;
-	constexpr int   SUMMON_MAX_TICKS = 2200;
+	constexpr int   FIRST_SUMMON_TICKS = 1600;
+	constexpr int   SUMMON_MIN_TICKS = 1800;
+	constexpr int   SUMMON_MAX_TICKS = 2600;
 	constexpr int   TANK_WAIT_MAX_TICKS = 3500;
-	constexpr int   PLANT_COLS = 6;             // he keeps columns 6-8 to himself
+	constexpr int   PLANT_COLS = 6;             // the lawn left of his home block
 
 	float RowHeight(Board* theBoard)
 	{
@@ -135,6 +152,25 @@ namespace
 		theX = theBomb.mFromX + (theBomb.mToX - theBomb.mFromX) * t;
 		theY = theBomb.mFromY + (theBomb.mToY - theBomb.mFromY) * t - 4.0f * anArc * t * (1.0f - t);
 	}
+
+	// Squares about to be hit, tinted red with an outline, pulsing.
+	void DrawDangerSquares(Graphics* g, Board* theBoard, int theCol0, int theCol1, int theRow0, int theRow1,
+		int thePulse, float theOffsetX, float theOffsetY)
+	{
+		const int aHeight = static_cast<int>(RowHeight(theBoard));
+		for (int aCol = std::max(theCol0, 0); aCol <= std::min(theCol1, 8); aCol++)
+		{
+			for (int aRow = std::max(theRow0, 0); aRow <= std::min(theRow1, 4); aRow++)
+			{
+				const int aX = theBoard->GridToPixelX(aCol, aRow) - static_cast<int>(theOffsetX);
+				const int aY = theBoard->GridToPixelY(aCol, aRow) - static_cast<int>(theOffsetY);
+				g->SetColor(Color(255, 40, 30, 45 + thePulse));
+				g->FillRect(aX + 3, aY + 3, 74, aHeight - 6);
+				g->SetColor(Color(255, 90, 60, 150 + thePulse));
+				g->DrawRect(aX + 3, aY + 3, 73, aHeight - 7);
+			}
+		}
+	}
 }
 
 bool Zombie::IsCoopDemoman()
@@ -165,7 +201,7 @@ void Zombie::InitCoopDemoman()
 	mCoopBossSummonTimer = FIRST_SUMMON_TICKS;
 	mCoopBossNextFire = false;
 	mCoopBossNextAction = ACTION_BOMBS;
-	mCoopBossDoomCooldown = DOOM_COOLDOWN / 2;
+	mCoopBossDoomCooldown = 0;
 	mCoopBossTanksSent = false;
 	mCoopBossAnimTicks = 0;
 	mCoopBossX = IsOnBoard() ? HomeX(mBoard) : 640.0f;
@@ -178,7 +214,7 @@ void Zombie::InitCoopDemoman()
 
 Rect Zombie::GetCoopDemoRect()
 {
-	return Rect(static_cast<int>(mCoopBossX) - 95, static_cast<int>(mCoopBossY) - 280, 190, 270);
+	return Rect(static_cast<int>(mCoopBossX) - 105, static_cast<int>(mCoopBossY) - 320, 210, 310);
 }
 
 bool Zombie::CoopDemoCanBeHit()
@@ -187,6 +223,38 @@ bool Zombie::CoopDemoCanBeHit()
 		return false;
 	// Off the edge of the lawn mid-charge: nothing can reach him there.
 	return mCoopBossX > -40.0f && mCoopBossX < 860.0f;
+}
+
+// Is he standing on this square? Then nothing can be planted there, and
+// anything already there is flattened (CoopDemoCrushUnderfoot).
+bool Zombie::CoopDemoBlocksSquare(int theCol, int theRow)
+{
+	switch (mCoopBossState)
+	{
+	case LD_HOP_OUT:
+	case LD_HOP_BACK:
+	case LD_CHARGE:
+	case LD_DYING:
+	case LD_GONE:
+		return false;  // in the air, on the run, or going
+	default:
+		break;
+	}
+	return std::abs(CellCenterX(mBoard, theCol) - mCoopBossX) <= BLOCK_HALF_WIDTH && std::abs(theRow - mRow) <= 1;
+}
+
+void Zombie::CoopDemoCrushUnderfoot()
+{
+	for (Plant* aPlant : mBoard->mPlants)
+	{
+		if (aPlant->mDead || !CoopDemoBlocksSquare(aPlant->mPlantCol, aPlant->mRow))
+			continue;
+		mBoard->mPlantsEaten++;
+		if (aPlant->NotOnGround())
+			aPlant->Die();
+		else
+			aPlant->Squish();
+	}
 }
 
 void Zombie::CoopDemoSetState(int theState, int theTimer)
@@ -199,17 +267,17 @@ void Zombie::CoopDemoSetState(int theState, int theTimer)
 void Zombie::CoopDemoGoIdle()
 {
 	const bool aLate = mBodyHealth * 2 <= mBodyMaxHealth;
-	CoopDemoSetState(LD_IDLE, aLate ? RandRangeInt(180, 320) : RandRangeInt(280, 450));
+	CoopDemoSetState(LD_IDLE, aLate ? RandRangeInt(LATE_REST_MIN_TICKS, LATE_REST_MAX_TICKS) : RandRangeInt(REST_MIN_TICKS, REST_MAX_TICKS));
 }
 
-// A plant's square, at random, for a bomb or a hop -- like a Bungee Zombie
-// picking its target. theTaken lists squares already aimed at (col*8+row).
+// A plant's square, at random -- like a Bungee Zombie picking its target.
+// theTaken lists squares already aimed at (col*8+row).
 static bool PickPlantSquare(Board* theBoard, int& theCol, int& theRow, const std::vector<int>& theTaken)
 {
 	std::vector<int> aSquares;
 	for (Plant* aPlant : theBoard->mPlants)
 	{
-		if (aPlant->mDead || aPlant->mPlantCol >= PLANT_COLS)
+		if (aPlant->mDead)
 			continue;
 		const int aKey = aPlant->mPlantCol * 8 + aPlant->mRow;
 		if (std::find(aSquares.begin(), aSquares.end(), aKey) == aSquares.end() &&
@@ -229,30 +297,27 @@ static bool PickPlantSquare(Board* theBoard, int& theCol, int& theRow, const std
 void Zombie::CoopDemoPickAttack()
 {
 	const bool aLate = mBodyHealth * 2 <= mBodyMaxHealth;
-	int aCol, aRow;
-	const bool aHasPlants = PickPlantSquare(mBoard, aCol, aRow, {});
-
-	int aBombs = 40, aHop = aHasPlants ? 25 : 0, aCharge = 25;
-	int aDoom = (aLate && mCoopBossDoomCooldown <= 0) ? 20 : 0;
+	const int aBombs = 45, aHop = 20, aCharge = 20;
+	const int aDoom = (aLate && mCoopBossDoomCooldown <= 0) ? 15 : 0;
 	int aRoll = Rand(aBombs + aHop + aCharge + aDoom);
 
 	if ((aRoll -= aBombs) < 0)
 	{
 		mCoopBossNextAction = ACTION_BOMBS;
-		mCoopBossAttacksLeft = aLate ? RandRangeInt(6, 8) : RandRangeInt(3, 5);
+		mCoopBossAttacksLeft = aLate ? RandRangeInt(4, 5) : 3;
 		mCoopBossTargetRow = RandRangeInt(1, 3);
 		CoopDemoSetState(LD_MOVE, 0);
 	}
 	else if ((aRoll -= aHop) < 0)
 	{
-		// The 3x3 he lands on is centred on the plant, kept on the lawn.
-		mCoopBossAttackLane = std::clamp(aCol, 1, PLANT_COLS - 1);
-		mCoopBossTargetRow = std::clamp(aRow, 1, 3);
+		// A random 3x3 of the lawn, marked before he jumps.
+		mCoopBossAttackLane = RandRangeInt(1, PLANT_COLS - 2);
+		mCoopBossTargetRow = RandRangeInt(1, 3);
 		mCoopBossFromX = mCoopBossX;
 		mCoopBossFromY = mCoopBossY;
 		mCoopBossToX = CellCenterX(mBoard, mCoopBossAttackLane);
 		mCoopBossToY = FeetY(mBoard, mCoopBossTargetRow);
-		CoopDemoSetState(LD_HOP_OUT, HOP_TICKS);
+		CoopDemoSetState(LD_HOP_AIM, HOP_AIM_TICKS);
 	}
 	else if ((aRoll -= aCharge) < 0)
 	{
@@ -285,11 +350,12 @@ void Zombie::CoopDemoThrowBomb(bool theDoom)
 	int aCol, aRow;
 	if (theDoom)
 	{
-		aCol = RandRangeInt(2, 3);
-		aRow = CENTER_ROW;
+		aCol = RandRangeInt(1, PLANT_COLS - 2);
+		aRow = RandRangeInt(1, 3);
 	}
-	else if (!PickPlantSquare(mBoard, aCol, aRow, aTaken))
+	else if (Rand(BOMB_AIMED_ONE_IN) != 0 || !PickPlantSquare(mBoard, aCol, aRow, aTaken))
 	{
+		// Anywhere on the lawn left of him.
 		aCol = Rand(PLANT_COLS);
 		aRow = Rand(5);
 	}
@@ -300,8 +366,8 @@ void Zombie::CoopDemoThrowBomb(bool theDoom)
 	aSlot->mCol = aCol;
 	aSlot->mRow = aRow;
 	// From his raised hand.
-	aSlot->mFromX = mCoopBossX - 55.0f;
-	aSlot->mFromY = mCoopBossY - 215.0f;
+	aSlot->mFromX = mCoopBossX - 55.0f * SCALE;
+	aSlot->mFromY = mCoopBossY - 215.0f * SCALE;
 	aSlot->mToX = CellCenterX(mBoard, aCol);
 	aSlot->mToY = CellCenterY(mBoard, aCol, aRow) + 10.0f;
 	aSlot->mFlightTicks = theDoom ? DOOM_FLIGHT : RandRangeInt(BOMB_MIN_FLIGHT, BOMB_MAX_FLIGHT);
@@ -331,8 +397,7 @@ void Zombie::CoopDemoBombLands(CoopDemoBomb& theBomb)
 	const int aRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 0);
 	if (theBomb.mDoom)
 	{
-		// Six squares across: three to the left of where it fell, two to the right.
-		CoopDemoDestroyPlants(theBomb.mCol - 3, theBomb.mCol + 2, theBomb.mRow - 3, theBomb.mRow + 2, false);
+		CoopDemoDestroyPlants(theBomb.mCol - DOOM_REACH, theBomb.mCol + DOOM_REACH, theBomb.mRow - DOOM_REACH, theBomb.mRow + DOOM_REACH, false);
 		mApp->AddPvzpParticle(theBomb.mToX, theBomb.mToY, aRenderOrder, ParticleEffect::PARTICLE_DOOM);
 		mApp->PlaySample(SOUND_DOOMSHROOM);
 		mBoard->ShakeBoard(3, -4);
@@ -413,10 +478,20 @@ void Zombie::CoopDemoSendTanks()
 			aTank->mBodyMaxHealth = COOP_DEMO_TANK_HEALTH;
 		}
 	}
-	for (int i = 0; i < 2; i++)
-		mBoard->AddZombieInRow(ZombieType::ZOMBIE_COOP_HEAVY, Rand(5), 0);
+	CoopDemoSummonHeavy();
 	mBoard->DisplayAdvice("The Demoman called in the tanks!", MessageStyle::MESSAGE_STYLE_HINT_FAST, AdviceType::ADVICE_NONE);
 	CoopDemoSetState(LD_WAIT_TANKS, TANK_WAIT_MAX_TICKS);
+}
+
+// His Heavy Weapons Guys are lighter than the ones in the other levels: they
+// come while everything else is going on.
+void Zombie::CoopDemoSummonHeavy()
+{
+	if (Zombie* aHeavy = mBoard->AddZombieInRow(ZombieType::ZOMBIE_COOP_HEAVY, Rand(5), 0))
+	{
+		aHeavy->mBodyHealth = COOP_DEMO_HEAVY_HEALTH;
+		aHeavy->mBodyMaxHealth = COOP_DEMO_HEAVY_HEALTH;
+	}
 }
 
 bool Zombie::CoopDemoTanksAlive()
@@ -490,15 +565,18 @@ void Zombie::UpdateCoopDemoman()
 	if (mCoopBossDoomCooldown > 0)
 		mCoopBossDoomCooldown--;
 
-	// Dancing Heavies now and then; two at a time once he is hurting.
+	// A Heavy Weapons Guy now and then.
 	if (mCoopBossState != LD_ENTER && mIceTrapCounter == 0 && --mCoopBossSummonTimer <= 0)
 	{
-		for (int i = 0; i < (aLate ? 2 : 1); i++)
-			mBoard->AddZombieInRow(ZombieType::ZOMBIE_COOP_HEAVY, Rand(5), 0);
+		CoopDemoSummonHeavy();
 		mCoopBossSummonTimer = RandRangeInt(SUMMON_MIN_TICKS, SUMMON_MAX_TICKS);
 	}
 
-	// Frozen: he stands still -- but a volley already under way keeps coming.
+	// Whatever is planted where he stands is flattened.
+	CoopDemoCrushUnderfoot();
+
+	// Frozen: he stands still, and whatever he was winding up waits -- but a
+	// volley already under way keeps coming.
 	const bool aFrozen = mIceTrapCounter > 0;
 	if (aFrozen && mCoopBossState != LD_SHOOT && mCoopBossState != LD_DOOM)
 		return;
@@ -562,10 +640,15 @@ void Zombie::UpdateCoopDemoman()
 		{
 			CoopDemoThrowBomb(true);
 			mCoopBossDoomCooldown = DOOM_COOLDOWN;
-			mBoard->DisplayAdvice("DOOM GRENADE! Freeze it!", MessageStyle::MESSAGE_STYLE_HINT_FAST, AdviceType::ADVICE_NONE);
+			mBoard->DisplayAdvice("DOOM GRENADE! Freeze it with an Ice-shroom!", MessageStyle::MESSAGE_STYLE_HINT_FAST, AdviceType::ADVICE_NONE);
 		}
 		if (mCoopBossTimer <= 0)
 			CoopDemoGoIdle();
+		break;
+
+	case LD_HOP_AIM:
+		if (--mCoopBossTimer <= 0)
+			CoopDemoSetState(LD_HOP_OUT, HOP_TICKS);
 		break;
 
 	case LD_HOP_OUT:
@@ -580,7 +663,7 @@ void Zombie::UpdateCoopDemoman()
 		mApp->PlayFoley(FoleyType::FOLEY_THUMP);
 		if (mCoopBossState == LD_HOP_OUT)
 		{
-			// Lands like the bus: everything under him is flattened.
+			// Lands like the bus: the marked square is flattened.
 			CoopDemoDestroyPlants(mCoopBossAttackLane - 1, mCoopBossAttackLane + 1, mCoopBossTargetRow - 1, mCoopBossTargetRow + 1, true);
 			CoopArt::PlayPackedSound("legend_explode");
 			mBoard->ShakeBoard(4, -6);
@@ -622,7 +705,7 @@ void Zombie::UpdateCoopDemoman()
 			if (aPlant->mDead || aPlant->mRow != mCoopBossTargetRow)
 				continue;
 			const float aPlantX = CellCenterX(mBoard, aPlant->mPlantCol);
-			if (aPlantX > mCoopBossX - 90.0f && aPlantX < mCoopBossX + 20.0f)
+			if (aPlantX > mCoopBossX - 100.0f && aPlantX < mCoopBossX + 20.0f)
 			{
 				mBoard->mPlantsEaten++;
 				if (aPlant->NotOnGround())
@@ -633,7 +716,7 @@ void Zombie::UpdateCoopDemoman()
 		}
 		if (mCoopBossAnimTicks % 25 == 0)
 			mBoard->ShakeBoard(1, -2);
-		if (mCoopBossX < -220.0f)
+		if (mCoopBossX < -240.0f)
 		{
 			// Off the left edge; back in from the right, in the middle.
 			mCoopBossX = 1000.0f;
@@ -663,6 +746,32 @@ void Zombie::UpdateCoopDemoman()
 
 void Zombie::DrawCoopDemoman(Graphics* g)
 {
+	// What is about to be hit, marked on the lawn under him.
+	if (IsOnBoard())
+	{
+		const int aPulse = static_cast<int>(45.0 * (0.5 + 0.5 * sin(mCoopBossAnimTicks * 0.25)));
+		Graphics aMarkG(*g);
+		if (mCoopBossState == LD_HOP_AIM || mCoopBossState == LD_HOP_OUT)
+		{
+			DrawDangerSquares(&aMarkG, mBoard, mCoopBossAttackLane - 1, mCoopBossAttackLane + 1,
+				mCoopBossTargetRow - 1, mCoopBossTargetRow + 1, aPulse, static_cast<float>(mX), static_cast<float>(mY));
+		}
+		else if (mCoopBossState == LD_CHARGE_WINDUP || mCoopBossState == LD_CHARGE)
+		{
+			const int aLastCol = std::clamp(static_cast<int>((mCoopBossX - 40.0f) / 80.0f), 0, 8);
+			DrawDangerSquares(&aMarkG, mBoard, 0, aLastCol, mCoopBossTargetRow, mCoopBossTargetRow, aPulse,
+				static_cast<float>(mX), static_cast<float>(mY));
+		}
+		for (const CoopDemoBomb& aBomb : mCoopBombs)
+		{
+			if (aBomb.mActive && aBomb.mDoom && aBomb.mFrozen == 0)
+			{
+				DrawDangerSquares(&aMarkG, mBoard, aBomb.mCol - DOOM_REACH, aBomb.mCol + DOOM_REACH,
+					aBomb.mRow - DOOM_REACH, aBomb.mRow + DOOM_REACH, aPulse, static_cast<float>(mX), static_cast<float>(mY));
+			}
+		}
+	}
+
 	const char* aSheet = "demo_idle";
 	int aFrame = mCoopBossAnimTicks * 15 / 100;
 	float aRotation = 0.0f;
@@ -732,12 +841,12 @@ void Zombie::DrawCoopDemoman(Graphics* g)
 		if (mIceTrapCounter > 0)
 			aColor = Color(120, 170, 255, anAlpha);
 		aG.SetColor(aColor);
-		CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX - mX, aY - mY, 1.0f, false, aRotation);
+		CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX - mX, aY - mY, SCALE, false, aRotation);
 
-		// Glows: red before a charge, white when hit or going to pieces.
+		// Glows: red before a charge or hop, white when hit or going to pieces.
 		int aGlow = 0;
 		Color aGlowColor(255, 255, 255);
-		if (mCoopBossState == LD_CHARGE_WINDUP)
+		if (mCoopBossState == LD_CHARGE_WINDUP || mCoopBossState == LD_HOP_AIM)
 		{
 			aGlow = 60 + static_cast<int>(90.0 * (0.5 + 0.5 * sin(mCoopBossAnimTicks * 0.4)));
 			aGlowColor = Color(255, 60, 30);
@@ -754,7 +863,7 @@ void Zombie::DrawCoopDemoman(Graphics* g)
 		{
 			aG.SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
 			aG.SetColor(Color(aGlowColor.mRed, aGlowColor.mGreen, aGlowColor.mBlue, aGlow * anAlpha / 255));
-			CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX - mX, aY - mY, 1.0f, false, aRotation);
+			CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX - mX, aY - mY, SCALE, false, aRotation);
 			aG.SetDrawMode(Graphics::DRAWMODE_NORMAL);
 		}
 	}
@@ -766,14 +875,13 @@ void Zombie::DrawCoopDemoman(Graphics* g)
 			continue;
 
 		const bool aLanded = aBomb.mTicks >= aBomb.mFlightTicks;
-		if (!aLanded && aBomb.mFrozen == 0)
+		if (!aLanded && aBomb.mFrozen == 0 && !aBomb.mDoom)
 		{
 			Graphics aTargetG(*g);
 			aTargetG.SetColorizeImages(true);
-			aTargetG.SetColor(aBomb.mDoom ? Color(255, 80, 60, 230) : Color(255, 255, 255, 180));
-			const float aScale = aBomb.mDoom ? 2.2f : 1.0f;
-			const float aW = IMAGE_BUNGEETARGET->mWidth * aScale, aH = IMAGE_BUNGEETARGET->mHeight * aScale;
-			PvzpDrawImageScaledF(&aTargetG, IMAGE_BUNGEETARGET, aBomb.mToX - aW * 0.5f - mX, aBomb.mToY - aH * 0.5f - mY, aScale, aScale);
+			aTargetG.SetColor(Color(255, 255, 255, 200));
+			const float aW = static_cast<float>(IMAGE_BUNGEETARGET->mWidth), aH = static_cast<float>(IMAGE_BUNGEETARGET->mHeight);
+			PvzpDrawImageScaledF(&aTargetG, IMAGE_BUNGEETARGET, aBomb.mToX - aW * 0.5f - mX, aBomb.mToY - aH * 0.5f - mY, 1.0f, 1.0f);
 		}
 
 		float aBombX, aBombY;
