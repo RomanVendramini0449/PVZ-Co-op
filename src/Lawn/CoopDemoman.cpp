@@ -484,8 +484,11 @@ void Zombie::CoopDemoSendTanks()
 	{
 		if (Zombie* aTank = mBoard->AddZombieInRow(ZombieType::ZOMBIE_COOP_TANK, aRow, 0))
 		{
-			aTank->mBodyHealth = COOP_DEMO_TANK_HEALTH;
-			aTank->mBodyMaxHealth = COOP_DEMO_TANK_HEALTH;
+			// His tanks' own health, scaled as the difficulty scaled this
+			// one's (it was made as an ordinary tank): Hard's 1.2x and the
+			// like apply to them too.
+			aTank->mBodyHealth = aTank->mBodyHealth * COOP_DEMO_TANK_HEALTH / COOP_TANK_HEALTH;
+			aTank->mBodyMaxHealth = aTank->mBodyHealth;
 		}
 	}
 	CoopDemoSummonHeavy();
@@ -499,8 +502,9 @@ void Zombie::CoopDemoSummonHeavy()
 {
 	if (Zombie* aHeavy = mBoard->AddZombieInRow(ZombieType::ZOMBIE_COOP_HEAVY, Rand(5), 0))
 	{
-		aHeavy->mBodyHealth = COOP_DEMO_HEAVY_HEALTH;
-		aHeavy->mBodyMaxHealth = COOP_DEMO_HEAVY_HEALTH;
+		// Scaled as the difficulty scaled it, like the tanks above.
+		aHeavy->mBodyHealth = aHeavy->mBodyHealth * COOP_DEMO_HEAVY_HEALTH / COOP_HEAVY_HEALTH;
+		aHeavy->mBodyMaxHealth = aHeavy->mBodyHealth;
 	}
 }
 
