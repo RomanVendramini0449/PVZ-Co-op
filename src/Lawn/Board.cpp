@@ -957,7 +957,8 @@ static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
 	// The Engineer's sentry to protect (Challenge::UpdateEngineerSentry).
 	{ "Up and Under",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_COOP_SOLDIER }, 6, 1,
-		{ { ZOMBIE_LADDER, 4, 2, 1, 2 }, { ZOMBIE_DIGGER, 7, 5, 1, 1 }, { ZOMBIE_COOP_HEAVY, 7, 4, 1, 1 }, { ZOMBIE_COOP_SPY, 4, 4, 1, 1 } }, 4 },
+		// No extra Diggers here: the Spies are what comes from behind.
+		{ { ZOMBIE_LADDER, 4, 2, 1, 2 }, { ZOMBIE_COOP_HEAVY, 7, 4, 1, 1 }, { ZOMBIE_COOP_SPY, 4, 4, 1, 1 } }, 3 },
 	// At night, in a storm.
 	{ "Yeti Season",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_YETI, ZOMBIE_COOP_SOLDIER }, 5, 0,
@@ -975,7 +976,7 @@ static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
 	{ "Red Spy in the Base",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_COOP_HEAVY,
 		  ZOMBIE_COOP_SOLDIER, ZOMBIE_COOP_SPY }, 9, 1,
-		{ { ZOMBIE_COOP_SPY, 3, 2, 1, 3 }, { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 10, 6, 1, 1 }, { ZOMBIE_COOP_SOLDIER, 4, 3, 1, 1 } }, 4 },
+		{ { ZOMBIE_COOP_SPY, 3, 2, 1, 3 }, { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 12, 6, 1, 1 }, { ZOMBIE_COOP_SOLDIER, 4, 3, 1, 1 } }, 4 },
 	{ "The Robots Are Coming",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI, ZOMBIE_COOP_TANK, ZOMBIE_COOP_SOLDIER, ZOMBIE_COOP_SPY }, 8, 1,
 		{ { ZOMBIE_ZAMBONI, 7, 4, 1, 1 }, { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 8, 5, 1, 1 }, { ZOMBIE_COOP_SOLDIER, 4, 3, 1, 1 } }, 4 },

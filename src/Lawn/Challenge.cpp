@@ -68,6 +68,7 @@ constexpr const int STORM_FLASH_TIME = 150;
 constexpr const int DEMO_THUNDER_FLASH_TICKS = 60;
 constexpr const float DEMO_RAIN_VOLUME = 0.35f;  // of the music's volume
 constexpr const float YETI_RAIN_VOLUME = 0.6f;
+constexpr const int ENGINEER_SENTRY_HEALTH = 2000;  // the sentry to protect: half a Wall-nut (4000), a Cattail's 300 seven times
 constexpr const int YETI_DARKNESS = 110;          // Yeti Season's gloom, of 255 (on the night lawn)
 constexpr const int YETI_FOG = 90;                // its fog at the right edge, of 255
 
@@ -218,7 +219,13 @@ void Challenge::StartLevel()
 		int aCol, aRow;
 		GetPlusSentrySquare(mApp->mCoopPlusLevel, aCol, aRow);
 		if (Plant* aSentry = mBoard->AddPlant(aCol, aRow, SEED_SENTRY))
+		{
+			// The Engineer's is built to last -- half a Wall-nut, not a
+			// Cattail's 300 -- so a stray bite or two does not end the level.
+			aSentry->mPlantHealth = ENGINEER_SENTRY_HEALTH;
+			aSentry->mPlantMaxHealth = ENGINEER_SENTRY_HEALTH;
 			mCoopSentryID = static_cast<PlantID>(mBoard->mPlants.DataArrayGetID(aSentry));
+		}
 		mCoopSentryLostCounter = -1;
 		mBoard->DisplayAdvice("Protect the Engineer's sentry!", MESSAGE_STYLE_HINT_LONG, ADVICE_NONE);
 	}

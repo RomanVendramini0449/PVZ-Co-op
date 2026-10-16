@@ -95,6 +95,9 @@ static const unsigned char gPacked30[] = {
 #embed "../../assets/coop/packed/spy_uncloak.ogg"
 };
 static const unsigned char gPacked31[] = {
+#embed "../../assets/coop/packed/turret_fire.ogg"
+};
+static const unsigned char gPacked32[] = {
 #embed "../../assets/coop/packed/legend_boss_music.ogg"
 };
 
@@ -130,7 +133,8 @@ const CoopPackedFile gCoopPackedFiles[] = {
 	{ "soldier_hit", gPacked28, sizeof(gPacked28) },
 	{ "spy_hit", gPacked29, sizeof(gPacked29) },
 	{ "spy_uncloak", gPacked30, sizeof(gPacked30) },
-	{ "legend_boss_music", gPacked31, sizeof(gPacked31) },
+	{ "turret_fire", gPacked31, sizeof(gPacked31) },
+	{ "legend_boss_music", gPacked32, sizeof(gPacked32) },
 	{ nullptr, nullptr, 0 },
 };
 
