@@ -99,6 +99,18 @@ def main(cfg_path, char_path, dave_dir, pak, parts_out, preview_out):
             keep = masks[part] & skin
             owner[masks[part] & ~keep] = ''
             masks[part] = keep
+    # A part can give its dark pixels below a line back to the body -- the
+    # collar under a chin belongs to the shirt, or it bobs with the head.
+    luma = 0.299 * r + 0.587 * g + 0.114 * b
+    for trim in cfg.get('trim_dark', []):
+        part = trim['part']
+        if part in masks:
+            yy = np.arange(H)[:, None]
+            dark = (luma < trim['max_luma']) & (yy > trim['below_y'])
+            dark = cv2.morphologyEx(dark.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)) > 0
+            give = masks[part] & dark
+            owner[give] = ''
+            masks[part] = masks[part] & ~give
     rest = present & (owner == '')
     masks[cfg['leftover']] = masks.get(cfg['leftover'], np.zeros((H, W), bool)) | rest
 
