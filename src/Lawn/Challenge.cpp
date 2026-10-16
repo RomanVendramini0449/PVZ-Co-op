@@ -2996,7 +2996,7 @@ void Challenge::DrawDemomanStorm(Graphics* g)
 		// not drawn, and would show its edge.
 		if (mApp->mGameScene != GameScenes::SCENE_PLAYING)
 			return;
-		const int aRamp = std::min(mBoard->mMainCounter, 200);
+		const int aRamp = static_cast<int>(std::min<uint32_t>(mBoard->mMainCounter, 200));
 		const int aDark = YETI_DARKNESS * (200 - anAlpha) / 200 * aRamp / 200;
 		g->SetColor(Color(8, 12, 28, aDark));
 		g->FillRect(-1000, -1000, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);
