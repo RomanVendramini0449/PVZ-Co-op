@@ -69,6 +69,7 @@ constexpr const int DEMO_THUNDER_FLASH_TICKS = 60;
 constexpr const float DEMO_RAIN_VOLUME = 0.35f;  // of the music's volume
 constexpr const float YETI_RAIN_VOLUME = 0.6f;
 constexpr const int YETI_DARKNESS = 150;          // Yeti Season's gloom, of 255
+constexpr const int YETI_FOG = 90;                // its fog at the right edge, of 255
 
 Challenge::Challenge()
 {
@@ -2990,14 +2991,22 @@ void Challenge::DrawDemomanStorm(Graphics* g)
 	{
 		// Yeti Season: a gloomy storm with fog rolling in from the right, so
 		// what is coming is hard to make out until the lightning shows it.
-		const int aDark = YETI_DARKNESS * (200 - anAlpha) / 200;
-		g->SetColor(Color(10, 14, 30, aDark));
+		// Only in play, fading in over its first two seconds: the camera's
+		// pans before and after a level look past the lawn, where this is
+		// not drawn, and would show its edge.
+		if (mApp->mGameScene != GameScenes::SCENE_PLAYING)
+			return;
+		const int aRamp = std::min(mBoard->mMainCounter, 200);
+		const int aDark = YETI_DARKNESS * (200 - anAlpha) / 200 * aRamp / 200;
+		g->SetColor(Color(8, 12, 28, aDark));
 		g->FillRect(-1000, -1000, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);
-		for (int aX = 260; aX < BOARD_WIDTH + 40; aX += 10)
+		// The fog: faint, and only over the right of the lawn, where the
+		// zombies come from -- it should hide them, not wash the lawn out.
+		for (int aX = 420; aX < BOARD_WIDTH; aX += 8)
 		{
-			const int aFog = (aX - 260) * 120 / (BOARD_WIDTH - 220) * (200 - anAlpha / 2) / 200;
-			g->SetColor(Color(150, 160, 172, std::min(aFog, 120)));
-			g->FillRect(aX, 0, 10, BOARD_HEIGHT);
+			const int aFog = (aX - 420) * YETI_FOG / (BOARD_WIDTH - 420) * (200 - anAlpha) / 200 * aRamp / 200;
+			g->SetColor(Color(70, 80, 96, aFog));
+			g->FillRect(aX, 0, 8, BOARD_HEIGHT);
 		}
 		g->SetColor(Color(255, 255, 255, anAlpha / 2));
 		g->FillRect(-1000, -1000, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);

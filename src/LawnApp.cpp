@@ -3184,7 +3184,7 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 			"Brr! Is it cold out here, or is it just me?",
 			"There's a storm rolling in. You can hardly see a thing.",
 			"Perfect weather for Yetis. Big, hairy, angry Yetis.",
-			"{SHAKE}Don't let them run off with your brains!",
+			"{SHAKE}Don't let them run off with your frickin brains!",
 		};
 	}
 
@@ -3192,9 +3192,9 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 	{
 		aLines = {
 			"You hear that? That's the sound of a really big guy...",
-			"...and his really big friends. Gargantuars, neighbor!",
-			"And some fella in a vest who just won't stop DANCING.",
-			"Hit 'em hard. Hit 'em early!",
+			"...and his really big friends. Gargantuars, or something!",
+			"And some fat guy in a vest who just won't stop DANCING.",
+			"Don't let 'em take your good eye!",
 		};
 	}
 
@@ -3203,18 +3203,18 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 		aLines = {
 			"Psst. Neighbor. Look down.",
 			"No, further down!",
-			"They're DIGGING. Under the lawn! The nerve!",
-			"Keep something facing backwards, okay? Okay!",
+			"They're DIGGING. Under the FUCKING lawn!",
+			"Keep something facing backwards, okay? OKAY!!!!???",
 		};
 	}
 
 	else if (theLevel == 10)
 	{
 		aLines = {
-			"This is it, neighbor. Everything they've got.",
-			"Footballers, robots, tanks, Yetis, Gargantuars... the whole circus!",
+			"This is it, nigboor. Everything they've got.",
+			"The whole fricking digitial circus or somethin!",
 			"Whatever happens out there...",
-			"{SHAKE}...don't let them eat my TACOS!",
+			"{SHAKE}...don't let them eat my ROLOS!!!",
 		};
 	}
 
@@ -3224,7 +3224,6 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 		aLines = {
 			"Something's different this time, neighbor.",
 			"I can feel it in my bones.",
-			"{NO_SOUND}...",
 			"Did you hear something?",
 		};
 	}
@@ -3234,8 +3233,9 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 		aLines = {
 			"Hey! Hold on a second, neighbor.",
 			"Here. I've been saving something special.",
-			"{SHOW_NOAH}I want you to have this.",
-			"{HANDING}This is NOAH. He throws goblin heads in five directions at once!",
+			"{SHOW_NOAH}It's a little version of me, I want you to have this.",
+			"{HANDING}NAH im just kidding.",
+			"{HANDING}This is NOAH. He throws little goblin heads in different directions at once!",
 			"{HANDING}Don't ask where he gets them. I didn't.",
 			"Okay. NOW go get 'em!",
 		};
