@@ -2385,7 +2385,13 @@ void Board::DoPlantingEffects(int theGridX, int theGridY, Plant* thePlant)
 		return;
 	}
 
-	if (IsPoolSquare(theGridX, theGridY))
+	if (mApp->IsAdventurePlusLevel() && mApp->IsWallnutBowlingLevel())
+	{
+		// A rocket launching, not a plant going in: no thud (the launch
+		// sound plays as the cursor lets go).
+		mApp->AddPvzpParticle(aXPos, aYPos, RenderLayer::RENDER_LAYER_TOP, ParticleEffect::PARTICLE_PLANTING);
+	}
+	else if (IsPoolSquare(theGridX, theGridY))
 	{
 		mApp->PlayFoley(FoleyType::FOLEY_PLANT_WATER);
 		mApp->AddPvzpParticle(aXPos, aYPos, RenderLayer::RENDER_LAYER_TOP, ParticleEffect::PARTICLE_PLANTING_POOL);
@@ -4520,7 +4526,10 @@ void Board::MouseDownWithPlant(int x, int y, int theClickCount)
 
 	if (mApp->IsWallnutBowlingLevel())
 	{
-		mApp->PlaySample(Sexy::SOUND_BOWLING);
+		// TF2 bowling launches a rocket: its own sound, in place of the
+		// bowling roll (and of the planting thud, DoPlantingEffects).
+		if (!(mApp->IsAdventurePlusLevel() && CoopArt::PlayPackedSoundIfAny("rocket_spawn")))
+			mApp->PlaySample(Sexy::SOUND_BOWLING);
 	}
 
 	ClearCursor();

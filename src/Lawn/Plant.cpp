@@ -185,8 +185,6 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 
 		if (mApp->IsWallnutBowlingLevel() && aBodyReanim->TrackExists("_ground"))
 		{
-			if (mApp->IsAdventurePlusLevel() && IsOnBoard())
-				CoopArt::PlayPackedSound("rocket_spawn");  // a rocket, not a Wall-nut (DrawPlusRocket)
 			aBodyReanim->SetFramesForLayer("_ground");
 			if (mSeedType == SeedType::SEED_WALLNUT || mSeedType == SeedType::SEED_EXPLODE_O_NUT)
 				aBodyReanim->mAnimRate = RandRangeFloat(12.0f, 18.0f);
