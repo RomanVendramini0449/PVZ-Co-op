@@ -300,7 +300,7 @@ bool SeedChooserScreen::Has7Rows()
 // upward over the Imitater's in that order, owned ones only.
 int SeedChooserScreen::AddonY(SeedType theSeedType)
 {
-	static const SeedType kStack[] = { SEED_IMITATER, SEED_LUCA, SEED_GRS, SEED_NOAH };
+	static const SeedType kStack[] = { SEED_IMITATER, SEED_LUCA, SEED_GRS, SEED_NOAH, SEED_SENTRY };
 	int aY = 503;
 	for (SeedType aSeed : kStack)
 	{
@@ -319,7 +319,7 @@ void SeedChooserScreen::GetSeedPositionInChooser(int theIndex, int& x, int& y)
 		x = mImitaterButton->mX;
 		y = mImitaterButton->mY;
 	}
-	else if (theIndex == SEED_LUCA || theIndex == SEED_GRS || theIndex == SEED_NOAH)
+	else if (theIndex == SEED_LUCA || theIndex == SEED_GRS || theIndex == SEED_NOAH || theIndex == SEED_SENTRY)
 	{
 		x = 464;
 		y = AddonY(static_cast<SeedType>(theIndex)) + 12;
@@ -382,7 +382,7 @@ void SeedChooserScreen::Draw(Graphics* g)
 	{
 		g->DrawImage(Sexy::IMAGE_SEEDCHOOSER_IMITATERADDON, 459, 503);
 	}
-	for (SeedType anAddon : { SEED_LUCA, SEED_GRS, SEED_NOAH })
+	for (SeedType anAddon : { SEED_LUCA, SEED_GRS, SEED_NOAH, SEED_SENTRY })
 	{
 		if (!mApp->HasSeedType(anAddon))
 			continue;

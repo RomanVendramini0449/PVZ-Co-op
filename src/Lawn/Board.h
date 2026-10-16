@@ -64,6 +64,7 @@ constexpr const int YETI_SPRAY_LEVEL = 40;  // 4-10, the stormy night
 constexpr const int ADVENTURE_PLUS_LEVELS = 11;
 // The last one is a boss battle at night (the boss itself is still to come).
 constexpr const int ADVENTURE_PLUS_BOSS_LEVEL = 11;
+constexpr const int ADVENTURE_PLUS_SENTRY_LEVEL = 7;         // beating it wins the Sentry Turret
 constexpr const int ADVENTURE_PLUS_YETI_LEVEL = 4;           // Yeti Season: dark, foggy, stormy
 constexpr const int ADVENTURE_PLUS_BOWLING_LEVEL = 5;   // played as Wall-nut Bowling
 // In the bowling level a Football Zombie's helmet is set to this whatever
@@ -72,7 +73,7 @@ constexpr const int ADVENTURE_PLUS_BOWLING_LEVEL = 5;   // played as Wall-nut Bo
 constexpr const int ADVENTURE_PLUS_BOWLING_FOOTBALL_HELM = 1500;
 // Every Adventure Plus zombie is this much tougher (percent), on top of the
 // difficulty: the mode assumes a full set of plants and upgrades.
-constexpr const int ADVENTURE_PLUS_HEALTH_PERCENT = 110;
+constexpr const int ADVENTURE_PLUS_HEALTH_PERCENT = 100;  // was 110: a little gentler, waves unchanged
 
 // A zombie an Adventure Plus level sends on purpose, on top of its random
 // mix: mPerWave of them every mEvery waves from wave mFromWave (0-based), and

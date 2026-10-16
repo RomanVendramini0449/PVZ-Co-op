@@ -112,6 +112,7 @@ enum AwardType : int32_t
 	AWARD_COOP_ROMAN_BEATEN,     // PvZ Co-op: Luca vs. Roman won
 	AWARD_COOP_GRS,              // PvZ Co-op: GRS, for beating Adventure Plus 5
 	AWARD_COOP_DEMOMAN_BEATEN,   // PvZ Co-op: the Legendary Demoman (Adventure Plus 11) beaten
+	AWARD_COOP_SENTRY,           // PvZ Co-op: the Sentry Turret, for beating Adventure Plus 7
 };
 enum BackgroundType : int32_t
 {
@@ -1108,6 +1109,7 @@ enum SeedType : int32_t
 	// these in the middle would shift every number after them.
 	SEED_GRS,   // green fumes through every zombie in reach, day or night
 	SEED_NOAH,  // five goblin heads at once, a Starfruit's spread
+	SEED_SENTRY,  // the Sentry Turret: a Cattail on dry land, homing on anything
 	NUM_SEED_TYPES,
 	SEED_BEGHOULED_BUTTON_SHUFFLE,
 	SEED_BEGHOULED_BUTTON_CRATER,
@@ -1133,7 +1135,7 @@ enum SeedType : int32_t
 	// Every chooser plant is below this: up to Luca, then GRS and Noah. The
 	// four between (Explode-o-nut to the Left Repeater) are never chosen;
 	// LawnApp::HasSeedType keeps them out.
-	NUM_SEEDS_IN_CHOOSER = 56,
+	NUM_SEEDS_IN_CHOOSER = 57,
 	SEED_NONE = -1
 };
 enum ShieldType : int32_t
@@ -1197,6 +1199,7 @@ enum StoreItem : int32_t
 	// over by Crazy Dave at the start of Adventure Plus 8.
 	STORE_ITEM_UNLOCK_GRS = 46,
 	STORE_ITEM_UNLOCK_NOAH = 47,
+	STORE_ITEM_UNLOCK_SENTRY = 48,  // the Sentry Turret, for beating Adventure Plus 7
 	STORE_ITEM_INVALID = -1
 };
 enum StorePages : int32_t

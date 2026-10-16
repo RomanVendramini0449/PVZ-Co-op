@@ -328,6 +328,10 @@ void AwardScreen::Draw(Graphics* g)
 	{
 		DrawAwardSeed(g, SEED_GRS);
 	}
+	else if (mAwardType == AWARD_COOP_SENTRY)
+	{
+		DrawAwardSeed(g, SEED_SENTRY);
+	}
 	else if (mAwardType == AWARD_COOP_DEMOMAN_BEATEN)
 	{
 		DrawBottom(g, "Legendary Demoman Defeated!", "Adventure Plus", "The Legendary Demoman is down. Team Fortress is saved... for now.");
@@ -539,12 +543,12 @@ void AwardScreen::StartButtonPressed()
 		mApp->KillAwardScreen();
 		mApp->ShowCreditScreen();
 	}
-	else if (mAwardType == AWARD_COOP_GRS)
+	else if (mAwardType == AWARD_COOP_GRS || mAwardType == AWARD_COOP_SENTRY)
 	{
-		// Graz comes with Adventure Plus's bowling level: play on into the
-		// next one, Graz in hand.
+		// Graz and the Sentry Turret come with Adventure Plus levels: play on
+		// into the next one, the new plant in hand.
 		mApp->KillAwardScreen();
-		mApp->mCoopPlusLevel = ADVENTURE_PLUS_BOWLING_LEVEL + 1;
+		mApp->mCoopPlusLevel = (mAwardType == AWARD_COOP_GRS ? ADVENTURE_PLUS_BOWLING_LEVEL : ADVENTURE_PLUS_SENTRY_LEVEL) + 1;
 		mApp->PreNewGame(GAMEMODE_COOP_ADVENTURE_PLUS, false);
 	}
 	else if (mAwardType == AWARD_HELP_ZOMBIENOTE || mAwardType == AWARD_COOP_LUCA || mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE ||

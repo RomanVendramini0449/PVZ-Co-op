@@ -109,7 +109,10 @@ constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	// PvZ Co-op: a Fume-shroom and a Starfruit underneath, their animations
 	// running unseen so they aim and fire as those do; drawn with their art.
 	{ .mSeedType = SeedType::SEED_GRS,               .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_FUMESHROOM,    .mPacketIndex = 9,  .mSeedCost = 150, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "GRS" },
-	{ .mSeedType = SeedType::SEED_NOAH,              .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_STARFRUIT,     .mPacketIndex = 30, .mSeedCost = 175, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "NOAH" }
+	{ .mSeedType = SeedType::SEED_NOAH,              .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_STARFRUIT,     .mPacketIndex = 30, .mSeedCost = 175, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "NOAH" },
+	// The Sentry Turret: a Cattail underneath -- it aims and fires as one,
+	// homing spikes at whatever is nearest, anywhere -- but on dry land.
+	{ .mSeedType = SeedType::SEED_SENTRY,            .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_CATTAIL,       .mPacketIndex = 27, .mSeedCost = 225, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "SENTRY" }
 };
 
 Plant::Plant()
@@ -647,6 +650,7 @@ int Plant::GetDamageRangeFlags(PlantWeapon thePlantWeapon)
 	case SeedType::SEED_CHOMPER:
 		return 9;
 	case SeedType::SEED_CATTAIL:
+	case SeedType::SEED_SENTRY:
 		return 11;
 	case SeedType::SEED_TANGLEKELP:
 		return 5;
@@ -796,7 +800,7 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon)
 		PlayBodyReanim("anim_shooting", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 14.0f);
 		mShootingCounter = 200;
 	}
-	else if (mSeedType == SeedType::SEED_CATTAIL)
+	else if (mSeedType == SeedType::SEED_CATTAIL || mSeedType == SeedType::SEED_SENTRY)
 	{
 		PlayBodyReanim("anim_shooting", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 20, 30.0f);
 		mShootingCounter = 50;
@@ -1006,7 +1010,7 @@ void Plant::UpdateShooter()
 		}
 	}
 
-	if (mLaunchCounter == 50 && mSeedType == SeedType::SEED_CATTAIL)
+	if (mLaunchCounter == 50 && (mSeedType == SeedType::SEED_CATTAIL || mSeedType == SeedType::SEED_SENTRY))
 	{
 		FindTargetAndFire(mRow, PlantWeapon::WEAPON_PRIMARY);
 	}
@@ -3293,7 +3297,7 @@ void Plant::UpdateShooting()
 			Fire(nullptr, mRow, PlantWeapon::WEAPON_PRIMARY);
 		}
 	}
-	else if (mSeedType == SeedType::SEED_CATTAIL)
+	else if (mSeedType == SeedType::SEED_CATTAIL || mSeedType == SeedType::SEED_SENTRY)
 	{
 		if (mShootingCounter == 19)
 		{
@@ -4732,6 +4736,7 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 		break;
 	case SeedType::SEED_CACTUS:
 	case SeedType::SEED_CATTAIL:
+	case SeedType::SEED_SENTRY:
 		aProjectileType = ProjectileType::PROJECTILE_SPIKE;
 		break;
 	case SeedType::SEED_CABBAGEPULT:
@@ -4789,7 +4794,7 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 		aOriginX = mX + 25;
 		aOriginY = mY - 46;
 	}
-	else if (mSeedType == SeedType::SEED_CATTAIL)
+	else if (mSeedType == SeedType::SEED_CATTAIL || mSeedType == SeedType::SEED_SENTRY)
 	{
 		aOriginX = mX + 20;
 		aOriginY = mY - 3;
@@ -4975,7 +4980,7 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 	{
 		aProjectile->mMotionType = ProjectileMotion::MOTION_BACKWARDS;
 	}
-	else if (mSeedType == SeedType::SEED_CATTAIL)
+	else if (mSeedType == SeedType::SEED_CATTAIL || mSeedType == SeedType::SEED_SENTRY)
 	{
 		aProjectile->mVelX = 2.0f;
 		aProjectile->mMotionType = ProjectileMotion::MOTION_HOMING;
@@ -5024,7 +5029,7 @@ Zombie* Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon)
 			}
 		}
 
-		if (mSeedType != SeedType::SEED_CATTAIL)
+		if (mSeedType != SeedType::SEED_CATTAIL && mSeedType != SeedType::SEED_SENTRY)
 		{
 			if (mSeedType == SeedType::SEED_GLOOMSHROOM)
 			{
@@ -5107,7 +5112,7 @@ Zombie* Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon)
 			}
 
 			int aWeight = -aZombieRect.mX;
-			if (mSeedType == SeedType::SEED_CATTAIL)
+			if (mSeedType == SeedType::SEED_CATTAIL || mSeedType == SeedType::SEED_SENTRY)
 			{
 				aWeight = -Distance2D(mX + 40.0f, mY + 40.0f, aZombieRect.mX + aZombieRect.mWidth / 2, aZombieRect.mY + aZombieRect.mHeight / 2);
 				if (aZombie->IsFlying())
@@ -5406,7 +5411,8 @@ Rect Plant::GetPlantAttackRect(PlantWeapon thePlantWeapon)
 	case SeedType::SEED_GRS:            aRect = Rect(mX + 60,       mY,             340,                mHeight);               break;
 	case SeedType::SEED_GLOOMSHROOM:    aRect = Rect(mX - 80,       mY - 80,        240,                240);                   break;
 	case SeedType::SEED_TANGLEKELP:     aRect = Rect(mX,            mY,             mWidth,             mHeight);               break;
-	case SeedType::SEED_CATTAIL:        aRect = Rect(-BOARD_WIDTH,  -BOARD_HEIGHT,  BOARD_WIDTH * 2,    BOARD_HEIGHT * 2);      break;
+	case SeedType::SEED_CATTAIL:
+	case SeedType::SEED_SENTRY:         aRect = Rect(-BOARD_WIDTH,  -BOARD_HEIGHT,  BOARD_WIDTH * 2,    BOARD_HEIGHT * 2);      break;
 	default:                            aRect = Rect(mX + 60,       mY,             BOARD_WIDTH,        mHeight);               break;
 	}
 

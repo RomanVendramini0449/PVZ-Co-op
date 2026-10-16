@@ -328,12 +328,12 @@ Fortress Bowling (Wall-nut Bowling; footballs always take three balls),
 6 Heavy Weapons Guy (Gargantuars, ladders, diggers), 7 Red Spy in the Base,
 8 The Robots Are Coming (Zambonis), 9 Tunnel Vision (diggers, pogos),
 10 Everything, Everywhere, and 11 Legendary Demoman (below). Budgets are
-bigger than the campaign's, and zombies have a quarter more health.
+bigger than the campaign's.
 
 Zombie budgets follow the campaign's replay formula (2/5 of a point a wave)
 plus a small per-level bonus and the zombies each level sends on purpose:
-about one and a half to two and a half times a replayed campaign level, and
-zombies have a tenth more health. Bowling follows the campaign's own bowling
+about one and a half to two and a half times a replayed campaign level, at
+normal zombie health. Bowling follows the campaign's own bowling
 budget, stretched over 20 waves; its footballs come only on purpose (six in
 all, three balls each). The arithmetic is in
 `tools/zombie-art/wave_model.py`.
@@ -353,8 +353,10 @@ Heavies turn up in every level but bowling and the boss (a few early on, in
 numbers in 6 and 10); tanks in 7, 8, 9 and 10. Bowling ends with one
 Gargantuar in its final wave.
 
-Two plants are earned here, kept as add-ons beside the seed chooser's grid
-like Luca: **GRS** (beating level 5; a fume attack through the lane, green
+Three plants are earned here, kept as add-ons beside the seed chooser's grid
+like Luca: the **Sentry Turret** (beating level 7, seed packet and award
+screen; a Cattail on dry land: homing spikes at the nearest zombie anywhere,
+drawn as a Cattail until its own art arrives), **GRS** (beating level 5; a fume attack through the lane, green
 bubbles) and **Noah** (Crazy Dave hands him over at the start of level 8;
 the Starfruit's five directions, firing goblin heads).
 

@@ -2037,6 +2037,12 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		// $20,000 for the Legendary Demoman, every time.
 		if (mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL)
 			mPlayerInfo->AddCoins(DEMOMAN_PRIZE_COINS);
+		// The Sentry Turret, for beating Red Spy in the Base.
+		if (mCoopPlusLevel == ADVENTURE_PLUS_SENTRY_LEVEL && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_SENTRY] == 0)
+		{
+			mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_SENTRY] = 1;
+			aUnlockedNewChallenge = true;
+		}
 		// GRS joins you for beating the bowling level.
 		if (mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_GRS] == 0)
 		{
@@ -2223,6 +2229,10 @@ void LawnApp::CheckForGameEnd()
 		else if (IsAdventurePlusLevel() && aUnlockedNewChallenge && mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL)
 		{
 			ShowAwardScreen(AwardType::AWARD_COOP_GRS, true);
+		}
+		else if (IsAdventurePlusLevel() && aUnlockedNewChallenge && mCoopPlusLevel == ADVENTURE_PLUS_SENTRY_LEVEL)
+		{
+			ShowAwardScreen(AwardType::AWARD_COOP_SENTRY, true);
 		}
 		else if (IsAdventurePlusLevel() && mCoopPlusLevel < ADVENTURE_PLUS_LEVELS)
 		{
@@ -2746,6 +2756,12 @@ void LawnApp::LoadingThreadProc()
 		"GRAZ burps green fumes that go straight through every zombie in front of him.{SHORTLINE}"
 		"{KEYWORD}Damage:{STAT} normal, to everything in reach{BR}{KEYWORD}Range:{STAT} four tiles{SHORTLINE}"
 		"Unlike a Fume-shroom, he never sleeps. That's because he drinks WAY too much monster energy.");
+	mStringProperties.insert_or_assign("SENTRY", "Sentry Turret");
+	mStringProperties.insert_or_assign("SENTRY_TOOLTIP", "Shoots homing spikes at the nearest zombie, anywhere");
+	mStringProperties.insert_or_assign("SENTRY_DESCRIPTION",
+		"The Sentry Turret finds the nearest zombie, wherever it is, and keeps shooting at it.{SHORTLINE}"
+		"{KEYWORD}Damage:{STAT} normal, two at a time{BR}{KEYWORD}Range:{STAT} the whole lawn, even the air{SHORTLINE}"
+		"A Cattail that left the pond and got a job. Sentry going up!");
 	mStringProperties.insert_or_assign("NOAH", "Noah");
 	mStringProperties.insert_or_assign("NOAH_TOOLTIP", "Throws goblin heads in five directions");
 	mStringProperties.insert_or_assign("NOAH_DESCRIPTION",
@@ -3573,6 +3589,8 @@ bool LawnApp::HasSeedType(SeedType theSeedType)
 		return mPlayerInfo != nullptr && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_GRS] > 0;
 	if (theSeedType == SeedType::SEED_NOAH && !(mBoard && mGameMode == GameMode::GAMEMODE_COOP_SANDBOX))
 		return mPlayerInfo != nullptr && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_NOAH] > 0;
+	if (theSeedType == SeedType::SEED_SENTRY && !(mBoard && mGameMode == GameMode::GAMEMODE_COOP_SANDBOX))
+		return mPlayerInfo != nullptr && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_SENTRY] > 0;
 
 	// The Dev Sandbox is for trying things out: every plant, upgrades and
 	// Luca included, whatever the profile has earned.

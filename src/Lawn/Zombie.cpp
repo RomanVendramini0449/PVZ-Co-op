@@ -7362,8 +7362,9 @@ bool Zombie::TrySpawnLevelAward()
 		// the first time, the prize money every time after.
 		aCoinType = mApp->HasSeedType(SeedType::SEED_LUCA) ? CoinType::COIN_AWARD_MONEY_BAG : CoinType::COIN_FINAL_SEED_PACKET;
 	}
-	else if (mApp->IsAdventurePlusLevel() && mApp->mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL &&
-		mApp->mPlayerInfo && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_GRS] == 0)
+	else if (mApp->IsAdventurePlusLevel() && mApp->mPlayerInfo &&
+		((mApp->mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_GRS] == 0) ||
+		 (mApp->mCoopPlusLevel == ADVENTURE_PLUS_SENTRY_LEVEL && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_SENTRY] == 0)))
 	{
 		// Graz's seed packet, the first time bowling is beaten, as Luca's
 		// comes from Gargantuar Onslaught (Coin::GetFinalSeedPacketType).

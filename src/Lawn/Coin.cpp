@@ -810,6 +810,10 @@ SeedType Coin::GetFinalSeedPacketType()
 	{
 		return SeedType::SEED_GRS;
 	}
+	if (mApp->IsAdventurePlusLevel() && mApp->mCoopPlusLevel == ADVENTURE_PLUS_SENTRY_LEVEL)
+	{
+		return SeedType::SEED_SENTRY;
+	}
 
 	if (mApp->IsFirstTimeAdventureMode() && mBoard && mBoard->mLevel <= 50)
 	{
