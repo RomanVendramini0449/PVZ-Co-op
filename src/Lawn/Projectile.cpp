@@ -68,6 +68,7 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 {
 	int aGridX = mBoard->PixelToGridXKeepOnBoard(theX, theY);
 	mProjectileType = theProjectileType;
+	mCoopSentry = false;
 	mPosX = theX;
 	mPosY = theY;
 	mPosZ = 0.0f;
@@ -1001,6 +1002,13 @@ void Projectile::Draw(Graphics* g)
 	{
 		// Centred where a pea's centre would be, so it flies the same line.
 		CoopArt::DrawCheese(g, mPosX - mX + 16.0f, mPosY + mPosZ - mY + 14.0f, mRotation);
+		return;
+	}
+	if (mCoopSentry && CoopArt::PackedImage("sentry_projectile"))
+	{
+		// The Sentry Turret's own shot, centred on the spike's middle, turned
+		// the way it flies.
+		CoopArt::DrawPackedRotated(g, "sentry_projectile", mPosX - mX + 20.0f, mPosY + mPosZ - mY + 12.0f, mRotation, 1.0f);
 		return;
 	}
 	if (mProjectileType == ProjectileType::PROJECTILE_GOBLIN)

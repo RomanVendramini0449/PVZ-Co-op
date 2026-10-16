@@ -493,6 +493,8 @@ inline constexpr ZombieAllowedLevels gZombieAllowedLevels[NUM_ZOMBIE_TYPES] = {
 	{ ZOMBIE_REDEYE_GARGANTUAR, {0} },
 	{ ZOMBIE_COOP_TANK, {0} },
 	{ ZOMBIE_COOP_HEAVY, {0} },
+	{ ZOMBIE_COOP_SPY, {0} },
+	{ ZOMBIE_COOP_SOLDIER, {0} },
 };
 
 inline constexpr SeedType gArtChallengeWallnut[MAX_GRID_SIZE_Y][MAX_GRID_SIZE_X] = {

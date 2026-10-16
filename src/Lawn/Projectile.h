@@ -58,6 +58,7 @@ public:
 	float                   mAccZ;
 	float                   mShadowY;
 	bool                    mDead;
+	bool                    mCoopSentry = false;  // a Sentry Turret's shot (a Cattail spike underneath); not saved
 	int32_t                 mAnimTicksPerFrame;
 	ProjectileMotion        mMotionType;
 	ProjectileType          mProjectileType;

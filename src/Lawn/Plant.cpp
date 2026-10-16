@@ -4100,6 +4100,10 @@ void Plant::Draw(Graphics* g)
 		{
 			DrawCoopPhotoPlant(g, aOffsetX, aOffsetY);
 		}
+		else if (mSeedType == SeedType::SEED_SENTRY && CoopArt::SheetFrames("sentry_idle") > 0)
+		{
+			DrawSentry(g, aOffsetX, aOffsetY);
+		}
 		else if (DrawShopSkin(g, aOffsetX, aOffsetY))
 		{
 			// Kernel or Philippe, bought from Crazy Dave, in place of the plant.
@@ -4222,6 +4226,38 @@ static bool GetShopSkin(SeedType theSeedType, CoopArt::Skin& theSkinOut)
 // still runs, unseen, so nothing about how it plays changes. Kernel crouches,
 // stretches as he leaps and lands flat; Philippe swells and glows as his fuse
 // burns down. Everything here is drawing only.
+// The Sentry Turret's own animations (assets/coop/sentry, packed): idling,
+// and its firing animation each time it shoots. The Cattail underneath does
+// the aiming and firing.
+void Plant::DrawSentry(Graphics* g, float theOffsetX, float theOffsetY)
+{
+	const char* aSheet = "sentry_idle";
+	const uint32_t aCounter = IsOnBoard() ? mBoard->mMainCounter : mApp->mAppCounter;
+	int aFrame = static_cast<int>(aCounter / 8);
+	if (mShootingCounter > 0 && CoopArt::SheetFrames("sentry_fire") > 0)
+	{
+		aSheet = "sentry_fire";
+		const int aFrames = CoopArt::SheetFrames(aSheet);
+		aFrame = std::min((50 - mShootingCounter) * aFrames / 50, aFrames - 1);
+	}
+
+	Graphics aG(*g);
+	aG.SetColorizeImages(true);
+	aG.SetColor(Color::White);
+	CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, theOffsetX + 40.0f, theOffsetY + 78.0f);
+	int aGlow = 0;
+	if (mHighlighted)
+		aGlow = 120;
+	else if (mEatenFlashCountdown > 0)
+		aGlow = std::clamp(mEatenFlashCountdown * 3, 0, 160);
+	if (aGlow > 0)
+	{
+		aG.SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
+		aG.SetColor(Color(255, 255, 255, aGlow));
+		CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, theOffsetX + 40.0f, theOffsetY + 78.0f);
+	}
+}
+
 // GRS and Noah: their pictures, breathing a little, with a kick when they
 // fire and the usual glows (highlighted, just bitten).
 void Plant::DrawCoopPhotoPlant(Graphics* g, float theOffsetX, float theOffsetY)
@@ -4362,6 +4398,12 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
 		{
 			CoopArt::DrawPhotoPlant(&aSeedG, aSeedType == SeedType::SEED_GRS ? "grs" : "noah",
 				thePosX + aOffsetX, thePosY + aOffsetY, aSeedG.mScaleX, aSeedG.mScaleY);
+		}
+		else if (aSeedType == SeedType::SEED_SENTRY && CoopArt::SheetFrames("sentry_idle") > 0)
+		{
+			// Standing in the middle of the 80x80 plant frame.
+			CoopArt::DrawSheetFrame(&aSeedG, "sentry_idle", 0, thePosX + aOffsetX + 40.0f * aSeedG.mScaleX,
+				thePosY + aOffsetY + 78.0f * aSeedG.mScaleY, aSeedG.mScaleX);
 		}
 		else if (CoopArt::Skin aSkin; GetShopSkin(aSeedType, aSkin))
 		{
@@ -4982,6 +5024,7 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 	}
 	else if (mSeedType == SeedType::SEED_CATTAIL || mSeedType == SeedType::SEED_SENTRY)
 	{
+		aProjectile->mCoopSentry = mSeedType == SeedType::SEED_SENTRY;  // drawn as its own shot
 		aProjectile->mVelX = 2.0f;
 		aProjectile->mMotionType = ProjectileMotion::MOTION_HOMING;
 		aProjectile->mTargetZombieID = mBoard->ZombieGetID(theTargetZombie);

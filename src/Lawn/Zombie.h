@@ -59,6 +59,8 @@ enum ZombieParts : int32_t
 // Adventure Plus enemies (docs/SPEC.md 10.3).
 constexpr int COOP_TANK_HEALTH = 1800;
 constexpr int COOP_HEAVY_HEALTH = 1300;
+constexpr int COOP_SPY_HEALTH = 500;            // a Digger has 270 and a 100 hard hat
+constexpr int COOP_SOLDIER_HEALTH = 500;        // body; plus the bucket's 1100: a Buckethead's 1370 and a bit
 constexpr int COOP_HEAVY_STILL_FRAME = 5;       // of his dance: standing upright
 constexpr float COOP_TANK_ANIM_RATE = 1.2f;     // tread cycles per Zomboni cycle (was 2)
 constexpr float COOP_HEAVY_DANCE_RATE = 0.6f;   // whole dances per Football Zombie stride
@@ -92,6 +94,8 @@ enum CoopZombieKind : int32_t
 	COOP_KIND_NONE,
 	COOP_KIND_TANK,   // built on the Zomboni: no ice, blows up at the end of its lane
 	COOP_KIND_HEAVY,  // the Heavy Weapons Guy, built on the Football Zombie: dances, no helmet
+	COOP_KIND_SPY,    // built on the Digger: travels cloaked, uncloaks behind your plants
+	COOP_KIND_SOLDIER,  // built on the Buckethead (his helmet is the bucket): more body
 };
 
 class ZombieDrawPosition
@@ -457,7 +461,8 @@ public:
 	// Adventure Plus enemies (mCoopKind).
 	void                            CoopTankBlast();
 	void                            CoopTankDetonate();
-	void                            DrawCoopKind(Graphics* g);
+	bool                            DrawCoopKind(Graphics* g);  // false: no art yet, draw the zombie underneath
+	ZombieType                      GetCoopDisplayType();       // what the street names it
 	void                            BossSetupReanim();
 	void                            MowDown();
 	void                            UpdateMowered();

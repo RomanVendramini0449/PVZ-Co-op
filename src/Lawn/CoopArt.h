@@ -115,6 +115,8 @@ namespace CoopArt
 		float theSquashX = 1.0f, float theSquashY = 1.0f, int theGlow = 0);
 	// Noah's goblin head, centred on (theCenterX, theCenterY), turned.
 	void DrawGoblinProjectile(Sexy::Graphics* g, float theCenterX, float theCenterY, float theRotation);
+	// A packed single picture centred on (theCenterX, theCenterY), turned and scaled.
+	void DrawPackedRotated(Sexy::Graphics* g, const char* theName, float theCenterX, float theCenterY, float theRotation, float theScale);
 	// A packed single picture by name ("noah", "grs", "goblin_projectile").
 	Sexy::Image* PackedImage(const char* theName);
 	// The frame count of a sprite sheet ("demo_idle", "tank"...), 0 if none.

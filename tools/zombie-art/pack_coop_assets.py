@@ -38,11 +38,24 @@ SHEETS = {
     'heavy':       ('dancing_heavy_enemy',            0.28, (241, 510)),
 }
 
+# Drop-in art: each character a folder of animations (folders of numbered
+# PNG frames), all sharing one size and ground point, worked out from the
+# frames themselves: the bottom middle of everything drawn across all of
+# them stands on the ground, scaled to the height given. Anything not there
+# yet is skipped, and the game draws the plant or zombie underneath instead.
+#   group: (folder, [animations], height on the lawn in pixels)
+GROUPS = {
+    'sentry':  ('sentry',  ['idle', 'fire'], 95),
+    'spy':     ('spy',     ['walk', 'uncloak', 'attack'], 135),
+    'soldier': ('soldier', ['walk', 'attack'], 135),
+}
+
 # name: (file, height in pixels to store at)
 SINGLES = {
     'noah':             ('noah.png', 180),
     'grs':              ('graz.png', 180),
     'goblin_projectile': ('goblin_projectile.png', 96),
+    'sentry_projectile': ('sentry/projectile.png', 36),  # optional: skipped until it exists
 }
 
 # name: (file, target mean loudness in dB, what it is matched to)
@@ -137,7 +150,27 @@ def main():
         m = pack_sheet(name, folder, scale, anchor)
         sheets.append(m)
         files.append((name, m['file']))
+    for group, (folder, anims, height) in GROUPS.items():
+        present = [a for a in anims if os.path.isdir(os.path.join(SRC, folder, a)) and frames_of(os.path.join(folder, a))]
+        if not present:
+            continue
+        boxes = []
+        for a in present:
+            for f in frames_of(os.path.join(folder, a)):
+                b = clean(Image.open(f).convert('RGBA')).split()[3].getbbox()
+                if b:
+                    boxes.append(b)
+        x0, y0 = min(b[0] for b in boxes), min(b[1] for b in boxes)
+        x1, y1 = max(b[2] for b in boxes), max(b[3] for b in boxes)
+        scale = height / float(y1 - y0)
+        anchor = ((x0 + x1) // 2, y1)
+        for a in present:
+            m = pack_sheet('%s_%s' % (group, a), os.path.join(folder, a), scale, anchor)
+            sheets.append(m)
+            files.append((m['name'], m['file']))
     for name, (file, height) in SINGLES.items():
+        if not os.path.exists(os.path.join(SRC, file)):
+            continue
         files.append((name, pack_single(name, file, height)))
     for name, (file, target, _, *limit) in SOUNDS.items():
         files.append((name, pack_sound(name, file, target, *limit)))

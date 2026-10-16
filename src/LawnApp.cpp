@@ -2750,6 +2750,8 @@ void LawnApp::LoadingThreadProc()
 	// Adventure Plus's own zombies, as the street before a level names them.
 	mStringProperties.insert_or_assign("TANK", "Tank");
 	mStringProperties.insert_or_assign("HEAVY_WEAPONS_GUY", "Heavy Weapons Guy");
+	mStringProperties.insert_or_assign("SPY", "Spy");
+	mStringProperties.insert_or_assign("SOLDIER", "Soldier");
 	mStringProperties.insert_or_assign("GRS", "Graz");
 	mStringProperties.insert_or_assign("GRS_TOOLTIP", "Burps green fumes through every zombie in reach");
 	mStringProperties.insert_or_assign("GRS_DESCRIPTION",

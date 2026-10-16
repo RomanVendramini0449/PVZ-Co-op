@@ -349,6 +349,14 @@ animations instead of its reanimation:
 - **Heavy Weapons Guy** (on the Football Zombie, dancing): as fast, no helmet,
   1,300 health, eats the same, drawn a fifth bigger. He has no death animation
   of his own: he topples over backwards, bounces once and fades.
+Two more, whose art goes in `assets/coop/spy` and `assets/coop/soldier`
+(drawn as the zombie underneath until it does):
+- **Spy** (on the Digger): walks in cloaked -- a faint shimmer, untouchable --
+  and uncloaks at the far left of the lawn, attacking your plants from behind.
+  500 health. In numbers in Red Spy in the Base; also in 9 and 10.
+- **Soldier** (on the Buckethead, the bucket his helmet): walks at you and
+  swings a shovel while eating. 500 body plus the bucket's 1,100. In most
+  levels.
 Heavies turn up in every level but bowling and the boss (a few early on, in
 numbers in 6 and 10); tanks in 7, 8, 9 and 10. Bowling ends with one
 Gargantuar in its final wave.

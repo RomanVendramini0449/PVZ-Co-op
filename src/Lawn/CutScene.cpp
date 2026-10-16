@@ -378,6 +378,7 @@ void CutScene::PreloadResources()
 		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_BOSS);
 		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_COOP_TANK);
 		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_COOP_HEAVY);
+		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_COOP_SOLDIER);
 		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_BUNGEE);  // the one that takes Dave
 		for (SeedType aSeed : { SEED_LUCA, SEED_NOAH, SEED_GRS, SEED_JALAPENO, SEED_ICESHROOM })
 			Plant::PreloadPlantResources(aSeed);

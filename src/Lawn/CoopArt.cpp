@@ -359,6 +359,20 @@ void CoopArt::DrawPhotoPlant(Graphics* g, const char* theName, float theX, float
 	DrawStandIn(g, PackedImageByName(theName), 80.0f, theX, theY, theScaleX, theScaleY, theSquashX, theSquashY, theGlow);
 }
 
+void CoopArt::DrawPackedRotated(Graphics* g, const char* theName, float theCenterX, float theCenterY, float theRotation, float theScale)
+{
+	Image* anImage = PackedImageByName(theName);
+	if (anImage == nullptr)
+		return;
+	Graphics aG(*g);
+	aG.SetLinearBlend(true);
+	SexyMatrix3 aTransform;
+	PvzpScaleRotateTransformMatrix(aTransform, theCenterX + g->mTransX, theCenterY + g->mTransY, theRotation, theScale, theScale);
+	const Rect aSrcRect(0, 0, anImage->mWidth, anImage->mHeight);
+	const Color& aColor = aG.mColorizeImages ? aG.mColor : Color::White;
+	PvzpBltMatrix(&aG, anImage, aTransform, aG.mClipRect, aColor, aG.mDrawMode, aSrcRect);
+}
+
 void CoopArt::DrawGoblinProjectile(Graphics* g, float theCenterX, float theCenterY, float theRotation)
 {
 	Image* anImage = PackedImageByName("goblin_projectile");

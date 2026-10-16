@@ -115,6 +115,8 @@ constinit const ZombieDefinition gZombieDefs[NUM_ZOMBIE_TYPES] = {
 	{ .mZombieType = ZOMBIE_REDEYE_GARGANTUAR, .mReanimationType = REANIM_GARGANTUAR, .mZombieValue = 10, .mStartingLevel = 48, .mFirstAllowedWave = 15, .mPickWeight = 6000, .mZombieName = "REDEYED_GARGANTUAR" },
 	{ .mZombieType = ZOMBIE_COOP_TANK, .mReanimationType = REANIM_ZOMBIE_ZAMBONI, .mZombieValue = 7, .mStartingLevel = 99, .mFirstAllowedWave = 6, .mPickWeight = 1500, .mZombieName = "TANK" },
 	{ .mZombieType = ZOMBIE_COOP_HEAVY, .mReanimationType = REANIM_ZOMBIE_FOOTBALL, .mZombieValue = 5, .mStartingLevel = 99, .mFirstAllowedWave = 3, .mPickWeight = 2000, .mZombieName = "HEAVY_WEAPONS_GUY" },
+	{ .mZombieType = ZOMBIE_COOP_SPY, .mReanimationType = REANIM_DIGGER, .mZombieValue = 4, .mStartingLevel = 99, .mFirstAllowedWave = 6, .mPickWeight = 1000, .mZombieName = "SPY" },
+	{ .mZombieType = ZOMBIE_COOP_SOLDIER, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 4, .mStartingLevel = 99, .mFirstAllowedWave = 2, .mPickWeight = 2500, .mZombieName = "SOLDIER" },
 };
 
 static ZombieType gBossZombieList[] = {
@@ -159,6 +161,16 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 	{
 		theType = ZombieType::ZOMBIE_FOOTBALL;
 		mCoopKind = CoopZombieKind::COOP_KIND_HEAVY;
+	}
+	else if (theType == ZombieType::ZOMBIE_COOP_SPY)
+	{
+		theType = ZombieType::ZOMBIE_DIGGER;
+		mCoopKind = CoopZombieKind::COOP_KIND_SPY;
+	}
+	else if (theType == ZombieType::ZOMBIE_COOP_SOLDIER)
+	{
+		theType = ZombieType::ZOMBIE_PAIL;
+		mCoopKind = CoopZombieKind::COOP_KIND_SOLDIER;
 	}
 
 	int aZombatarRecordIndex = -1;
@@ -917,6 +929,18 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 		mHelmType = HelmType::HELMTYPE_NONE;
 		mHelmHealth = 0;
 		mBodyHealth = COOP_HEAVY_HEALTH;
+	}
+	else if (mCoopKind == CoopZombieKind::COOP_KIND_SPY)
+	{
+		// No hard hat, and no dirt trail: he is cloaked, not digging.
+		mHelmType = HelmType::HELMTYPE_NONE;
+		mHelmHealth = 0;
+		mBodyHealth = COOP_SPY_HEALTH;
+		AttachmentDetachCrossFadeParticleType(mAttachmentID, ParticleEffect::PARTICLE_DIGGER_TUNNEL, nullptr);
+	}
+	else if (mCoopKind == CoopZombieKind::COOP_KIND_SOLDIER)
+	{
+		mBodyHealth = COOP_SOLDIER_HEALTH;
 	}
 
 	UpdateAnimSpeed();
@@ -2799,14 +2823,18 @@ void Zombie::UpdateZombieDigger()
 			mPhaseCounter = 130;
 			PlayZombieReanim("anim_drill", ReanimLoopType::REANIM_LOOP, 0, 20.0f);
 
-			mApp->PlayFoley(FoleyType::FOLEY_DIRT_RISE);
 			mApp->PlayFoley(FoleyType::FOLEY_WAKEUP);
 			AttachmentDetachCrossFadeParticleType(mAttachmentID, ParticleEffect::PARTICLE_DIGGER_TUNNEL, nullptr);
 			StopZombieSound();
 
-			mApp->AddPvzpParticle(mPosX + 60.0f, mPosY + 118.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_DIGGER_RISE);
-			Reanimation* aDirtReanim = mApp->AddReanimation(mPosX + 13.0f, mPosY + 97.0f, mRenderOrder + 1, ReanimationType::REANIM_DIGGER_DIRT);
-			aDirtReanim->mAnimRate = 24.0f;
+			// The Spy has been walking all along, cloaked: he just appears.
+			if (mCoopKind != CoopZombieKind::COOP_KIND_SPY)
+			{
+				mApp->PlayFoley(FoleyType::FOLEY_DIRT_RISE);
+				mApp->AddPvzpParticle(mPosX + 60.0f, mPosY + 118.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_DIGGER_RISE);
+				Reanimation* aDirtReanim = mApp->AddReanimation(mPosX + 13.0f, mPosY + 97.0f, mRenderOrder + 1, ReanimationType::REANIM_DIGGER_DIRT);
+				aDirtReanim->mAnimRate = 24.0f;
+			}
 		}
 	}
 	else if (mZombiePhase == ZombiePhase::PHASE_DIGGER_RISING)
@@ -6410,9 +6438,14 @@ void Zombie::Draw(Graphics* g)
 	}
 	if (mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_INVISIGHOUL || mFromWave == Zombie::ZOMBIE_WAVE_UI)
 	{
-		if (mCoopKind != CoopZombieKind::COOP_KIND_NONE)
+		if (mCoopKind != CoopZombieKind::COOP_KIND_NONE && DrawCoopKind(g))
 		{
-			DrawCoopKind(g);
+			// Its own art (until that arrives, the zombie underneath, below).
+		}
+		else if (mCoopKind == CoopZombieKind::COOP_KIND_SPY && (mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING ||
+			mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING_PAUSE_WITHOUT_AXE))
+		{
+			// A Spy without his art yet: cloaked is unseen.
 		}
 		else if (mBodyReanimID != ReanimationID::REANIMATIONID_NULL)
 		{
@@ -11232,31 +11265,77 @@ void Zombie::CoopTankDetonate()
 // The tank and the Heavy are drawn from their own animations; the zombie
 // each is built on runs underneath, unseen, and sets the pace -- frozen or
 // chilled, the drawing slows and stops with it.
-void Zombie::DrawCoopKind(Graphics* g)
+// What the street before a level calls this zombie.
+ZombieType Zombie::GetCoopDisplayType()
+{
+	switch (mCoopKind)
+	{
+	case CoopZombieKind::COOP_KIND_TANK:    return ZombieType::ZOMBIE_COOP_TANK;
+	case CoopZombieKind::COOP_KIND_HEAVY:   return ZombieType::ZOMBIE_COOP_HEAVY;
+	case CoopZombieKind::COOP_KIND_SPY:     return ZombieType::ZOMBIE_COOP_SPY;
+	case CoopZombieKind::COOP_KIND_SOLDIER: return ZombieType::ZOMBIE_COOP_SOLDIER;
+	default:                                return mZombieType;
+	}
+}
+
+// The Adventure Plus enemies drawn from their own animations (packed by
+// pack_coop_assets.py); the zombie each is built on runs underneath, unseen,
+// and sets the pace -- frozen or chilled, the drawing slows and stops with it.
+// False when its art is not in yet: the caller draws the zombie underneath.
+bool Zombie::DrawCoopKind(Graphics* g)
 {
 	const bool aTank = mCoopKind == CoopZombieKind::COOP_KIND_TANK;
-	const char* aSheet = aTank ? "tank" : "heavy";
-	// The tank is the biggest thing on the lawn short of a Gargantuar; the
-	// Heavy is a big man, but it is bigger.
-	const float aScale = aTank ? 1.3f : 1.2f;
+	const char* aSheet = "heavy";
+	const char* anAttack = nullptr;   // drawn while eating, if there is one
+	float aScale = 1.0f;
+	float aRate = 1.0f;               // animation cycles per cycle of the zombie underneath
+	int aStillFrame = 0;
+	switch (mCoopKind)
+	{
+	case CoopZombieKind::COOP_KIND_TANK:
+		// The biggest thing on the lawn short of a Gargantuar.
+		aSheet = "tank";
+		aScale = 1.3f;
+		aRate = COOP_TANK_ANIM_RATE;
+		break;
+	case CoopZombieKind::COOP_KIND_HEAVY:
+		aSheet = "heavy";
+		aScale = 1.2f;
+		aRate = COOP_HEAVY_DANCE_RATE;
+		aStillFrame = COOP_HEAVY_STILL_FRAME;
+		break;
+	case CoopZombieKind::COOP_KIND_SPY:
+		aSheet = "spy_walk";
+		anAttack = "spy_attack";
+		break;
+	case CoopZombieKind::COOP_KIND_SOLDIER:
+		aSheet = "soldier_walk";
+		anAttack = "soldier_attack";
+		break;
+	default:
+		return false;
+	}
+	if (CoopArt::SheetFrames(aSheet) <= 0)
+		return false;
+	if (anAttack && mIsEating && CoopArt::SheetFrames(anAttack) > 0)
+		aSheet = anAttack;  // the shovel swing, the knife
 	const int aFrames = CoopArt::SheetFrames(aSheet);
-	if (aFrames <= 0)
-		return;
 
 	Reanimation* aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
 	const float aAnimTime = aBodyReanim ? aBodyReanim->mAnimTime : 0.0f;
 	// Counted across loops of the zombie underneath, so a rate that is not a
-	// whole number runs on smoothly: the tank's treads at a little over one
-	// turn a Zomboni cycle, the Heavy's dance at a bit over half a stride.
+	// whole number runs on smoothly.
 	const float aPhase = (aBodyReanim ? static_cast<float>(aBodyReanim->mLoopCount) : 0.0f) + aAnimTime;
-	int aFrame = static_cast<int>(aPhase * aFrames * (aTank ? COOP_TANK_ANIM_RATE : COOP_HEAVY_DANCE_RATE)) % aFrames;
-	// Neither has an animation for standing still -- waiting on the street
-	// before the level, stopped to eat, frozen, buttered or stopped dead --
-	// so then each holds one frame instead of driving or dancing on the spot.
-	const bool aStill = !IsOnBoard() || mIsEating || mIceTrapCounter > 0 || mButteredCounter > 0 ||
-		(aTank && mVelX <= 0.0f);
+	int aFrame = static_cast<int>(aPhase * aFrames * aRate) % aFrames;
+	// No animation for standing still -- waiting on the street before the
+	// level, frozen, buttered, dizzy, or a tank stopped dead -- so then each
+	// holds one frame instead of walking on the spot. Eating is an animation
+	// of its own where there is one.
+	const bool anAttacking = anAttack && aSheet == anAttack;
+	const bool aStill = !IsOnBoard() || (mIsEating && !anAttacking) || mIceTrapCounter > 0 || mButteredCounter > 0 ||
+		mZombiePhase == ZombiePhase::PHASE_DIGGER_STUNNED || (aTank && mVelX <= 0.0f);
 	if (aStill)
-		aFrame = aTank ? 0 : COOP_HEAVY_STILL_FRAME;
+		aFrame = aStillFrame % aFrames;
 
 	// Ground point, in this zombie's own drawing space.
 	float aX = aTank ? 76.0f : 70.0f;
@@ -11266,8 +11345,33 @@ void Zombie::DrawCoopKind(Graphics* g)
 	if (mZombieFade >= 0)
 		aAlpha = std::clamp(255 * mZombieFade / 10, 0, 255);
 
-	// The Heavy has no death of his own: he topples over backwards, bounces
-	// once on his back and fades out where he lies.
+	// The Spy: all but invisible on his way, a shimmer at most; then he
+	// uncloaks where he comes up, behind your plants.
+	if (mCoopKind == CoopZombieKind::COOP_KIND_SPY)
+	{
+		aY = 118.0f - mAltitude;  // where the Digger would be, he stands on the ground
+		if (mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING || mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING_PAUSE_WITHOUT_AXE)
+		{
+			aAlpha = aAlpha * (24 + static_cast<int>(14.0 * sin(mZombieAge * 0.13))) / 255;
+		}
+		else if (mZombiePhase == ZombiePhase::PHASE_DIGGER_RISING || mZombiePhase == ZombiePhase::PHASE_DIGGER_RISE_WITHOUT_AXE)
+		{
+			const float aUncloak = std::clamp(1.0f - mPhaseCounter / 130.0f, 0.0f, 1.0f);
+			if (CoopArt::SheetFrames("spy_uncloak") > 0)
+			{
+				aSheet = "spy_uncloak";
+				aFrame = std::min(static_cast<int>(aUncloak * CoopArt::SheetFrames(aSheet)), CoopArt::SheetFrames(aSheet) - 1);
+			}
+			else
+			{
+				aFrame = 0;
+				aAlpha = aAlpha * (24 + static_cast<int>(231 * aUncloak)) / 255;
+			}
+		}
+	}
+
+	// No death animations of their own: the tank blows up (ZamboniDeath);
+	// the rest topple over backwards, bounce once and fade out where they lie.
 	const bool aDying = mZombiePhase == ZombiePhase::PHASE_ZOMBIE_DYING;
 	const bool aBurned = mZombiePhase == ZombiePhase::PHASE_ZOMBIE_BURNED;
 	if (!aTank && aDying)
@@ -11278,7 +11382,7 @@ void Zombie::DrawCoopKind(Graphics* g)
 		if (aT > 0.52f && aT < 0.7f)
 			aRotation -= static_cast<float>(sin((aT - 0.52f) / 0.18f * 3.14159f)) * 0.12f;
 		aX += aRotation * 8.0f;
-		aFrame = 0;
+		aFrame = aStillFrame % CoopArt::SheetFrames(aSheet);
 	}
 
 	Graphics aG(*g);
@@ -11296,7 +11400,9 @@ void Zombie::DrawCoopKind(Graphics* g)
 		aG.SetColor(Color(255, 255, 255, aAlpha));
 	}
 
-	const bool aFlip = mMindControlled;
+	// Facing right when walking back the other way (the Spy, behind your
+	// plants) or hypnotised -- but not both.
+	const bool aFlip = mMindControlled != IsWalkingBackwards();
 	if (aFlip)
 		aX = (aTank ? 153.0f : 120.0f) - aX;
 	CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX, aY, aScale, aFlip, aFlip ? -aRotation : aRotation);
@@ -11308,6 +11414,7 @@ void Zombie::DrawCoopKind(Graphics* g)
 		aG.SetColor(Color(255, 255, 255, std::min(mJustGotShotCounter * 10, 120) * aAlpha / 255));
 		CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX, aY, aScale, aFlip, aFlip ? -aRotation : aRotation);
 	}
+	return true;
 }
 
 void Zombie::DrawCoopRoman(Graphics* g)

@@ -1427,6 +1427,8 @@ enum ZombieType : int32_t
 	// really is, so it keeps all of that zombie's rules.
 	ZOMBIE_COOP_TANK,
 	ZOMBIE_COOP_HEAVY,
+	ZOMBIE_COOP_SPY,      // a Digger underneath: cloaked on the way, uncloaks behind you
+	ZOMBIE_COOP_SOLDIER,  // a Buckethead underneath, tougher, swings a shovel
 	NUM_ZOMBIE_TYPES,
 	ZOMBIE_CACHED_POLEVAULTER_WITH_POLE,
 	NUM_CACHED_ZOMBIE_TYPES
