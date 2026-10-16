@@ -6,8 +6,8 @@ game's piece of the same name in Adventure Plus (CMakeLists.txt reads them,
 with assets/coop/zombie-parts). The game's own are kept in save/, which the
 game does not read -- copy one back here to undo a change.
 
-  zombie_cone1/2/3              Conehead: whole, dented, nearly gone
-  zombie_bucket1/2/3            Buckethead: the same three stages
+  zombie_cone1/2/3              Conehead: whole, dented, nearly gone (yours: raised 7 px, @0,-7)
+  zombie_bucket1/2/3            Buckethead: the same three stages (yours: raised 7 px, @0,-7)
   zombie_football_helmet/2/3    Football Zombie's helmet
   zombie_digger_hardhat/2/3     Digger (miner) Zombie's hard hat
   _all-headwear-sheet.png       all of them on one page, to look at
