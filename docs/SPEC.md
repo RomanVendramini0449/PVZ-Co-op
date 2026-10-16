@@ -362,9 +362,10 @@ the rain, with thunder. Dave's talk ends with a Bungee Zombie taking him, his
 name replaces Ready-Set-Plant, and his own music plays. The conveyor brings
 Luca (no sun here), Noah, GRS, Jalapenos and Ice-shrooms. He stands in a 3x3
 block on the right and flattens anything planted under him; everywhere else
-can be planted, his other lanes' columns included. He has 40,000 health
+can be planted, his other lanes' columns included. He has 45,000 health
 (tuned so the belt's plant every 4 s outpaces what he destroys), rests 6.5-9.5 s
-between attacks (4.5-7 s below half health), and every attack is marked on the
+between attacks (4-6.5 s below half health, when he also hops far more and
+throws a doom grenade every 25 s or so), and every attack is marked on the
 lawn first:
 - bombs: 3 (later 4-5), most at random squares, one in four at a plant;
 - a hop onto a marked 3x3, which he flattens, then back;
@@ -373,7 +374,9 @@ lawn first:
 An Ice-shroom freezes him in place (an attack he is winding up waits) and
 freezes his bombs, which burst harmlessly. A light Heavy Weapons Guy (900)
 comes every 18-26 s; at half health he calls in two 2,500-health tanks and
-waits for them. He topples over and blows up.
+waits for them. He topples over and blows up. Every win pays **$20,000**. He is drawn among
+the zombies at the depth of his feet; his bombs and the marks go over
+everything.
 
 Losing in Adventure Plus has no house to walk into: the left side of the lawn
 blows up, lane by lane and then all at once, and the game is over.

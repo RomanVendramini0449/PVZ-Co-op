@@ -328,6 +328,12 @@ void AwardScreen::Draw(Graphics* g)
 	{
 		DrawAwardSeed(g, SEED_GRS);
 	}
+	else if (mAwardType == AWARD_COOP_DEMOMAN_BEATEN)
+	{
+		DrawBottom(g, "Legendary Demoman Defeated!", "Adventure Plus", "The Legendary Demoman is down. Team Fortress is saved... for now.");
+		g->DrawImage(Sexy::IMAGE_TROPHY_HI_RES, BOARD_WIDTH / 2 - Sexy::IMAGE_TROPHY_HI_RES->mWidth / 2, 137);
+		DrawCoopPrizeLine(g, DEMOMAN_PRIZE_COINS);
+	}
 	else if (mAwardType == AWARD_COOP_ROMAN_BEATEN)
 	{
 		DrawBottom(g, "Roman Defeated!", "Luca vs. Roman", "Luca has kept Roman at bay... for now.");
@@ -534,7 +540,7 @@ void AwardScreen::StartButtonPressed()
 		mApp->ShowCreditScreen();
 	}
 	else if (mAwardType == AWARD_HELP_ZOMBIENOTE || mAwardType == AWARD_COOP_LUCA || mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE ||
-		mAwardType == AWARD_COOP_ROMAN_BEATEN || mAwardType == AWARD_COOP_GRS)
+		mAwardType == AWARD_COOP_ROMAN_BEATEN || mAwardType == AWARD_COOP_GRS || mAwardType == AWARD_COOP_DEMOMAN_BEATEN)
 	{
 		mApp->KillAwardScreen();
 		mApp->ShowGameSelector();

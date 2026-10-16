@@ -79,15 +79,15 @@ namespace
 		ACTION_DOOM,
 	};
 
-	constexpr float SCALE = 1.15f;              // his art, a bit over his 3x3 block
+	constexpr float SCALE = 1.3f;               // his art, towering over his 3x3 block
 	constexpr int   HOME_COL = 7;               // the middle of his block: columns 6-8
 	constexpr int   CENTER_ROW = 2;
 	constexpr float BLOCK_HALF_WIDTH = 100.0f;  // a column's middle this close to him is under him
 	constexpr int   ENTER_TICKS = 290;          // his spawn animation, 58 frames at 20 a second
 	constexpr int   REST_MIN_TICKS = 650;       // between attacks
 	constexpr int   REST_MAX_TICKS = 950;
-	constexpr int   LATE_REST_MIN_TICKS = 450;  // once he is down to half
-	constexpr int   LATE_REST_MAX_TICKS = 700;
+	constexpr int   LATE_REST_MIN_TICKS = 400;  // once he is down to half
+	constexpr int   LATE_REST_MAX_TICKS = 650;
 	constexpr int   SHOOT_TICKS = 50;           // one throw
 	constexpr int   SHOOT_RELEASE_TICK = 28;    // the bomb leaves his hand
 	constexpr int   HOP_AIM_TICKS = 140;
@@ -110,7 +110,7 @@ namespace
 	constexpr float DOOM_ARC = 260.0f;
 	constexpr int   DOOM_FUSE = 320;            // on the ground, fizzing, before it goes off
 	constexpr int   DOOM_REACH = 2;             // squares each way: a 5x5
-	constexpr int   DOOM_COOLDOWN = 4500;
+	constexpr int   DOOM_COOLDOWN = 2500;
 	constexpr int   BOMB_FROZEN_TICKS = 70;
 	constexpr int   FIRST_SUMMON_TICKS = 1600;
 	constexpr int   SUMMON_MIN_TICKS = 1800;
@@ -214,7 +214,7 @@ void Zombie::InitCoopDemoman()
 
 Rect Zombie::GetCoopDemoRect()
 {
-	return Rect(static_cast<int>(mCoopBossX) - 105, static_cast<int>(mCoopBossY) - 320, 210, 310);
+	return Rect(static_cast<int>(mCoopBossX) - 118, static_cast<int>(mCoopBossY) - 360, 236, 350);
 }
 
 bool Zombie::CoopDemoCanBeHit()
@@ -297,8 +297,9 @@ static bool PickPlantSquare(Board* theBoard, int& theCol, int& theRow, const std
 void Zombie::CoopDemoPickAttack()
 {
 	const bool aLate = mBodyHealth * 2 <= mBodyMaxHealth;
-	const int aBombs = 45, aHop = 20, aCharge = 20;
-	const int aDoom = (aLate && mCoopBossDoomCooldown <= 0) ? 15 : 0;
+	// Once he is down to half he jumps much more, and throws doom grenades.
+	const int aBombs = aLate ? 35 : 45, aHop = aLate ? 40 : 25, aCharge = 20;
+	const int aDoom = (aLate && mCoopBossDoomCooldown <= 0) ? 25 : 0;
 	int aRoll = Rand(aBombs + aHop + aCharge + aDoom);
 
 	if ((aRoll -= aBombs) < 0)
@@ -479,7 +480,7 @@ void Zombie::CoopDemoSendTanks()
 		}
 	}
 	CoopDemoSummonHeavy();
-	mBoard->DisplayAdvice("The Demoman called in the tanks!", MessageStyle::MESSAGE_STYLE_HINT_FAST, AdviceType::ADVICE_NONE);
+	mBoard->DisplayAdvice("The Legendary Demoman called in the tanks!", MessageStyle::MESSAGE_STYLE_HINT_FAST, AdviceType::ADVICE_NONE);
 	CoopDemoSetState(LD_WAIT_TANKS, TANK_WAIT_MAX_TICKS);
 }
 
@@ -744,9 +745,11 @@ void Zombie::UpdateCoopDemoman()
 	mRow = std::clamp(static_cast<int>(std::floor(aRows + 0.5f)), 0, 4);
 }
 
-void Zombie::DrawCoopDemoman(Graphics* g)
+// What is about to be hit, marked on the lawn, and his bombs: drawn over
+// everything, apart from his body (DrawCoopDemoman), which stands among the
+// zombies at the depth of his feet.
+void Zombie::DrawCoopDemoMarks(Graphics* g)
 {
-	// What is about to be hit, marked on the lawn under him.
 	if (IsOnBoard())
 	{
 		const int aPulse = static_cast<int>(45.0 * (0.5 + 0.5 * sin(mCoopBossAnimTicks * 0.25)));
@@ -758,7 +761,8 @@ void Zombie::DrawCoopDemoman(Graphics* g)
 		}
 		else if (mCoopBossState == LD_CHARGE_WINDUP || mCoopBossState == LD_CHARGE)
 		{
-			const int aLastCol = std::clamp(static_cast<int>((mCoopBossX - 40.0f) / 80.0f), 0, 8);
+			// The lane up to him, not under him.
+			const int aLastCol = std::clamp(static_cast<int>((mCoopBossX - 120.0f) / 80.0f), 0, 8);
 			DrawDangerSquares(&aMarkG, mBoard, 0, aLastCol, mCoopBossTargetRow, mCoopBossTargetRow, aPulse,
 				static_cast<float>(mX), static_cast<float>(mY));
 		}
@@ -772,6 +776,48 @@ void Zombie::DrawCoopDemoman(Graphics* g)
 		}
 	}
 
+	// The bombs, and where each will land.
+	for (const CoopDemoBomb& aBomb : mCoopBombs)
+	{
+		if (!aBomb.mActive)
+			continue;
+
+		const bool aLanded = aBomb.mTicks >= aBomb.mFlightTicks;
+		if (!aLanded && aBomb.mFrozen == 0 && !aBomb.mDoom)
+		{
+			Graphics aTargetG(*g);
+			aTargetG.SetColorizeImages(true);
+			aTargetG.SetColor(Color(255, 255, 255, 200));
+			const float aW = static_cast<float>(IMAGE_BUNGEETARGET->mWidth), aH = static_cast<float>(IMAGE_BUNGEETARGET->mHeight);
+			PvzpDrawImageScaledF(&aTargetG, IMAGE_BUNGEETARGET, aBomb.mToX - aW * 0.5f - mX, aBomb.mToY - aH * 0.5f - mY, 1.0f, 1.0f);
+		}
+
+		float aBombX, aBombY;
+		BombPosition(aBomb, aBombX, aBombY);
+		const float aScale = aBomb.mDoom ? 2.6f : 1.0f;
+		const float aSpin = aLanded ? 0.0f : aBomb.mTicks * (aBomb.mDoom ? 0.06f : 0.18f);
+		const int aBombFrame = (aBomb.mTicks + aBomb.mFuse) / 6;
+
+		Graphics aBombG(*g);
+		aBombG.SetColorizeImages(true);
+		aBombG.SetColor(aBomb.mFrozen > 0 ? Color(120, 190, 255) : Color::White);
+		CoopArt::DrawSheetFrame(&aBombG, "demo_bomb", aBombFrame, aBombX - mX, aBombY - mY, aScale, false, aSpin);
+		// A doom grenade on the ground flashes faster and faster.
+		if (aBomb.mDoom && aLanded && aBomb.mFrozen == 0)
+		{
+			const int aPeriod = std::max(6, aBomb.mFuse / 8);
+			if ((aBomb.mFuse / aPeriod) % 2 == 0)
+			{
+				aBombG.SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
+				aBombG.SetColor(Color(255, 40, 20, 200));
+				CoopArt::DrawSheetFrame(&aBombG, "demo_bomb", aBombFrame, aBombX - mX, aBombY - mY, aScale, false, aSpin);
+			}
+		}
+	}
+}
+
+void Zombie::DrawCoopDemoman(Graphics* g)
+{
 	const char* aSheet = "demo_idle";
 	int aFrame = mCoopBossAnimTicks * 15 / 100;
 	float aRotation = 0.0f;
@@ -865,45 +911,6 @@ void Zombie::DrawCoopDemoman(Graphics* g)
 			aG.SetColor(Color(aGlowColor.mRed, aGlowColor.mGreen, aGlowColor.mBlue, aGlow * anAlpha / 255));
 			CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX - mX, aY - mY, SCALE, false, aRotation);
 			aG.SetDrawMode(Graphics::DRAWMODE_NORMAL);
-		}
-	}
-
-	// The bombs, and where each will land.
-	for (const CoopDemoBomb& aBomb : mCoopBombs)
-	{
-		if (!aBomb.mActive)
-			continue;
-
-		const bool aLanded = aBomb.mTicks >= aBomb.mFlightTicks;
-		if (!aLanded && aBomb.mFrozen == 0 && !aBomb.mDoom)
-		{
-			Graphics aTargetG(*g);
-			aTargetG.SetColorizeImages(true);
-			aTargetG.SetColor(Color(255, 255, 255, 200));
-			const float aW = static_cast<float>(IMAGE_BUNGEETARGET->mWidth), aH = static_cast<float>(IMAGE_BUNGEETARGET->mHeight);
-			PvzpDrawImageScaledF(&aTargetG, IMAGE_BUNGEETARGET, aBomb.mToX - aW * 0.5f - mX, aBomb.mToY - aH * 0.5f - mY, 1.0f, 1.0f);
-		}
-
-		float aBombX, aBombY;
-		BombPosition(aBomb, aBombX, aBombY);
-		const float aScale = aBomb.mDoom ? 2.6f : 1.0f;
-		const float aSpin = aLanded ? 0.0f : aBomb.mTicks * (aBomb.mDoom ? 0.06f : 0.18f);
-		const int aBombFrame = (aBomb.mTicks + aBomb.mFuse) / 6;
-
-		Graphics aBombG(*g);
-		aBombG.SetColorizeImages(true);
-		aBombG.SetColor(aBomb.mFrozen > 0 ? Color(120, 190, 255) : Color::White);
-		CoopArt::DrawSheetFrame(&aBombG, "demo_bomb", aBombFrame, aBombX - mX, aBombY - mY, aScale, false, aSpin);
-		// A doom grenade on the ground flashes faster and faster.
-		if (aBomb.mDoom && aLanded && aBomb.mFrozen == 0)
-		{
-			const int aPeriod = std::max(6, aBomb.mFuse / 8);
-			if ((aBomb.mFuse / aPeriod) % 2 == 0)
-			{
-				aBombG.SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
-				aBombG.SetColor(Color(255, 40, 20, 200));
-				CoopArt::DrawSheetFrame(&aBombG, "demo_bomb", aBombFrame, aBombX - mX, aBombY - mY, aScale, false, aSpin);
-			}
 		}
 	}
 }

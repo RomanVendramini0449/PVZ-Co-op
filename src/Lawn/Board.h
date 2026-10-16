@@ -101,6 +101,7 @@ constexpr const int ROMAN_FIRST_COL = 6;
 constexpr const int ROMAN_CENTER_ROW = 2;
 constexpr const int ROMAN_HEALTH = 60000;               // one and a half Dr. Zombosses
 constexpr const int ROMAN_PRIZE_COINS = 1500;           // $15,000 a win (coins count in tens)
+constexpr const int DEMOMAN_PRIZE_COINS = 2000;         // $20,000 for each Legendary Demoman win
 constexpr const int ROMAN_IDLE_MIN_TICKS = 400;         // rests 4-7 s between attack runs
 constexpr const int ROMAN_IDLE_MAX_TICKS = 700;
 constexpr const int ROMAN_FIRST_SUMMON_TICKS = 1500;

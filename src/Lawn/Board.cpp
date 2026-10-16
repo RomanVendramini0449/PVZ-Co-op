@@ -6802,11 +6802,20 @@ void Board::AddBossRenderItem(RenderItem* theRenderList, int& theCurRenderItem, 
 	PVZP_ASSERT(theCurRenderItem < MAX_RENDER_ITEMS);
 	if (theBossZombie->IsCoopDemoman())
 	{
-		// The Demoman is one picture; his bombs are drawn with him.
+		// The Legendary Demoman stands among the zombies at the depth of his
+		// feet (the bottom row of his block), so what is in front of him
+		// is drawn in front of him...
 		RenderItem* aItem = &theRenderList[theCurRenderItem];
 		aItem->mRenderObjectType = RenderObjectType::RENDER_ITEM_BOSS_PART;
-		aItem->mZPos = MakeRenderOrder(RenderLayer::RENDER_LAYER_BOSS, 4, 2);
+		aItem->mZPos = MakeRenderOrder(RenderLayer::RENDER_LAYER_ZOMBIE, std::min(theBossZombie->mRow + 1, 4), 1);
 		aItem->mBossPart = BossPart::BOSS_PART_MAIN;
+		theCurRenderItem++;
+		// ...while his bombs and the marks of what is about to be hit go
+		// over everything.
+		aItem = &theRenderList[theCurRenderItem];
+		aItem->mRenderObjectType = RenderObjectType::RENDER_ITEM_BOSS_PART;
+		aItem->mZPos = MakeRenderOrder(RenderLayer::RENDER_LAYER_BOSS, 4, 2);
+		aItem->mBossPart = BossPart::BOSS_PART_FIREBALL;
 		theCurRenderItem++;
 		return;
 	}

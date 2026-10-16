@@ -3268,7 +3268,8 @@ void Plant::UpdateShooting()
 	if (mSeedType == SeedType::SEED_GRS && mShootingCounter == 15)
 	{
 		int aRenderPosition = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0);
-		PvzpParticleSystem* aFumes = mApp->AddPvzpParticle(mX + 85, mY + 31, aRenderPosition, ParticleEffect::PARTICLE_FUMECLOUD);
+		// From the middle of his face, not where a Fume-shroom's mouth is.
+		PvzpParticleSystem* aFumes = mApp->AddPvzpParticle(mX + 40, mY + 38, aRenderPosition, ParticleEffect::PARTICLE_FUMECLOUD);
 		if (aFumes)
 			aFumes->OverrideColor(nullptr, Color(90, 255, 70));
 	}

@@ -10712,6 +10712,8 @@ void Zombie::DrawBossPart(Graphics* g, BossPart theBossPart)
 	{
 		if (theBossPart == BossPart::BOSS_PART_MAIN)
 			DrawCoopDemoman(g);
+		else if (theBossPart == BossPart::BOSS_PART_FIREBALL)
+			DrawCoopDemoMarks(g);
 		return;
 	}
 	if (IsCoopRoman())
@@ -11230,7 +11232,14 @@ void Zombie::DrawCoopKind(Graphics* g)
 
 	Reanimation* aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
 	const float aAnimTime = aBodyReanim ? aBodyReanim->mAnimTime : 0.0f;
-	int aFrame = static_cast<int>(aAnimTime * aFrames * (aTank ? 2 : 1));
+	int aFrame = static_cast<int>(aAnimTime * aFrames * 2);
+	if (!aTank && aBodyReanim)
+	{
+		// The Heavy dances at a bit over half the Football Zombie's stride,
+		// counted across loops so it runs on smoothly.
+		const float aPhase = static_cast<float>(aBodyReanim->mLoopCount) + aAnimTime;
+		aFrame = static_cast<int>(aPhase * aFrames * COOP_HEAVY_DANCE_RATE) % aFrames;
+	}
 	// Neither has an animation for standing still -- waiting on the street
 	// before the level, stopped to eat, frozen, buttered or stopped dead --
 	// so then each holds one frame instead of driving or dancing on the spot.

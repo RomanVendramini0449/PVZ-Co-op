@@ -111,6 +111,7 @@ enum AwardType : int32_t
 	AWARD_COOP_ONSLAUGHT_PRIZE,  // PvZ Co-op: its prize money, every win after
 	AWARD_COOP_ROMAN_BEATEN,     // PvZ Co-op: Luca vs. Roman won
 	AWARD_COOP_GRS,              // PvZ Co-op: GRS, for beating Adventure Plus 5
+	AWARD_COOP_DEMOMAN_BEATEN,   // PvZ Co-op: the Legendary Demoman (Adventure Plus 11) beaten
 };
 enum BackgroundType : int32_t
 {

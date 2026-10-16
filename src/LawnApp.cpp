@@ -2034,6 +2034,9 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		// reaches the joining player like the rest of the host's progress.
 		if (mCoopPlusLevel >= 1 && mCoopPlusLevel <= ADVENTURE_PLUS_LEVELS)
 			mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_ADVENTURE_PLUS_BEATEN] |= 1u << (mCoopPlusLevel - 1);
+		// $20,000 for the Legendary Demoman, every time.
+		if (mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL)
+			mPlayerInfo->AddCoins(DEMOMAN_PRIZE_COINS);
 		// GRS joins you for beating the bowling level.
 		if (mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_GRS] == 0)
 		{
@@ -2212,6 +2215,10 @@ void LawnApp::CheckForGameEnd()
 		else if (mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
 		{
 			ShowAwardScreen(AwardType::AWARD_COOP_ROMAN_BEATEN, true);
+		}
+		else if (IsAdventurePlusLevel() && mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL)
+		{
+			ShowAwardScreen(AwardType::AWARD_COOP_DEMOMAN_BEATEN, true);
 		}
 		else if (IsAdventurePlusLevel() && aUnlockedNewChallenge && mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL)
 		{
