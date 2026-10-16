@@ -362,10 +362,10 @@ the rain, with thunder. Dave's talk ends with a Bungee Zombie taking him, his
 name replaces Ready-Set-Plant, and his own music plays. The conveyor brings
 Luca (no sun here), Noah, GRS, Jalapenos and Ice-shrooms. He stands in a 3x3
 block on the right and flattens anything planted under him; everywhere else
-can be planted, his other lanes' columns included. He has 45,000 health
+can be planted, his other lanes' columns included. He has 60,000 health
 (tuned so the belt's plant every 4 s outpaces what he destroys), rests 6.5-9.5 s
 between attacks (4-6.5 s below half health, when he also hops far more and
-throws a doom grenade every 25 s or so), and every attack is marked on the
+throws a doom grenade every 15-20 s or so), and every attack is marked on the
 lawn first:
 - bombs: 3 (later 4-5), most at random squares, one in four at a plant;
 - a hop onto a marked 3x3, which he flattens, then back;

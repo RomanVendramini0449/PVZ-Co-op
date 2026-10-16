@@ -110,7 +110,7 @@ namespace
 	constexpr float DOOM_ARC = 260.0f;
 	constexpr int   DOOM_FUSE = 320;            // on the ground, fizzing, before it goes off
 	constexpr int   DOOM_REACH = 2;             // squares each way: a 5x5
-	constexpr int   DOOM_COOLDOWN = 2500;
+	constexpr int   DOOM_COOLDOWN = 1500;       // 15 s: below half, doom grenades are his main threat
 	constexpr int   BOMB_FROZEN_TICKS = 70;
 	constexpr int   FIRST_SUMMON_TICKS = 1600;
 	constexpr int   SUMMON_MIN_TICKS = 1800;
@@ -299,7 +299,7 @@ void Zombie::CoopDemoPickAttack()
 	const bool aLate = mBodyHealth * 2 <= mBodyMaxHealth;
 	// Once he is down to half he jumps much more, and throws doom grenades.
 	const int aBombs = aLate ? 35 : 45, aHop = aLate ? 40 : 25, aCharge = 20;
-	const int aDoom = (aLate && mCoopBossDoomCooldown <= 0) ? 25 : 0;
+	const int aDoom = (aLate && mCoopBossDoomCooldown <= 0) ? 40 : 0;
 	int aRoll = Rand(aBombs + aHop + aCharge + aDoom);
 
 	if ((aRoll -= aBombs) < 0)
