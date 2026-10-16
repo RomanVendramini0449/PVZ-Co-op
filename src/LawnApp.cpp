@@ -2723,6 +2723,9 @@ void LawnApp::LoadingThreadProc()
 		"That's KERNEL! He used to be a regular old squash. Don't ask him about it. He squashes zombies exactly the same, he's just angrier about it.");
 	mStringProperties.insert_or_assign("CRAZY_DAVE_3952",
 		"This pepper is CRAZY! His name is Philippe. He burns a whole lane just like a regular Jalapeno, but he enjoys it WAY too much.");
+	// Adventure Plus's own zombies, as the street before a level names them.
+	mStringProperties.insert_or_assign("TANK", "Tank");
+	mStringProperties.insert_or_assign("HEAVY_WEAPONS_GUY", "Heavy Weapons Guy");
 	mStringProperties.insert_or_assign("GRS", "GRS");
 	mStringProperties.insert_or_assign("GRS_TOOLTIP", "Breathes green fumes through every zombie in reach");
 	mStringProperties.insert_or_assign("GRS_DESCRIPTION",

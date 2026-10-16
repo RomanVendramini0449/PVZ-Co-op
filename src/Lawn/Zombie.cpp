@@ -11221,7 +11221,9 @@ void Zombie::DrawCoopKind(Graphics* g)
 {
 	const bool aTank = mCoopKind == CoopZombieKind::COOP_KIND_TANK;
 	const char* aSheet = aTank ? "tank" : "heavy";
-	const float aScale = aTank ? 1.0f : 1.2f;  // the Heavy is a big man
+	// The tank is the biggest thing on the lawn short of a Gargantuar; the
+	// Heavy is a big man, but it is bigger.
+	const float aScale = aTank ? 1.5f : 1.2f;
 	const int aFrames = CoopArt::SheetFrames(aSheet);
 	if (aFrames <= 0)
 		return;
@@ -11229,6 +11231,13 @@ void Zombie::DrawCoopKind(Graphics* g)
 	Reanimation* aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
 	const float aAnimTime = aBodyReanim ? aBodyReanim->mAnimTime : 0.0f;
 	int aFrame = static_cast<int>(aAnimTime * aFrames * (aTank ? 2 : 1));
+	// Neither has an animation for standing still -- waiting on the street
+	// before the level, stopped to eat, frozen, buttered or stopped dead --
+	// so then each holds one frame instead of driving or dancing on the spot.
+	const bool aStill = !IsOnBoard() || mIsEating || mIceTrapCounter > 0 || mButteredCounter > 0 ||
+		(aTank && mVelX <= 0.0f);
+	if (aStill)
+		aFrame = aTank ? 0 : COOP_HEAVY_STILL_FRAME;
 
 	// Ground point, in this zombie's own drawing space.
 	float aX = aTank ? 76.0f : 70.0f;

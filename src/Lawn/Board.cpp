@@ -3787,9 +3787,14 @@ void Board::UpdateToolTip(const HitResult* theHitResult)
 			return;
 		}
 
-		std::string aZombieName = std::format("[{}]", GetZombieDefinition(aZombie->mZombieType).mZombieName);
+		// The tank and the Heavy run as a Zomboni and a Football Zombie
+		// underneath, but are named as themselves, and have no Almanac page.
+		const ZombieType aNameType = aZombie->mCoopKind == CoopZombieKind::COOP_KIND_TANK ? ZombieType::ZOMBIE_COOP_TANK
+			: aZombie->mCoopKind == CoopZombieKind::COOP_KIND_HEAVY ? ZombieType::ZOMBIE_COOP_HEAVY : aZombie->mZombieType;
+		std::string aZombieName = std::format("[{}]", GetZombieDefinition(aNameType).mZombieName);
 		mToolTip->SetTitle(aZombieName);
-		if (mApp->CanShowAlmanac() && aZombie->mZombieType != ZombieType::ZOMBIE_REDEYE_GARGANTUAR)
+		if (mApp->CanShowAlmanac() && aZombie->mZombieType != ZombieType::ZOMBIE_REDEYE_GARGANTUAR &&
+			aZombie->mCoopKind == CoopZombieKind::COOP_KIND_NONE)
 		{
 			mToolTip->SetLabel("[CLICK_TO_VIEW]");
 		}
