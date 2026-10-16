@@ -2758,6 +2758,12 @@ void LawnApp::LoadingThreadProc()
 		"GRAZ burps green fumes that go straight through every zombie in front of him.{SHORTLINE}"
 		"{KEYWORD}Damage:{STAT} normal, to everything in reach{BR}{KEYWORD}Range:{STAT} four tiles{SHORTLINE}"
 		"Unlike a Fume-shroom, he never sleeps. That's because he drinks WAY too much monster energy.");
+	mStringProperties.insert_or_assign("TF2_ROCKET", "Rocket");
+	mStringProperties.insert_or_assign("TF2_ROCKET_TOOLTIP", "Flies down the lane, bouncing off what it hits");
+	mStringProperties.insert_or_assign("TF2_CRIT_ROCKET", "Crit Rocket");
+	mStringProperties.insert_or_assign("TF2_CRIT_ROCKET_TOOLTIP", "Explodes on the first zombie it hits");
+	mStringProperties.insert_or_assign("TF2_BIG_ROCKET", "Big Rocket");
+	mStringProperties.insert_or_assign("TF2_BIG_ROCKET_TOOLTIP", "Flattens everything in its lane");
 	mStringProperties.insert_or_assign("SENTRY", "Sentry Turret");
 	mStringProperties.insert_or_assign("SENTRY_TOOLTIP", "Shoots homing spikes at the nearest zombie, anywhere");
 	mStringProperties.insert_or_assign("SENTRY_DESCRIPTION",

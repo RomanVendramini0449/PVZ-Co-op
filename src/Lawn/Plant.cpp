@@ -4256,13 +4256,15 @@ bool Plant::DrawPlusRocket(Graphics* g, SeedType theSeedType, float theX, float 
 	if (CoopArt::SheetFrames(aSheet) <= 0)
 		return false;
 	const float aScale = theScale * (theSeedType == SeedType::SEED_GIANT_WALLNUT ? 2.0f : 1.0f);
-	const float aTurn = theState == PlantState::STATE_BOWLING_UP ? -0.45f : theState == PlantState::STATE_BOWLING_DOWN ? 0.45f : 0.0f;
+	// Rockets glide level, whichever way they bounce: no tilting, no rolling.
+	const float aTurn = 0.0f;
+	(void)theState;
 	Graphics aG(*g);
 	aG.SetColorizeImages(true);
 	aG.SetColor(Color::White);
 	// The packed ground point is the rocket's bottom middle: drop it by half
 	// its height so it is centred in the plant's square.
-	CoopArt::DrawSheetFrame(&aG, aSheet, static_cast<int>(theCounter / 4), theX + 40.0f * theScale, theY + 40.0f * theScale + 15.0f * aScale,
+	CoopArt::DrawSheetFrame(&aG, aSheet, static_cast<int>(theCounter / 4), theX + 40.0f * theScale, theY + 40.0f * theScale + 12.0f * aScale,
 		aScale, false, aTurn);
 	return true;
 }
@@ -5372,8 +5374,24 @@ int Plant::GetCost(SeedType theSeedType, SeedType theImitaterType)
 	}
 }
 
+// TF2 bowling (Adventure Plus 5) calls its Wall-nuts rockets.
+static const char* PlusRocketKey(SeedType theSeedType)
+{
+	if (gLawnApp == nullptr || !gLawnApp->IsAdventurePlusLevel() || !gLawnApp->IsWallnutBowlingLevel())
+		return nullptr;
+	switch (theSeedType)
+	{
+	case SeedType::SEED_WALLNUT:        return "TF2_ROCKET";
+	case SeedType::SEED_EXPLODE_O_NUT:  return "TF2_CRIT_ROCKET";
+	case SeedType::SEED_GIANT_WALLNUT:  return "TF2_BIG_ROCKET";
+	default:                            return nullptr;
+	}
+}
+
 std::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterType)
 {
+	if (const char* aRocket = PlusRocketKey(theSeedType))
+		return std::string(PvzpStringTranslate(std::format("[{}]", aRocket)));
 	const PlantDefinition& aPlantDef = GetPlantDefinition(theSeedType);
 	std::string aName = std::format("[{}]", aPlantDef.mPlantName);
 	std::string aTranslatedName(PvzpStringTranslate(aName));
@@ -5391,6 +5409,8 @@ std::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterType)
 
 std::string Plant::GetToolTip(SeedType theSeedType)
 {
+	if (const char* aRocket = PlusRocketKey(theSeedType))
+		return std::string(PvzpStringTranslate(std::format("[{}_TOOLTIP]", aRocket)));
 	const PlantDefinition& aPlantDef = GetPlantDefinition(theSeedType);
 	std::string aToolTip = std::format("[{}_TOOLTIP]", aPlantDef.mPlantName);
 	return std::string(PvzpStringTranslate(aToolTip));

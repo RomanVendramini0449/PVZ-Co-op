@@ -51,9 +51,9 @@ GROUPS = {
     # About the Heavy Weapons Guy's size (143 px drawn 1.2x).
     'spy':     ('spy',     {'walk': 'loopwalk', 'attack': 'attack', 'idle': 'still_idle', 'uncloak': 'uncloak'}, 172),
     'soldier': ('soldier', {'walk': 'walk', 'attack': 'attack', 'idle': 'idle_stand'}, 172),
-    # Adventure Plus bowling's rockets, in place of the Wall-nuts: a
-    # rocket's thickness, about a Wall-nut's length.
-    'rocket':  ('rocket',  {'normal': 'rocket_normal', 'crit': 'crit_rocket_loop'}, 30),
+    # Adventure Plus bowling's rockets, in place of the Wall-nuts: about a
+    # Wall-nut's size (the plain one some 82 px long).
+    'rocket':  ('rocket',  {'normal': 'rocket_normal', 'crit': 'crit_rocket_loop'}, 25),
 }
 
 # name: (file, height in pixels to store at)
@@ -105,9 +105,19 @@ def clean(im):
     return Image.merge('RGBA', (r, g, b, a))
 
 
-def pack_sheet(name, folder, scale, anchor):
+def pack_sheet(name, folder, scale, anchor, ground_each_frame=False):
     files = frames_of(folder)
     frames = [clean(Image.open(f).convert('RGBA')) for f in files]
+    if ground_each_frame:
+        # Every frame's lowest point moved down onto the ground line, for a
+        # walk exported with the whole figure bobbing: the feet stay planted.
+        grounded = []
+        for f in frames:
+            b = f.split()[3].getbbox()
+            g = Image.new('RGBA', f.size, (0, 0, 0, 0))
+            g.paste(f, (0, (anchor[1] - b[3]) if b else 0))
+            grounded.append(g)
+        frames = grounded
     boxes = [f.split()[3].getbbox() for f in frames]
     boxes = [b for b in boxes if b]
     x0, y0 = min(b[0] for b in boxes), min(b[1] for b in boxes)
@@ -176,9 +186,18 @@ def main():
         x0, y0 = min(b[0] for b in boxes), min(b[1] for b in boxes)
         x1, y1 = max(b[2] for b in boxes), max(b[3] for b in boxes)
         scale = height / float(y1 - y0)
-        anchor = ((x0 + x1) // 2, y1)
         for a in present:
-            m = pack_sheet('%s_%s' % (group, a), os.path.join(folder, anims[a]), scale, anchor)
+            # One size and one middle for all of a character's animations
+            # (so switching between them does not jump sideways), but each
+            # stands on its own lowest point: a run held off the ground in
+            # every frame would otherwise float above the lawn.
+            bottom = 0
+            for f in frames_of(os.path.join(folder, anims[a])):
+                b = clean(Image.open(f).convert('RGBA')).split()[3].getbbox()
+                if b:
+                    bottom = max(bottom, b[3])
+            anchor = ((x0 + x1) // 2, bottom)
+            m = pack_sheet('%s_%s' % (group, a), os.path.join(folder, anims[a]), scale, anchor, ground_each_frame=(a == 'walk'))
             sheets.append(m)
             files.append((m['name'], m['file']))
     for name, (file, height) in SINGLES.items():
