@@ -504,11 +504,6 @@ void StoreScreen::Draw(Graphics* g)
 	}
 	g->DrawImage(Sexy::IMAGE_STORE_SIGN, 285, aStoreSignPosY);
 
-	Graphics gCrazyDave = Graphics(*g);
-	gCrazyDave.mTransX -= 42.0f;
-	gCrazyDave.mTransY += 68.0f;
-	mApp->DrawCrazyDave(&gCrazyDave);
-
 	if (!mHatchTimer && mHatchOpen)
 	{
 		for (int i = 0; i < MAX_PAGE_SPOTS; i++)
@@ -520,12 +515,6 @@ void StoreScreen::Draw(Graphics* g)
 			}
 		}
 	}
-
-	g->DrawImage(Sexy::IMAGE_COINBANK, STORESCREEN_COINBANK_X, STORESCREEN_COINBANK_Y);
-	g->SetColor(Color(180, 255, 90));
-	g->SetFont(Sexy::FONT_CONTINUUMBOLD14);
-	std::string aCoinLabel = mApp->GetMoneyString(mApp->mPlayerInfo->mCoins);
-	g->DrawString(aCoinLabel, STORESCREEN_COINBANK_X + 116 - Sexy::FONT_CONTINUUMBOLD14->StringWidth(aCoinLabel), STORESCREEN_COINBANK_Y + 24);
 
 	if (!mPrevButton->mDisabled)
 	{
@@ -545,6 +534,21 @@ void StoreScreen::Draw(Graphics* g)
 
 void StoreScreen::DrawOverlay(Graphics* g)
 {
+	// Crazy Dave stands in front of the page buttons (drawn as widgets, after
+	// Draw), and the money counter in front of him -- a taller stand-in than
+	// Dave reaches both.
+	Graphics gCrazyDave = Graphics(*g);
+	gCrazyDave.SetLinearBlend(true);
+	gCrazyDave.mTransX -= 42.0f;
+	gCrazyDave.mTransY += 68.0f;
+	mApp->DrawCrazyDave(&gCrazyDave);
+
+	g->DrawImage(Sexy::IMAGE_COINBANK, STORESCREEN_COINBANK_X, STORESCREEN_COINBANK_Y);
+	g->SetColor(Color(180, 255, 90));
+	g->SetFont(Sexy::FONT_CONTINUUMBOLD14);
+	std::string aCoinLabel = mApp->GetMoneyString(mApp->mPlayerInfo->mCoins);
+	g->DrawString(aCoinLabel, STORESCREEN_COINBANK_X + 116 - Sexy::FONT_CONTINUUMBOLD14->StringWidth(aCoinLabel), STORESCREEN_COINBANK_Y + 24);
+
 	for (Coin* aCoin : mCoins)
 	{
 		if (!aCoin->mDead)

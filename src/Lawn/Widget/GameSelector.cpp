@@ -1540,7 +1540,7 @@ void GameSelector::DrawCoopLevelSelect(Graphics* g)
 		if (aButton.mCode == kBonusOnslaught)
 		{
 			aTitle = "Gargantuar Onslaught";
-			aNote = aHasLuca ? "25 Gargantuars, 2 waves. Win: $10,000" : "25 Gargantuars, 2 waves. Win: Luca + $10,000";
+			aNote = aHasLuca ? "25 Gargantuars, 2 waves. Win: $2,500" : "25 Gargantuars, 2 waves. Win: Luca + $2,500";
 			aFill = Color(110, 45, 30, 235);
 		}
 		else if (aButton.mCode == kBonusSandbox)

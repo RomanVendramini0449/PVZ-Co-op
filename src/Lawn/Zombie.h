@@ -60,6 +60,7 @@ enum ZombieParts : int32_t
 constexpr int COOP_TANK_HEALTH = 1800;
 constexpr int COOP_HEAVY_HEALTH = 1300;
 constexpr int COOP_HEAVY_STILL_FRAME = 5;       // of his dance: standing upright
+constexpr float COOP_TANK_ANIM_RATE = 1.2f;     // tread cycles per Zomboni cycle (was 2)
 constexpr float COOP_HEAVY_DANCE_RATE = 0.6f;   // whole dances per Football Zombie stride
 constexpr float COOP_TANK_DETONATE_X = 35.0f;  // just before the lawn mower
 constexpr int COOP_DEMO_HEALTH = 60000;         // five to six minutes of a typical lawn's fire
@@ -452,6 +453,7 @@ public:
 	void                            CoopDemoStartDeath();
 	void                            DrawCoopDemoman(Graphics* g);
 	void                            DrawCoopDemoMarks(Graphics* g);
+	void                            DrawCoopDemoBombs(Graphics* g, bool theOnGround);
 	// Adventure Plus enemies (mCoopKind).
 	void                            CoopTankBlast();
 	void                            CoopTankDetonate();

@@ -116,6 +116,23 @@ bool Music::PvzpLoadMusic(MusicFile theMusicFile, std::string_view theFileName)
 	return true;
 }
 
+// The packed boss music is limited to 0.6 of full scale (pack_coop_assets.py)
+// and raised here by this much as it plays: louder than the music slider's
+// cap would otherwise let any music be, and still without clipping.
+static constexpr int COOP_MUSIC_BOOST_NUM = 8;
+static constexpr int COOP_MUSIC_BOOST_DEN = 5;
+
+static void SDLCALL CoopMusicBoost(Mix_Music*, void* theStream, int theLength, void*)
+{
+	// The game opens the audio device as 16-bit (SDLSoundManager).
+	Sint16* aSamples = static_cast<Sint16*>(theStream);
+	for (int i = 0; i < theLength / 2; i++)
+	{
+		const int aValue = aSamples[i] * COOP_MUSIC_BOOST_NUM / COOP_MUSIC_BOOST_DEN;
+		aSamples[i] = static_cast<Sint16>(std::clamp(aValue, -32768, 32767));
+	}
+}
+
 // A recording built into the game (CoopPacked.h), loaded the first time it
 // is wanted. The bytes are the executable's own, so they stay valid.
 bool Music::LoadPackedMusic(MusicFile theMusicFile, const char* thePackedName)
@@ -132,6 +149,7 @@ bool Music::LoadPackedMusic(MusicFile theMusicFile, const char* thePackedName)
 	Mix_Music* aHMusic = Mix_LoadMUS_RW(SDL_RWFromConstMem(aData, static_cast<int>(aSize)), 1);
 	if (aHMusic == nullptr)
 		return false;
+	Mix_RegisterMusicEffect(aHMusic, CoopMusicBoost, nullptr, nullptr);
 
 	SDLMusicInfo aMusicInfo;
 	aMusicInfo.mHMusic = aHMusic;
@@ -641,7 +659,7 @@ void Music::StartGameMusic()
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN || mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM)
 		MakeSureMusicIsPlaying(MusicTune::MUSIC_TUNE_ZEN_GARDEN);
 	else if (mApp->IsLegendaryDemomanLevel())
-		MakeSureMusicIsPlaying(MusicTune::MUSIC_TUNE_COOP_LEGEND);
+		;  // his music starts as he lands (Zombie::UpdateCoopDemoman), not before
 	else if (mApp->IsBossFightLevel())  // Dr. Zomboss, or Roman
 		MakeSureMusicIsPlaying(MusicTune::MUSIC_TUNE_FINAL_BOSS_BRAINIAC_MANIAC);
 	else if (mApp->IsWallnutBowlingLevel() || mApp->IsWhackAZombieLevel() || mApp->IsLittleTroubleLevel() || mApp->IsBungeeBlitzLevel() ||

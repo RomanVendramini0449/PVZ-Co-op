@@ -806,6 +806,10 @@ SeedType Coin::GetFinalSeedPacketType()
 	{
 		return SeedType::SEED_LUCA;
 	}
+	if (mApp->IsAdventurePlusLevel() && mApp->mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL)
+	{
+		return SeedType::SEED_GRS;
+	}
 
 	if (mApp->IsFirstTimeAdventureMode() && mBoard && mBoard->mLevel <= 50)
 	{

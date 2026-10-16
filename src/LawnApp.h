@@ -401,6 +401,9 @@ public:
 	bool					IsCoopRomanLevel();
 	// Adventure Plus 11, the boss.
 	bool					IsLegendaryDemomanLevel();
+	// Adventure Plus's rain and thunder: the Legendary Demoman's level, and
+	// Yeti Season, which is dark and foggy too.
+	bool					IsPlusStormLevel();
 	bool					IsAdventurePlusLevel();
 	// Adventure Plus: write this level's intro lines into the string table
 	// (as Crazy Dave messages from 4000 + 100 * level) and return the first

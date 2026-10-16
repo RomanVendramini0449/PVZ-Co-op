@@ -342,7 +342,7 @@ void AwardScreen::Draw(Graphics* g)
 	}
 	else if (mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE)
 	{
-		DrawBottom(g, "Challenge Complete!", "$10,000", "Prize money for beating Gargantuar Onslaught. Spend it at Crazy Dave's!");
+		DrawBottom(g, "Challenge Complete!", "$2,500", "Prize money for beating Gargantuar Onslaught. Spend it at Crazy Dave's!");
 		g->DrawImage(Sexy::IMAGE_MONEYBAG_HI_RES, BOARD_WIDTH / 2 - Sexy::IMAGE_MONEYBAG_HI_RES->mWidth / 2, 150);
 	}
 	else if (mAwardType != AWARD_ACHIEVEMENTONLY)
@@ -539,8 +539,16 @@ void AwardScreen::StartButtonPressed()
 		mApp->KillAwardScreen();
 		mApp->ShowCreditScreen();
 	}
+	else if (mAwardType == AWARD_COOP_GRS)
+	{
+		// Graz comes with Adventure Plus's bowling level: play on into the
+		// next one, Graz in hand.
+		mApp->KillAwardScreen();
+		mApp->mCoopPlusLevel = ADVENTURE_PLUS_BOWLING_LEVEL + 1;
+		mApp->PreNewGame(GAMEMODE_COOP_ADVENTURE_PLUS, false);
+	}
 	else if (mAwardType == AWARD_HELP_ZOMBIENOTE || mAwardType == AWARD_COOP_LUCA || mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE ||
-		mAwardType == AWARD_COOP_ROMAN_BEATEN || mAwardType == AWARD_COOP_GRS || mAwardType == AWARD_COOP_DEMOMAN_BEATEN)
+		mAwardType == AWARD_COOP_ROMAN_BEATEN || mAwardType == AWARD_COOP_DEMOMAN_BEATEN)
 	{
 		mApp->KillAwardScreen();
 		mApp->ShowGameSelector();

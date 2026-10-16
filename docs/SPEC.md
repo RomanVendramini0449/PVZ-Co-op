@@ -284,7 +284,7 @@ campaign and leave the saved progress alone:
   9990, 30 seconds to set up, then two waves: two Gargantuars lined up in
   every lane, then three -- 25 in all. The second comes 10 seconds after the
   first is entirely gone (2 minutes at most), so it meets what the first left
-  standing, lawn mowers included. Every win pays **$10,000**; the first also
+  standing, lawn mowers included. Every win pays **$2,500**; the first also
   awards **Luca** with the usual "you got a new plant" screen.
 - **Dev Sandbox** (`GAMEMODE_COOP_SANDBOX`): a pool lawn, every plant in the
   chooser (upgrades and Luca included), sun held at 9990, no recharge, and a
@@ -349,8 +349,9 @@ animations instead of its reanimation:
 - **Heavy Weapons Guy** (on the Football Zombie, dancing): as fast, no helmet,
   1,300 health, eats the same, drawn a fifth bigger. He has no death animation
   of his own: he topples over backwards, bounces once and fades.
-The Heavy turns up from level 2 (a few) and in 6, 7, 9 and 10; the tank in 8
-and 10.
+Heavies turn up in every level but bowling and the boss (a few early on, in
+numbers in 6 and 10); tanks in 7, 8, 9 and 10. Bowling ends with one
+Gargantuar in its final wave.
 
 Two plants are earned here, kept as add-ons beside the seed chooser's grid
 like Luca: **GRS** (beating level 5; a fume attack through the lane, green
@@ -374,15 +375,24 @@ lawn first:
 An Ice-shroom freezes him in place (an attack he is winding up waits) and
 freezes his bombs, which burst harmlessly. A light Heavy Weapons Guy (900)
 comes every 18-26 s; at half health he calls in two 2,500-health tanks and
-waits for them. He topples over and blows up. Every win pays **$20,000**. He is drawn among
+waits for them. He drops out of the sky with a thud to start, and his music begins as he
+lands. He goes out in a storm of explosions over the whole lawn, topples over,
+and blows up in a white flash. Every win pays **$20,000**. He is drawn among
 the zombies at the depth of the top row of his block, so whatever walks through
 his lanes is drawn over him; his bombs and the marks go over everything. Below
 half health the belt brings twice the Ice-shrooms, to answer the doom
 grenades. In his level the rain plays at 35% and his music 3 dB over the final
 boss's tune.
 
-Losing in Adventure Plus has no house to walk into: the left side of the lawn
-blows up, lane by lane and then all at once, and the game is over.
+Adventure Plus plays on like the campaign: a win goes straight to the next
+level (Graz's award screen first, after bowling, whose first win drops his seed
+packet). Crazy Dave talks before levels 1, 3, 4, 6, 8, 9, 10 and 11
+(`LawnApp::SetupAdventurePlusDialogue`). Yeti Season is dark, foggy and stormy:
+rain, thunder, and lightning that lights the lawn up.
+
+Losing in Adventure Plus has no house to walk into: the camera swings left onto
+the base, which blows up, lane by lane and then all at once, and the game is
+over.
 
 Each level can open with a talk in Crazy Dave's style
 (`LawnApp::SetupAdventurePlusDialogue`, lines written into the string table

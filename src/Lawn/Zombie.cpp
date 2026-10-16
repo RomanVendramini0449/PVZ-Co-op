@@ -7362,6 +7362,13 @@ bool Zombie::TrySpawnLevelAward()
 		// the first time, the prize money every time after.
 		aCoinType = mApp->HasSeedType(SeedType::SEED_LUCA) ? CoinType::COIN_AWARD_MONEY_BAG : CoinType::COIN_FINAL_SEED_PACKET;
 	}
+	else if (mApp->IsAdventurePlusLevel() && mApp->mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL &&
+		mApp->mPlayerInfo && mApp->mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_GRS] == 0)
+	{
+		// Graz's seed packet, the first time bowling is beaten, as Luca's
+		// comes from Gargantuar Onslaught (Coin::GetFinalSeedPacketType).
+		aCoinType = CoinType::COIN_FINAL_SEED_PACKET;
+	}
 	else if (mApp->mGameMode == GameMode::GAMEMODE_COOP_SANDBOX || mApp->mGameMode == GameMode::GAMEMODE_COOP_ROMAN ||
 		mApp->mGameMode == GameMode::GAMEMODE_COOP_ADVENTURE_PLUS)
 	{
@@ -10710,10 +10717,15 @@ void Zombie::DrawBossPart(Graphics* g, BossPart theBossPart)
 {
 	if (IsCoopDemoman())
 	{
+		// Board::AddBossRenderItem puts each of these at its own depth.
 		if (theBossPart == BossPart::BOSS_PART_MAIN)
 			DrawCoopDemoman(g);
-		else if (theBossPart == BossPart::BOSS_PART_FIREBALL)
+		else if (theBossPart == BossPart::BOSS_PART_BACK_LEG)
 			DrawCoopDemoMarks(g);
+		else if (theBossPart == BossPart::BOSS_PART_BACK_ARM)
+			DrawCoopDemoBombs(g, true);
+		else if (theBossPart == BossPart::BOSS_PART_FIREBALL)
+			DrawCoopDemoBombs(g, false);
 		return;
 	}
 	if (IsCoopRoman())
@@ -11232,14 +11244,11 @@ void Zombie::DrawCoopKind(Graphics* g)
 
 	Reanimation* aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
 	const float aAnimTime = aBodyReanim ? aBodyReanim->mAnimTime : 0.0f;
-	int aFrame = static_cast<int>(aAnimTime * aFrames * 2);
-	if (!aTank && aBodyReanim)
-	{
-		// The Heavy dances at a bit over half the Football Zombie's stride,
-		// counted across loops so it runs on smoothly.
-		const float aPhase = static_cast<float>(aBodyReanim->mLoopCount) + aAnimTime;
-		aFrame = static_cast<int>(aPhase * aFrames * COOP_HEAVY_DANCE_RATE) % aFrames;
-	}
+	// Counted across loops of the zombie underneath, so a rate that is not a
+	// whole number runs on smoothly: the tank's treads at a little over one
+	// turn a Zomboni cycle, the Heavy's dance at a bit over half a stride.
+	const float aPhase = (aBodyReanim ? static_cast<float>(aBodyReanim->mLoopCount) : 0.0f) + aAnimTime;
+	int aFrame = static_cast<int>(aPhase * aFrames * (aTank ? COOP_TANK_ANIM_RATE : COOP_HEAVY_DANCE_RATE)) % aFrames;
 	// Neither has an animation for standing still -- waiting on the street
 	// before the level, stopped to eat, frozen, buttered or stopped dead --
 	// so then each holds one frame instead of driving or dancing on the spot.

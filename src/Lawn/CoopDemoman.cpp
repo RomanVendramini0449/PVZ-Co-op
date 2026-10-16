@@ -41,6 +41,8 @@
 #include "../LawnApp.h"
 #include "../Resources.h"
 #include "../ConstEnums.h"
+#include "../GameConstants.h"
+#include "System/Music.h"
 #include "../PvzpLib/PvzpFoley.h"
 #include "../PvzpLib/PvzpCommon.h"
 #include "../PvzpLib/PvzpParticle.h"
@@ -55,6 +57,7 @@ namespace
 {
 	enum DemoState : int32_t
 	{
+		LD_FALL,           // dropping out of the sky at the start
 		LD_ENTER,
 		LD_IDLE,
 		LD_MOVE,           // sliding up or down to the row his next attack needs
@@ -98,10 +101,14 @@ namespace
 	constexpr float CHARGE_SPEED = 5.0f;        // pixels a tick
 	constexpr float RETURN_SPEED = 2.5f;
 	constexpr float MOVE_SPEED = 2.5f;
-	constexpr int   DYING_TICKS = 330;
-	constexpr int   DYING_FALL_START = 160;
+	constexpr int   FALL_TICKS = 75;            // from above the screen to the ground
+	constexpr float FALL_HEIGHT = 720.0f;
+	constexpr int   DYING_FALL_START = 160;     // going to pieces until he topples...
 	constexpr int   DYING_FALL_TICKS = 70;
-	constexpr int   DYING_BOOM = DYING_FALL_START + DYING_FALL_TICKS;
+	constexpr int   DYING_BOOM = DYING_FALL_START + DYING_FALL_TICKS;  // ...and blows up as he lands
+	constexpr int   DYING_FLASH_TICKS = 90;     // the screen white, fading
+	constexpr int   DYING_AWARD = DYING_BOOM + 95;
+	constexpr int   DYING_TICKS = DYING_AWARD + 15;
 	constexpr int   BOMB_MIN_FLIGHT = 100;
 	constexpr int   BOMB_MAX_FLIGHT = 130;
 	constexpr float BOMB_ARC = 170.0f;
@@ -193,8 +200,8 @@ void Zombie::InitCoopDemoman()
 	mZombiePhase = ZombiePhase::PHASE_BOSS_IDLE;
 	mRow = CENTER_ROW;
 
-	mCoopBossState = LD_ENTER;
-	mCoopBossTimer = ENTER_TICKS;
+	mCoopBossState = LD_FALL;
+	mCoopBossTimer = FALL_TICKS;
 	mCoopBossAttacksLeft = 0;
 	mCoopBossTargetRow = CENTER_ROW;
 	mCoopBossAttackLane = 0;
@@ -219,7 +226,7 @@ Rect Zombie::GetCoopDemoRect()
 
 bool Zombie::CoopDemoCanBeHit()
 {
-	if (mCoopBossState == LD_DYING || mCoopBossState == LD_GONE)
+	if (mCoopBossState == LD_DYING || mCoopBossState == LD_GONE || mCoopBossState == LD_FALL)
 		return false;
 	// Off the edge of the lawn mid-charge: nothing can reach him there.
 	return mCoopBossX > -40.0f && mCoopBossX < 860.0f;
@@ -231,6 +238,7 @@ bool Zombie::CoopDemoBlocksSquare(int theCol, int theRow)
 {
 	switch (mCoopBossState)
 	{
+	case LD_FALL:
 	case LD_HOP_OUT:
 	case LD_HOP_BACK:
 	case LD_CHARGE:
@@ -406,8 +414,9 @@ void Zombie::CoopDemoBombLands(CoopDemoBomb& theBomb)
 	else
 	{
 		CoopDemoDestroyPlants(theBomb.mCol, theBomb.mCol, theBomb.mRow, theBomb.mRow, false);
-		mApp->AddPvzpParticle(theBomb.mToX, theBomb.mToY - 20.0f, aRenderOrder, ParticleEffect::PARTICLE_BOSS_EXPLOSION);
-		mBoard->ShakeBoard(1, 2);
+		// The Cherry Bomb's own blast.
+		mApp->AddPvzpParticle(theBomb.mToX, theBomb.mToY - 20.0f, aRenderOrder, ParticleEffect::PARTICLE_POWIE);
+		mBoard->ShakeBoard(3, -4);
 	}
 	CoopArt::PlayPackedSound("legend_explode");
 	theBomb.mActive = false;
@@ -534,28 +543,48 @@ void Zombie::UpdateCoopDemoman()
 	{
 		mCoopBossAnimTicks++;
 		const int anElapsed = DYING_TICKS - --mCoopBossTimer;
-		if (anElapsed < DYING_FALL_START && anElapsed % 20 == 0)
+		const int aTopOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 0);
+		if (anElapsed < DYING_BOOM && anElapsed % 8 == 0)
 		{
-			// Going to pieces: small blasts all over him.
+			// Going to pieces: blasts all over him...
 			const Rect aRect = GetCoopDemoRect();
 			const float aX = RandRangeFloat(static_cast<float>(aRect.mX), static_cast<float>(aRect.mX + aRect.mWidth));
 			const float aY = RandRangeFloat(static_cast<float>(aRect.mY), static_cast<float>(aRect.mY + aRect.mHeight));
-			mApp->AddPvzpParticle(aX, aY, Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 0), ParticleEffect::PARTICLE_BOSS_EXPLOSION);
+			mApp->AddPvzpParticle(aX, aY, aTopOrder, ParticleEffect::PARTICLE_BOSS_EXPLOSION);
 			mApp->PlayFoley(FoleyType::FOLEY_BOSS_EXPLOSION_SMALL);
 			mBoard->ShakeBoard(1, 2);
 		}
-		else if (anElapsed == DYING_BOOM)
+		if ((anElapsed < DYING_FALL_START && anElapsed % 18 == 9) || (anElapsed > DYING_BOOM && anElapsed < DYING_BOOM + 70 && anElapsed % 10 == 0))
 		{
-			// He hits the ground, and the whole lot goes up.
-			mApp->AddPvzpParticle(mCoopBossX + 60.0f, mCoopBossY - 60.0f, Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 0), ParticleEffect::PARTICLE_DOOM);
-			CoopArt::PlayPackedSound("legend_explode");
-			mApp->PlayFoley(FoleyType::FOLEY_THUMP);
-			mBoard->ShakeBoard(6, -8);
+			// ...and all over the lawn, his whole stock going off.
+			const float aX = RandRangeFloat(60.0f, 760.0f);
+			const float aY = RandRangeFloat(110.0f, 560.0f);
+			mApp->AddPvzpParticle(aX, aY, aTopOrder, ParticleEffect::PARTICLE_POWIE);
+			if (anElapsed % 36 == 9 || anElapsed > DYING_BOOM)
+				mApp->PlayFoley(FoleyType::FOLEY_CHERRYBOMB);
+			mBoard->ShakeBoard(2, -3);
 		}
-		else if (anElapsed == DYING_BOOM + 40)  // faded out: the award takes everyone off the board, him included
+		if (anElapsed == DYING_BOOM)
 		{
+			// He hits the ground and the whole lot goes up: a doom cloud, a
+			// ring of blasts, everything else on the lawn with him, and the
+			// screen white (DrawCoopDemoBombs).
+			mApp->AddPvzpParticle(mCoopBossX + 60.0f, mCoopBossY - 60.0f, aTopOrder, ParticleEffect::PARTICLE_DOOM);
+			for (int i = 0; i < 8; i++)
+			{
+				const float anAngle = i * 3.14159f / 4.0f;
+				mApp->AddPvzpParticle(mCoopBossX + 170.0f * cosf(anAngle), mCoopBossY - 120.0f + 110.0f * sinf(anAngle), aTopOrder, ParticleEffect::PARTICLE_POWIE);
+			}
+			CoopArt::PlayPackedSound("legend_explode");
+			mApp->PlaySample(SOUND_BOSSEXPLOSION);
+			mApp->PlayFoley(FoleyType::FOLEY_CHERRYBOMB);
+			mApp->PlayFoley(FoleyType::FOLEY_THUMP);
+			mBoard->ShakeBoard(10, -12);
 			BossDie();   // takes everyone else down with him
-			DropLoot();  // and the level's award drops where he fell
+		}
+		else if (anElapsed == DYING_AWARD)
+		{
+			DropLoot();  // the flash gone: the level's award drops where he fell
 		}
 		if (mCoopBossTimer <= 0)
 			mCoopBossState = LD_GONE;
@@ -567,7 +596,7 @@ void Zombie::UpdateCoopDemoman()
 		mCoopBossDoomCooldown--;
 
 	// A Heavy Weapons Guy now and then.
-	if (mCoopBossState != LD_ENTER && mIceTrapCounter == 0 && --mCoopBossSummonTimer <= 0)
+	if (mCoopBossState != LD_FALL && mCoopBossState != LD_ENTER && mIceTrapCounter == 0 && --mCoopBossSummonTimer <= 0)
 	{
 		CoopDemoSummonHeavy();
 		mCoopBossSummonTimer = RandRangeInt(SUMMON_MIN_TICKS, SUMMON_MAX_TICKS);
@@ -579,12 +608,26 @@ void Zombie::UpdateCoopDemoman()
 	// Frozen: he stands still, and whatever he was winding up waits -- but a
 	// volley already under way keeps coming.
 	const bool aFrozen = mIceTrapCounter > 0;
-	if (aFrozen && mCoopBossState != LD_SHOOT && mCoopBossState != LD_DOOM)
+	if (aFrozen && mCoopBossState != LD_SHOOT && mCoopBossState != LD_DOOM && mCoopBossState != LD_FALL)
 		return;
 	mCoopBossAnimTicks++;
 
 	switch (mCoopBossState)
 	{
+	case LD_FALL:
+		if (--mCoopBossTimer <= 0)
+		{
+			// Down he comes: a thud, a shake, and his music, as his entrance
+			// begins.
+			mApp->PlayFoley(FoleyType::FOLEY_THUMP);
+			CoopArt::PlayPackedSound("legend_explode");
+			mApp->AddPvzpParticle(mCoopBossX, mCoopBossY - 10.0f, Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 0), ParticleEffect::PARTICLE_MOWER_CLOUD);
+			mBoard->ShakeBoard(6, -10);
+			mApp->mMusic->MakeSureMusicIsPlaying(MusicTune::MUSIC_TUNE_COOP_LEGEND);
+			CoopDemoSetState(LD_ENTER, ENTER_TICKS);
+		}
+		break;
+
 	case LD_ENTER:
 		if (--mCoopBossTimer <= 0)
 			CoopDemoGoIdle();
@@ -745,9 +788,8 @@ void Zombie::UpdateCoopDemoman()
 	mRow = std::clamp(static_cast<int>(std::floor(aRows + 0.5f)), 0, 4);
 }
 
-// What is about to be hit, marked on the lawn, and his bombs: drawn over
-// everything, apart from his body (DrawCoopDemoman), which stands among the
-// zombies at the depth of his feet.
+// What is about to be hit, marked on the lawn: drawn on the ground, under
+// the plants and zombies standing on it (Board::AddBossRenderItem).
 void Zombie::DrawCoopDemoMarks(Graphics* g)
 {
 	if (IsOnBoard())
@@ -776,21 +818,43 @@ void Zombie::DrawCoopDemoMarks(Graphics* g)
 		}
 	}
 
-	// The bombs, and where each will land.
+	// Where each bomb in the air will land.
+	for (const CoopDemoBomb& aBomb : mCoopBombs)
+	{
+		if (!aBomb.mActive || aBomb.mFrozen != 0 || aBomb.mDoom || aBomb.mTicks >= aBomb.mFlightTicks)
+			continue;
+		Graphics aTargetG(*g);
+		aTargetG.SetColorizeImages(true);
+		aTargetG.SetColor(Color(255, 255, 255, 200));
+		const float aW = static_cast<float>(IMAGE_BUNGEETARGET->mWidth), aH = static_cast<float>(IMAGE_BUNGEETARGET->mHeight);
+		PvzpDrawImageScaledF(&aTargetG, IMAGE_BUNGEETARGET, aBomb.mToX - aW * 0.5f - mX, aBomb.mToY - aH * 0.5f - mY, 1.0f, 1.0f);
+	}
+}
+
+// His bombs: those in the air over everything (theOnGround false, with the
+// white flash of his end), a doom grenade that has landed at the depth of
+// the row it lies in (theOnGround true).
+void Zombie::DrawCoopDemoBombs(Graphics* g, bool theOnGround)
+{
+	if (!theOnGround && mCoopBossState == LD_DYING)
+	{
+		const int anElapsed = DYING_TICKS - mCoopBossTimer;
+		if (anElapsed >= DYING_BOOM && anElapsed < DYING_BOOM + DYING_FLASH_TICKS)
+		{
+			const int anAlpha = 255 - (anElapsed - DYING_BOOM) * 255 / DYING_FLASH_TICKS;
+			g->SetColor(Color(255, 255, 255, anAlpha));
+			g->FillRect(-1000 - mX, -1000 - mY, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);
+		}
+	}
+
 	for (const CoopDemoBomb& aBomb : mCoopBombs)
 	{
 		if (!aBomb.mActive)
 			continue;
 
 		const bool aLanded = aBomb.mTicks >= aBomb.mFlightTicks;
-		if (!aLanded && aBomb.mFrozen == 0 && !aBomb.mDoom)
-		{
-			Graphics aTargetG(*g);
-			aTargetG.SetColorizeImages(true);
-			aTargetG.SetColor(Color(255, 255, 255, 200));
-			const float aW = static_cast<float>(IMAGE_BUNGEETARGET->mWidth), aH = static_cast<float>(IMAGE_BUNGEETARGET->mHeight);
-			PvzpDrawImageScaledF(&aTargetG, IMAGE_BUNGEETARGET, aBomb.mToX - aW * 0.5f - mX, aBomb.mToY - aH * 0.5f - mY, 1.0f, 1.0f);
-		}
+		if (aLanded != theOnGround)
+			continue;
 
 		float aBombX, aBombY;
 		BombPosition(aBomb, aBombX, aBombY);
@@ -826,6 +890,15 @@ void Zombie::DrawCoopDemoman(Graphics* g)
 
 	switch (mCoopBossState)
 	{
+	case LD_FALL:
+	{
+		// Dropping from above the screen, faster and faster.
+		aSheet = "demo_spawn";
+		aFrame = 0;
+		const float t = static_cast<float>(FALL_TICKS - mCoopBossTimer) / FALL_TICKS;
+		aY -= FALL_HEIGHT * (1.0f - t * t);
+		break;
+	}
 	case LD_ENTER:
 		aSheet = "demo_spawn";
 		aFrame = std::min(mCoopBossAnimTicks * 20 / 100, CoopArt::SheetFrames(aSheet) - 1);

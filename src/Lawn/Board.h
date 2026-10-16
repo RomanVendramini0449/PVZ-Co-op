@@ -51,7 +51,7 @@ constexpr const int ONSLAUGHT_WAVES = 2;
 constexpr const int ONSLAUGHT_LANES = 5;
 constexpr const int ONSLAUGHT_FIRST_PER_LANE = 2;
 constexpr const int ONSLAUGHT_LAST_PER_LANE = 3;
-constexpr const int ONSLAUGHT_PRIZE_COINS = 1000;      // $10,000 (coins count in tens)
+constexpr const int ONSLAUGHT_PRIZE_COINS = 250;       // $2,500 (coins count in tens)
 // Luca vs. Roman: Roman fills a 3x3 block over the last three columns, which
 // nothing can be planted in, and moves up and down within them.
 // Yeti Spray: how many Yetis level 4-10 brings at full strength, and the
@@ -64,6 +64,7 @@ constexpr const int YETI_SPRAY_LEVEL = 40;  // 4-10, the stormy night
 constexpr const int ADVENTURE_PLUS_LEVELS = 11;
 // The last one is a boss battle at night (the boss itself is still to come).
 constexpr const int ADVENTURE_PLUS_BOSS_LEVEL = 11;
+constexpr const int ADVENTURE_PLUS_YETI_LEVEL = 4;           // Yeti Season: dark, foggy, stormy
 constexpr const int ADVENTURE_PLUS_BOWLING_LEVEL = 5;   // played as Wall-nut Bowling
 // In the bowling level a Football Zombie's helmet is set to this whatever
 // the difficulty: a ball takes 900 off a helmet, so two break it and the

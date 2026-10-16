@@ -1507,14 +1507,19 @@ void CutScene::StartZombiesWon()
 // the grate, the left side of the lawn blows up, lane by lane and then all at
 // once, the screen goes dark, and that is the game. Fixed timings and places,
 // no generator, so both co-op players see the same.
-static const int	PlusLostTimeFirstBlast			= 300;
+static const int	PlusLostTimePanStart			= 100;   // the camera swings left onto the base...
+static const int	PlusLostTimePanEnd				= 1300;
+static const int	PlusLostTimeFirstBlast			= 1100;  // ...and it starts going up as it arrives
 static const int	PlusLostTimeBlastStep			= 220;
-static const int	PlusLostTimeBigBlast			= 1600;
-static const int	PlusLostTimeDark				= 2600;
-static const int	PlusLostTimeEnd					= 4600;
+static const int	PlusLostTimeBigBlast			= 2400;
+static const int	PlusLostTimeDark				= 3400;
+static const int	PlusLostTimeEnd					= 5400;
 
 void CutScene::UpdateAdventurePlusLost()
 {
+	if (mCutsceneTime > PlusLostTimePanStart && mCutsceneTime <= PlusLostTimePanEnd)
+		mBoard->Move(CalcPosition(PlusLostTimePanStart, PlusLostTimePanEnd, 0, BOARD_OFFSET), 0);
+
 	static const int kRows[] = { 2, 0, 4, 1, 3 };
 	const int aRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 0);
 	for (int i = 0; i < 5; i++)
@@ -1522,7 +1527,8 @@ void CutScene::UpdateAdventurePlusLost()
 		if (mCutsceneTime != PlusLostTimeFirstBlast + PlusLostTimeBlastStep * i)
 			continue;
 		const int aRow = kRows[i];
-		const float aX = 40.0f + 30.0f * ((i * 3) % 4);
+		// The base left of the lawn, now in view.
+		const float aX = -170.0f + 55.0f * ((i * 3) % 4);
 		const float aY = static_cast<float>(mBoard->GridToPixelY(0, aRow)) + 50.0f;
 		mApp->AddPvzpParticle(aX, aY, aRenderOrder, ParticleEffect::PARTICLE_POWIE);
 		mApp->PlayFoley(FoleyType::FOLEY_CHERRYBOMB);
@@ -1531,7 +1537,9 @@ void CutScene::UpdateAdventurePlusLost()
 
 	if (mCutsceneTime == PlusLostTimeBigBlast)
 	{
-		mApp->AddPvzpParticle(110.0f, 330.0f, aRenderOrder, ParticleEffect::PARTICLE_DOOM);
+		mApp->AddPvzpParticle(-60.0f, 330.0f, aRenderOrder, ParticleEffect::PARTICLE_DOOM);
+		for (int i = 0; i < 5; i++)
+			mApp->AddPvzpParticle(-150.0f + 70.0f * i, static_cast<float>(mBoard->GridToPixelY(0, i)) + 40.0f, aRenderOrder, ParticleEffect::PARTICLE_POWIE);
 		mApp->PlaySample(SOUND_DOOMSHROOM);
 		CoopArt::PlayPackedSound("legend_explode");
 		mBoard->ShakeBoard(8, -10);

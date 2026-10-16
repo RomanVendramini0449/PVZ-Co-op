@@ -2016,7 +2016,7 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		// with the profile and reaches the joining player with the rest.
 		aUnlockedNewChallenge = mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] == 0;
 		mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_LUCA] = 1;
-		// And $10,000, every time.
+		// And $2,500, every time.
 		mPlayerInfo->AddCoins(ONSLAUGHT_PRIZE_COINS);
 	}
 	else if (mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
@@ -2223,6 +2223,13 @@ void LawnApp::CheckForGameEnd()
 		else if (IsAdventurePlusLevel() && aUnlockedNewChallenge && mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL)
 		{
 			ShowAwardScreen(AwardType::AWARD_COOP_GRS, true);
+		}
+		else if (IsAdventurePlusLevel() && mCoopPlusLevel < ADVENTURE_PLUS_LEVELS)
+		{
+			// Adventure Plus is a campaign: on to the next level, as the
+			// campaign does. The menu is a button away from there.
+			mCoopPlusLevel++;
+			PreNewGame(GameMode::GAMEMODE_COOP_ADVENTURE_PLUS, false);
 		}
 		else
 		{
@@ -2727,18 +2734,18 @@ void LawnApp::LoadingThreadProc()
 	mStringProperties.insert_or_assign("CRAZY_DAVE_3950",
 		"YETI SPRAY! One whiff and every Yeti for miles will come running in droves! Only works during an especially terrible storm.");
 	mStringProperties.insert_or_assign("CRAZY_DAVE_3951",
-		"That's KERNEL! He used to be a regular old squash. Don't ask him about it. He squashes zombies exactly the same, he's just angrier about it.");
+		"That's KERNEL! He used to be a regular old guy, but now he is a squash. DO NOT ask him about it.");
 	mStringProperties.insert_or_assign("CRAZY_DAVE_3952",
 		"This pepper is CRAZY! His name is Philippe. He burns a whole lane just like a regular Jalapeno, but he enjoys it WAY too much.");
 	// Adventure Plus's own zombies, as the street before a level names them.
 	mStringProperties.insert_or_assign("TANK", "Tank");
 	mStringProperties.insert_or_assign("HEAVY_WEAPONS_GUY", "Heavy Weapons Guy");
-	mStringProperties.insert_or_assign("GRS", "GRS");
-	mStringProperties.insert_or_assign("GRS_TOOLTIP", "Breathes green fumes through every zombie in reach");
+	mStringProperties.insert_or_assign("GRS", "Graz");
+	mStringProperties.insert_or_assign("GRS_TOOLTIP", "Burps green fumes through every zombie in reach");
 	mStringProperties.insert_or_assign("GRS_DESCRIPTION",
-		"GRS breathes green fumes that go straight through every zombie in front of him.{SHORTLINE}"
+		"GRAZ burps green fumes that go straight through every zombie in front of him.{SHORTLINE}"
 		"{KEYWORD}Damage:{STAT} normal, to everything in reach{BR}{KEYWORD}Range:{STAT} four tiles{SHORTLINE}"
-		"Unlike a Fume-shroom, he never sleeps. Nobody has asked why.");
+		"Unlike a Fume-shroom, he never sleeps. That's because he drinks WAY too much monster energy.");
 	mStringProperties.insert_or_assign("NOAH", "Noah");
 	mStringProperties.insert_or_assign("NOAH_TOOLTIP", "Throws goblin heads in five directions");
 	mStringProperties.insert_or_assign("NOAH_DESCRIPTION",
@@ -3161,6 +3168,56 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 		};
 	}
 
+	else if (theLevel == 3)
+	{
+		aLines = {
+			"Neighbor! The zombies found ladders!",
+			"And shovels! They're coming over AND under!",
+			"{MOUTH_BIG_OH}Who sells shovels to zombies?! That's MY job!",
+			"Keep something looking behind you. Trust me.",
+		};
+	}
+
+	else if (theLevel == 4)
+	{
+		aLines = {
+			"Brr! Is it cold out here, or is it just me?",
+			"There's a storm rolling in. You can hardly see a thing.",
+			"Perfect weather for Yetis. Big, hairy, angry Yetis.",
+			"{SHAKE}Don't let them run off with your brains!",
+		};
+	}
+
+	else if (theLevel == 6)
+	{
+		aLines = {
+			"You hear that? That's the sound of a really big guy...",
+			"...and his really big friends. Gargantuars, neighbor!",
+			"And some fella in a vest who just won't stop DANCING.",
+			"Hit 'em hard. Hit 'em early!",
+		};
+	}
+
+	else if (theLevel == 9)
+	{
+		aLines = {
+			"Psst. Neighbor. Look down.",
+			"No, further down!",
+			"They're DIGGING. Under the lawn! The nerve!",
+			"Keep something facing backwards, okay? Okay!",
+		};
+	}
+
+	else if (theLevel == 10)
+	{
+		aLines = {
+			"This is it, neighbor. Everything they've got.",
+			"Footballers, robots, tanks, Yetis, Gargantuars... the whole circus!",
+			"Whatever happens out there...",
+			"{SHAKE}...don't let them eat my TACOS!",
+		};
+	}
+
 	else if (theLevel == ADVENTURE_PLUS_BOSS_LEVEL)
 	{
 		// Then a Bungee Zombie takes him (CutScene::AdvanceCrazyDaveDialog).
@@ -3213,6 +3270,11 @@ bool LawnApp::IsCoopRomanLevel()
 bool LawnApp::IsLegendaryDemomanLevel()
 {
 	return IsAdventurePlusLevel() && mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL;
+}
+
+bool LawnApp::IsPlusStormLevel()
+{
+	return IsAdventurePlusLevel() && (mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL || mCoopPlusLevel == ADVENTURE_PLUS_YETI_LEVEL);
 }
 
 // Dr. Zomboss's level, Roman's or the Demoman's: a boss with a health bar
@@ -4164,6 +4226,33 @@ void LawnApp::DrawCrazyDave(Graphics* g)
 	if (aCrazyDaveReanim == nullptr)
 		return;
 
+	// Adventure Plus can put someone else in Dave's place: his animation still
+	// runs, unseen, and the stand-in follows it in, talks and leaves with it.
+	if (Image* aStandIn = IsAdventurePlusLevel() ? CoopArt::AdventurePlusNarrator() : nullptr)
+		CoopArt::DrawNarrator(g, aCrazyDaveReanim, aStandIn, !mCrazyDaveMessageText.empty(), mAppCounter);
+	else
+		aCrazyDaveReanim->Draw(g);
+
+	// Noah, held out in Dave's handing hand.
+	if (mCoopDaveHoldingNoah && (mCrazyDaveState == CrazyDaveState::CRAZY_DAVE_HANDING_TALKING ||
+		mCrazyDaveState == CrazyDaveState::CRAZY_DAVE_HANDING_IDLING))
+	{
+		const int aHand = aCrazyDaveReanim->FindTrackIndex("Dave_handinghand");
+		ReanimatorTransform aHandTransform;
+		aCrazyDaveReanim->GetCurrentTransform(aHand, &aHandTransform);
+		SexyMatrix3 aMatrix;
+		Reanimation::MatrixFromTransform(aHandTransform, aMatrix);
+		SexyMatrix3Multiply(aMatrix, aCrazyDaveReanim->mOverlayMatrix, aMatrix);
+		// Centred on the hand -- the middle of the hand picture (Dave's is
+		// 114 x 75; the narrator's sits on the same middle) -- a little up,
+		// so the palm shows under him.
+		const float aX = aMatrix.m00 * 57.0f + aMatrix.m01 * 37.0f + aMatrix.m02;
+		const float aY = aMatrix.m10 * 57.0f + aMatrix.m11 * 37.0f + aMatrix.m12 - 25.0f;
+		// A photo plant's middle is 40 x 39.5 of its scale from its corner.
+		CoopArt::DrawPhotoPlant(g, "noah", aX - 40.0f * 1.4f, aY - 39.5f * 1.4f, 1.4f, 1.4f);
+	}
+
+	// What he says, over him: a tall stand-in's head can reach the bubble.
 	if (mCrazyDaveMessageText.size())
 	{
 		Image* aBubbleImage = IMAGE_STORE_SPEECHBUBBLE2;
@@ -4208,29 +4297,6 @@ void LawnApp::DrawCrazyDave(Graphics* g)
 		{
 			PvzpDrawString(g, GetString("CLICK_TO_CONTINUE", "click to continue"), aPosX + 139, aPosY + 140, FONT_PICO129, Color::Black, DrawStringJustification::DS_ALIGN_CENTER);
 		}
-	}
-
-	// Adventure Plus can put someone else in Dave's place: his animation still
-	// runs, unseen, and the stand-in follows it in, talks and leaves with it.
-	if (Image* aStandIn = IsAdventurePlusLevel() ? CoopArt::AdventurePlusNarrator() : nullptr)
-		CoopArt::DrawNarrator(g, aCrazyDaveReanim, aStandIn, !mCrazyDaveMessageText.empty(), mAppCounter);
-	else
-		aCrazyDaveReanim->Draw(g);
-
-	// Noah, held out in Dave's handing hand.
-	if (mCoopDaveHoldingNoah && (mCrazyDaveState == CrazyDaveState::CRAZY_DAVE_HANDING_TALKING ||
-		mCrazyDaveState == CrazyDaveState::CRAZY_DAVE_HANDING_IDLING))
-	{
-		const int aHand = aCrazyDaveReanim->FindTrackIndex("Dave_handinghand");
-		ReanimatorTransform aHandTransform;
-		aCrazyDaveReanim->GetCurrentTransform(aHand, &aHandTransform);
-		SexyMatrix3 aMatrix;
-		Reanimation::MatrixFromTransform(aHandTransform, aMatrix);
-		SexyMatrix3Multiply(aMatrix, aCrazyDaveReanim->mOverlayMatrix, aMatrix);
-		// The middle of the hand picture (114 x 75), a little above the palm.
-		const float aX = aMatrix.m00 * 57.0f + aMatrix.m01 * 20.0f + aMatrix.m02;
-		const float aY = aMatrix.m10 * 57.0f + aMatrix.m11 * 20.0f + aMatrix.m12;
-		CoopArt::DrawPhotoPlant(g, "noah", aX - 55.0f, aY - 105.0f, 1.4f, 1.4f);
 	}
 }
 

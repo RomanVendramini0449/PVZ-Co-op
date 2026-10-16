@@ -947,32 +947,33 @@ void Board::PickZombieWaves()
 static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
 	{ "You're On Your Way to Dust Bowl",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL }, 3, 0,
-		{ { ZOMBIE_PAIL, 3, 2, 1, 2 } }, 1 },
+		{ { ZOMBIE_PAIL, 3, 2, 1, 2 }, { ZOMBIE_COOP_HEAVY, 12, 7, 1, 1 } }, 2 },
 	{ "Yummy, Yummy Brains",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL }, 4, 0,
-		{ { ZOMBIE_FOOTBALL, 5, 3, 1, 2 }, { ZOMBIE_PAIL, 3, 3, 1, 1 }, { ZOMBIE_COOP_HEAVY, 9, 9, 1, 1 } }, 3 },
+		{ { ZOMBIE_FOOTBALL, 5, 3, 1, 2 }, { ZOMBIE_PAIL, 3, 3, 1, 1 }, { ZOMBIE_COOP_HEAVY, 6, 4, 1, 1 } }, 3 },
 	{ "Up and Under",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_LADDER, ZOMBIE_DIGGER }, 5, 1,
-		{ { ZOMBIE_LADDER, 4, 2, 1, 2 }, { ZOMBIE_DIGGER, 6, 4, 1, 2 } }, 2 },
+		{ { ZOMBIE_LADDER, 4, 2, 1, 2 }, { ZOMBIE_DIGGER, 6, 4, 1, 2 }, { ZOMBIE_COOP_HEAVY, 7, 4, 1, 1 } }, 3 },
 	{ "Yeti Season",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_YETI }, 4, 0,
-		{ { ZOMBIE_YETI, 2, 3, 1, 2 } }, 1 },
-	// Footballs only come on purpose here: each one takes three balls.
+		{ { ZOMBIE_YETI, 2, 3, 1, 2 }, { ZOMBIE_COOP_HEAVY, 8, 5, 1, 1 } }, 2 },
+	// Footballs only come on purpose here: each one takes three balls. And
+	// one Gargantuar, in the final wave.
 	{ "Team Fortress Bowling",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_NEWSPAPER }, 4, 0,
-		{ { ZOMBIE_FOOTBALL, 6, 4, 1, 1 } }, 1 },
+		{ { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_GARGANTUAR, 19, 1, 0, 1 } }, 2 },
 	{ "Heavy Weapons Guy",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY }, 6, 1,
 		{ { ZOMBIE_GARGANTUAR, 9, 5, 1, 1 }, { ZOMBIE_LADDER, 4, 3, 1, 1 }, { ZOMBIE_COOP_HEAVY, 4, 3, 1, 2 } }, 3 },
 	{ "Red Spy in the Base",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_COOP_HEAVY }, 8, 1,
-		{ { ZOMBIE_FOOTBALL, 5, 3, 1, 2 }, { ZOMBIE_POLEVAULTER, 3, 3, 1, 2 } }, 2 },
+		{ { ZOMBIE_FOOTBALL, 5, 3, 1, 2 }, { ZOMBIE_POLEVAULTER, 3, 3, 1, 2 }, { ZOMBIE_COOP_TANK, 10, 6, 1, 1 } }, 3 },
 	{ "The Robots Are Coming",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI, ZOMBIE_COOP_TANK }, 6, 1,
 		{ { ZOMBIE_ZAMBONI, 7, 4, 1, 1 }, { ZOMBIE_FOOTBALL, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 8, 5, 1, 1 } }, 3 },
 	{ "Tunnel Vision",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_DIGGER, ZOMBIE_POGO, ZOMBIE_JACK_IN_THE_BOX, ZOMBIE_COOP_HEAVY }, 7, 1,
-		{ { ZOMBIE_DIGGER, 4, 2, 1, 2 }, { ZOMBIE_POGO, 6, 4, 1, 1 } }, 2 },
+		{ { ZOMBIE_DIGGER, 4, 2, 1, 2 }, { ZOMBIE_POGO, 6, 4, 1, 1 }, { ZOMBIE_COOP_TANK, 10, 6, 1, 1 } }, 3 },
 	{ "Everything, Everywhere",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_DIGGER,
 		  ZOMBIE_ZAMBONI, ZOMBIE_YETI, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_TANK }, 11, 2,
@@ -6802,30 +6803,41 @@ void Board::AddBossRenderItem(RenderItem* theRenderList, int& theCurRenderItem, 
 	PVZP_ASSERT(theCurRenderItem < MAX_RENDER_ITEMS);
 	if (theBossZombie->IsCoopDemoman())
 	{
-		// The Legendary Demoman is drawn among the zombies at the depth of the
-		// top row of his block: anything walking through his three lanes --
-		// the tanks and Heavies he sends -- is drawn over him, and only what
-		// is in the rows behind him is drawn under him...
-		RenderItem* aItem = &theRenderList[theCurRenderItem];
-		aItem->mRenderObjectType = RenderObjectType::RENDER_ITEM_BOSS_PART;
-		aItem->mZPos = MakeRenderOrder(RenderLayer::RENDER_LAYER_ZOMBIE, std::max(theBossZombie->mRow - 1, 0), 0);
-		aItem->mBossPart = BossPart::BOSS_PART_MAIN;
-		theCurRenderItem++;
-		// ...while his bombs and the marks of what is about to be hit go
-		// over everything.
-		aItem = &theRenderList[theCurRenderItem];
-		aItem->mRenderObjectType = RenderObjectType::RENDER_ITEM_BOSS_PART;
-		aItem->mZPos = MakeRenderOrder(RenderLayer::RENDER_LAYER_BOSS, 4, 2);
-		aItem->mBossPart = BossPart::BOSS_PART_FIREBALL;
-		theCurRenderItem++;
+		// The Legendary Demoman by the same rule as everything on the lawn:
+		// whatever stands lower on the screen is drawn over what stands
+		// higher. His body goes at the depth of his feet (the bottom row of
+		// his block), a doom grenade lying on the lawn at the depth of its
+		// row, and the marks of what is about to be hit on the ground under
+		// it all. Only bombs in the air go over everything.
+		auto AddItem = [&](BossPart thePart, int theZPos)
+		{
+			RenderItem* anItem = &theRenderList[theCurRenderItem];
+			anItem->mRenderObjectType = RenderObjectType::RENDER_ITEM_BOSS_PART;
+			anItem->mZPos = theZPos;
+			anItem->mBossPart = thePart;
+			theCurRenderItem++;
+		};
+		AddItem(BossPart::BOSS_PART_BACK_LEG, MakeRenderOrder(RenderLayer::RENDER_LAYER_GROUND, 0, 1));
+		AddItem(BossPart::BOSS_PART_MAIN, MakeRenderOrder(RenderLayer::RENDER_LAYER_ZOMBIE, std::min(theBossZombie->mRow + 1, 4), 1));
+		for (const CoopDemoBomb& aBomb : theBossZombie->mCoopBombs)
+		{
+			if (aBomb.mActive && aBomb.mDoom && aBomb.mTicks >= aBomb.mFlightTicks)
+			{
+				AddItem(BossPart::BOSS_PART_BACK_ARM, MakeRenderOrder(RenderLayer::RENDER_LAYER_ZOMBIE, aBomb.mRow, 0));
+				break;
+			}
+		}
+		AddItem(BossPart::BOSS_PART_FIREBALL, MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 5));
 		return;
 	}
 	if (theBossZombie->IsCoopRoman())
 	{
-		// Roman is one picture, plus whatever ball he has rolling.
+		// Roman is one picture, plus whatever ball he has rolling. Like the
+		// Legendary Demoman, he stands at the depth of the bottom row of his
+		// block: what walks below it is drawn over him.
 		RenderItem* aItem = &theRenderList[theCurRenderItem];
 		aItem->mRenderObjectType = RenderObjectType::RENDER_ITEM_BOSS_PART;
-		aItem->mZPos = MakeRenderOrder(RenderLayer::RENDER_LAYER_BOSS, 4, 2);
+		aItem->mZPos = MakeRenderOrder(RenderLayer::RENDER_LAYER_ZOMBIE, std::min(theBossZombie->mRow + 1, 4), 1);
 		aItem->mBossPart = BossPart::BOSS_PART_MAIN;
 		theCurRenderItem++;
 
@@ -7180,7 +7192,7 @@ void Board::DrawGameObjects(Graphics* g)
 	{
 		AddUIRenderItem(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_FOG, MakeRenderOrder(RenderLayer::RENDER_LAYER_FOG, 0, 0));
 	}
-	if (mApp->IsStormyNightLevel() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsLegendaryDemomanLevel())
+	if (mApp->IsStormyNightLevel() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsPlusStormLevel())
 	{
 		AddUIRenderItem(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_STORM, MakeRenderOrder(RenderLayer::RENDER_LAYER_FOG, 0, 3));
 	}

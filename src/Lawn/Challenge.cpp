@@ -67,6 +67,8 @@ constexpr const int MAX_SCARY_POTS = 54;
 constexpr const int STORM_FLASH_TIME = 150;
 constexpr const int DEMO_THUNDER_FLASH_TICKS = 60;
 constexpr const float DEMO_RAIN_VOLUME = 0.35f;  // of the music's volume
+constexpr const float YETI_RAIN_VOLUME = 0.6f;
+constexpr const int YETI_DARKNESS = 150;          // Yeti Season's gloom, of 255
 
 Challenge::Challenge()
 {
@@ -126,7 +128,7 @@ void Challenge::LoadBeghouledBoardState(BeghouledBoardState* theBoardState)
 void Challenge::InitLevel()
 {
 	// The rain at full strength, except under the Legendary Demoman's music.
-	mApp->mSoundSystem->mRainVolumeScale = mApp->IsLegendaryDemomanLevel() ? DEMO_RAIN_VOLUME : 1.0f;
+	mApp->mSoundSystem->mRainVolumeScale = mApp->IsLegendaryDemomanLevel() ? DEMO_RAIN_VOLUME : mApp->IsPlusStormLevel() ? YETI_RAIN_VOLUME : 1.0f;
 	if (mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS)
 	{
 		mChallengeStateCounter = 100;
@@ -138,7 +140,7 @@ void Challenge::InitLevel()
 		mChallengeStateCounter = 100;
 		mApp->PlayFoley(FOLEY_RAIN);
 	}
-	if (mApp->IsLegendaryDemomanLevel())
+	if (mApp->IsPlusStormLevel())
 	{
 		// Rain all through, and thunder now and then (UpdateDemomanStorm).
 		mChallengeStateCounter = DEMO_THUNDER_FLASH_TICKS + 300;
@@ -2015,7 +2017,7 @@ void Challenge::Update()
 {
 	if (mApp->IsStormyNightLevel())
 		UpdateStormyNight();
-	if (mApp->IsLegendaryDemomanLevel() && !mBoard->mPaused)
+	if (mApp->IsPlusStormLevel() && !mBoard->mPaused)
 		UpdateDemomanStorm();
 
 	if (mBoard->mPaused)
@@ -2028,7 +2030,7 @@ void Challenge::Update()
 		return;
 	}
 
-	if (mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsStormyNightLevel() || mApp->IsLegendaryDemomanLevel())
+	if (mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsStormyNightLevel() || mApp->IsPlusStormLevel())
 	{
 		UpdateRain();
 	}
@@ -2969,28 +2971,55 @@ void Challenge::UpdateDemomanStorm()
 
 void Challenge::DrawDemomanStorm(Graphics* g)
 {
-	if (mChallengeStateCounter > DEMO_THUNDER_FLASH_TICKS)
+	// The lightning, 0 between claps: two flickers, then a fade.
+	int anAlpha = 0;
+	if (mChallengeStateCounter <= DEMO_THUNDER_FLASH_TICKS)
+	{
+		const int aTime = DEMO_THUNDER_FLASH_TICKS - mChallengeStateCounter;
+		if (aTime < 6)
+			anAlpha = 170;
+		else if (aTime < 12)
+			anAlpha = 40;
+		else if (aTime < 18)
+			anAlpha = 200;
+		else
+			anAlpha = std::max(0, 200 - (aTime - 18) * 200 / (DEMO_THUNDER_FLASH_TICKS - 18));
+	}
+
+	if (!mApp->IsLegendaryDemomanLevel())
+	{
+		// Yeti Season: a gloomy storm with fog rolling in from the right, so
+		// what is coming is hard to make out until the lightning shows it.
+		const int aDark = YETI_DARKNESS * (200 - anAlpha) / 200;
+		g->SetColor(Color(10, 14, 30, aDark));
+		g->FillRect(-1000, -1000, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);
+		for (int aX = 260; aX < BOARD_WIDTH + 40; aX += 10)
+		{
+			const int aFog = (aX - 260) * 120 / (BOARD_WIDTH - 220) * (200 - anAlpha / 2) / 200;
+			g->SetColor(Color(150, 160, 172, std::min(aFog, 120)));
+			g->FillRect(aX, 0, 10, BOARD_HEIGHT);
+		}
+		g->SetColor(Color(255, 255, 255, anAlpha / 2));
+		g->FillRect(-1000, -1000, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);
+		// The seed banks and the top-right buttons stay in plain sight.
+		mBoard->DrawUIBottom(g);
+		mBoard->DrawTopRightUI(g);
 		return;
-	// Two flickers, then a fade.
-	const int aTime = DEMO_THUNDER_FLASH_TICKS - mChallengeStateCounter;
-	int anAlpha;
-	if (aTime < 6)
-		anAlpha = 170;
-	else if (aTime < 12)
-		anAlpha = 40;
-	else if (aTime < 18)
-		anAlpha = 200;
-	else
-		anAlpha = std::max(0, 200 - (aTime - 18) * 200 / (DEMO_THUNDER_FLASH_TICKS - 18));
-	g->SetColor(Color(255, 255, 255, anAlpha));
-	g->FillRect(-1000, -1000, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);
+	}
+
+	if (anAlpha <= 0)
+		return;
+	{
+		g->SetColor(Color(255, 255, 255, anAlpha));
+		g->FillRect(-1000, -1000, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);
+	}
 }
 
 void Challenge::DrawWeather(Graphics* g)
 {
-	if (mApp->IsStormyNightLevel() || mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsLegendaryDemomanLevel())
+	if (mApp->IsStormyNightLevel() || mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsPlusStormLevel())
 		DrawRain(g);
-	if (mApp->IsLegendaryDemomanLevel())
+	if (mApp->IsPlusStormLevel())
 		DrawDemomanStorm(g);
 
 	if (mApp->IsStormyNightLevel())
