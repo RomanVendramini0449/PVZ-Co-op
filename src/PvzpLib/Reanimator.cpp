@@ -724,10 +724,13 @@ bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, [[maybe_unused]] int
 	// one (a cracked helmet, a lost arm), else the frame's image. Drawn over
 	// the original's footprint, scaled to it if its size differs.
 	Image* aSubstitute = nullptr;
+	const CoopArt::PartSubstitute* aSubstituteInfo = nullptr;
 	Image* aReplacedImage = aTrackInstance->mImageOverride != nullptr ? aTrackInstance->mImageOverride
 		: aAtlasImage != nullptr ? aAtlasImage->mOriginalImage : aImage;
 	if (aReplacedImage != nullptr && reinterpret_cast<uintptr_t>(aReplacedImage) > 1000)
-		aSubstitute = CoopArt::SubstituteZombiePart(aReplacedImage);
+		aSubstituteInfo = CoopArt::SubstituteZombiePart(aReplacedImage);
+	if (aSubstituteInfo != nullptr)
+		aSubstitute = aSubstituteInfo->mImage;
 	if (aSubstitute != nullptr)
 	{
 		aImage = aSubstitute;
@@ -769,7 +772,15 @@ bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, [[maybe_unused]] int
 		aFullScreen = true;  // a screen-sized rect is filled later
 	}
 
-	if (aSubstitute != nullptr)
+	if (aSubstitute != nullptr && aSubstituteInfo->mHasOffset)
+	{
+		// At true size, its top-left (x, y) original pixels from the
+		// original's: the image is drawn about its centre, so put that there.
+		aMatrix.LoadIdentity();
+		SexyMatrix3Translation(aMatrix, aSubstituteInfo->mOffsetX + aSubstitute->mWidth * 0.5f,
+			aSubstituteInfo->mOffsetY + aSubstitute->mHeight * 0.5f);
+	}
+	else if (aSubstitute != nullptr)
 	{
 		// The part's footprint: the original's size, which the pivot above
 		// was measured from. Squeeze the replacement into it.
@@ -796,7 +807,22 @@ bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, [[maybe_unused]] int
 		theTriangleGroup->DrawGroup(g);  // flush the accumulated triangles first
 
 	SexyMatrix3 aTransformMatrix;
-	MatrixFromTransform(aTransform, aTransformMatrix);
+	// A substitute anchored to another track moves the way that one does.
+	ReanimatorTransform aAnchorTransform;
+	bool aUseAnchor = false;
+	if (aSubstitute != nullptr && !aSubstituteInfo->mAnchorTrack.empty())
+	{
+		for (int anIndex = 0; anIndex < mDefinition->mTracks.count; anIndex++)
+		{
+			if (strcasecmp(mDefinition->mTracks.tracks[anIndex].mName, aSubstituteInfo->mAnchorTrack.c_str()) == 0)
+			{
+				GetCurrentTransform(anIndex, &aAnchorTransform);
+				aUseAnchor = true;
+				break;
+			}
+		}
+	}
+	MatrixFromTransform(aUseAnchor ? aAnchorTransform : aTransform, aTransformMatrix);
 	SexyMatrix3Multiply(aMatrix, aTransformMatrix, aMatrix);  // apply the track transform
 	SexyMatrix3Multiply(aMatrix, mOverlayMatrix, aMatrix);  // apply the overlay matrix
 	SexyMatrix3Translation(aMatrix, aTrackInstance->mShakeX + g->mTransX, aTrackInstance->mShakeY + g->mTransY);  // apply track shake and g's translation

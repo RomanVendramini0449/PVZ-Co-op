@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstddef>
 #include <unordered_map>
 
@@ -313,7 +314,7 @@ Image* CoopArt::AdventurePlusBackground(bool theNight)
 	return theNight ? gAdventurePlusNightBackground : gAdventurePlusBackground;
 }
 
-Image* CoopArt::SubstituteZombiePart(Image* theOriginal)
+const CoopArt::PartSubstitute* CoopArt::SubstituteZombiePart(Image* theOriginal)
 {
 	if (gCoopZombiePartCount == 0 || gLawnApp == nullptr || !gLawnApp->IsAdventurePlusLevel() || gLawnApp->mBoard == nullptr)
 		return nullptr;
@@ -321,7 +322,7 @@ Image* CoopArt::SubstituteZombiePart(Image* theOriginal)
 	// Built on first use: each part file is named after the image it
 	// replaces ("Zombie_head.png" replaces IMAGE_REANIM_ZOMBIE_HEAD), so ask
 	// for that image the way the animations do, and remember the pair.
-	static std::unordered_map<Image*, Image*> sParts;
+	static std::unordered_map<Image*, PartSubstitute> sParts;
 	static bool sBuilt = false;
 	if (!sBuilt)
 	{
@@ -329,20 +330,41 @@ Image* CoopArt::SubstituteZombiePart(Image* theOriginal)
 		for (int i = 0; i < gCoopZombiePartCount; i++)
 		{
 			const CoopArtPart& aPart = gCoopZombieParts[i];
+			// "name@x,y~Track": see PartSubstitute.
+			std::string aName = aPart.mName;
+			PartSubstitute aSub;
+			const size_t aTilde = aName.find('~');
+			if (aTilde != std::string::npos)
+			{
+				aSub.mAnchorTrack = aName.substr(aTilde + 1);
+				aName.resize(aTilde);
+			}
+			const size_t anAt = aName.find('@');
+			if (anAt != std::string::npos)
+			{
+				float aX = 0.0f, aY = 0.0f;
+				if (sscanf(aName.c_str() + anAt + 1, "%f,%f", &aX, &aY) == 2)
+				{
+					aSub.mHasOffset = true;
+					aSub.mOffsetX = aX;
+					aSub.mOffsetY = aY;
+				}
+				aName.resize(anAt);
+			}
 			std::string anId = "IMAGE_REANIM_";
-			for (const char* aChar = aPart.mName; *aChar; aChar++)
-				anId.push_back(static_cast<char>(toupper(static_cast<unsigned char>(*aChar))));
+			for (char aChar : aName)
+				anId.push_back(static_cast<char>(toupper(static_cast<unsigned char>(aChar))));
 			Image* anOriginal = nullptr;
 			if (!DefinitionLoadImage(&anOriginal, anId) || anOriginal == nullptr)
 				continue;
-			Image* aReplacement = gLawnApp->GetImageFromMemory(aPart.mData, aPart.mSize, std::string("coop/zombie-parts/") + aPart.mName);
-			if (aReplacement != nullptr)
-				sParts[anOriginal] = aReplacement;
+			aSub.mImage = gLawnApp->GetImageFromMemory(aPart.mData, aPart.mSize, std::string("coop/parts/") + aPart.mName);
+			if (aSub.mImage != nullptr)
+				sParts[anOriginal] = aSub;
 		}
 	}
 
 	const auto anIt = sParts.find(theOriginal);
-	return anIt == sParts.end() ? nullptr : anIt->second;
+	return anIt == sParts.end() ? nullptr : &anIt->second;
 }
 
 Image* CoopArt::AdventurePlusNarrator()

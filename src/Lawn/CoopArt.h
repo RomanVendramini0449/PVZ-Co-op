@@ -22,6 +22,8 @@
 #ifndef __COOPART_H__
 #define __COOPART_H__
 
+#include <string>
+
 namespace Sexy
 {
 	class Color;
@@ -83,11 +85,27 @@ namespace CoopArt
 	// night one (the boss battle) is adventure_plus_night_background.png.
 	Sexy::Image* AdventurePlusBackground(bool theNight);
 
+	// A part drawn in place of one of the game's. Its file name says how:
+	//   name.png             squeezed into the original's footprint
+	//   name@x,y.png         at true size, its top-left at (x, y) in the
+	//                        original's pixels -- for a part bigger than
+	//                        the one it replaces
+	//   name@x,y~Track.png   as above, but moved by another track of the
+	//                        same animation (a mouth that follows the head)
+	struct PartSubstitute
+	{
+		Sexy::Image* mImage = nullptr;
+		bool         mHasOffset = false;
+		float        mOffsetX = 0.0f;
+		float        mOffsetY = 0.0f;
+		std::string  mAnchorTrack;
+	};
+
 	// Adventure Plus: the repainted zombie or Crazy Dave part
-	// (assets/coop/zombie-parts, assets/coop/dave-parts) to
-	// draw in place of theOriginal, or nullptr to draw it as it is. Always
-	// nullptr outside an Adventure Plus level, and cheap when there are none.
-	Sexy::Image* SubstituteZombiePart(Sexy::Image* theOriginal);
+	// (assets/coop/zombie-parts, assets/coop/dave-parts) to draw in place of
+	// theOriginal, or nullptr to draw it as it is. Always nullptr outside an
+	// Adventure Plus level, and cheap when there are none.
+	const PartSubstitute* SubstituteZombiePart(Sexy::Image* theOriginal);
 
 	// Adventure Plus's stand-in for Crazy Dave (assets/coop/
 	// adventure_plus_narrator.png); nullptr while there is none.
