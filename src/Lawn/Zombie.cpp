@@ -11225,7 +11225,7 @@ void Zombie::DrawCoopKind(Graphics* g)
 	const char* aSheet = aTank ? "tank" : "heavy";
 	// The tank is the biggest thing on the lawn short of a Gargantuar; the
 	// Heavy is a big man, but it is bigger.
-	const float aScale = aTank ? 1.5f : 1.2f;
+	const float aScale = aTank ? 1.3f : 1.2f;
 	const int aFrames = CoopArt::SheetFrames(aSheet);
 	if (aFrames <= 0)
 		return;

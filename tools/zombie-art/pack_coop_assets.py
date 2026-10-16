@@ -54,7 +54,9 @@ SOUNDS = {
     # The final boss's tune (mainmusic.mo3 from order 0x9E) as the game plays
     # it: SDL-Mixer-X gives a tracker stream at full volume +6 dB of master
     # gain, which a plain recording does not get, so it is matched here.
-    'legend_boss_music':  ('newsoundsandsongs/legend_boss_music.mp3', -16.2, 'Brainiac Maniac, in game'),
+    # Then 3 dB more: his level has rain and thunder over it, Dr. Zomboss's
+    # has not.
+    'legend_boss_music':  ('newsoundsandsongs/legend_boss_music.mp3', -13.2, 'Brainiac Maniac, in game, +3 dB'),
 }
 
 

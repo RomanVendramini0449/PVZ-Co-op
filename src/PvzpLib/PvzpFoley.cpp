@@ -306,7 +306,7 @@ void PvzpFoley::PlayFoleyPitch(FoleyType theFoleyType, float thePitch)
 	if (thePitch != 0.0f)
 		aSoundInstance->AdjustPitch(thePitch);
 	if (TestBit(aFoleyParams->mFoleyFlags, FoleyFlags::FOLEYFLAGS_USES_MUSIC_VOLUME))
-		ApplyMusicVolume(aFoleyInstance);
+		ApplyMusicVolume(aFoleyInstance, theFoleyType);
 	bool aIsLooping = TestBit(aFoleyParams->mFoleyFlags, FoleyFlags::FOLEYFLAGS_LOOP);
 	aSoundInstance->Play(aIsLooping, false);
 }
@@ -391,12 +391,13 @@ void PvzpFoley::CancelPausedFoley()
 	}
 }
 
-void PvzpFoley::ApplyMusicVolume(FoleyInstance* theFoleyInstance)
+void PvzpFoley::ApplyMusicVolume(FoleyInstance* theFoleyInstance, FoleyType theFoleyType)
 {
+	const double aScale = theFoleyType == FoleyType::FOLEY_RAIN ? mRainVolumeScale : 1.0;
 	if (gSexyAppBase->mSfxVolume < 1e-6)
 		theFoleyInstance->mInstance->SetVolume(0.0);
 	else
-		theFoleyInstance->mInstance->SetVolume(gSexyAppBase->mMusicVolume / gSexyAppBase->mSfxVolume);  // so the volume equals the music volume once the sfx volume is applied
+		theFoleyInstance->mInstance->SetVolume(aScale * gSexyAppBase->mMusicVolume / gSexyAppBase->mSfxVolume);  // so the volume equals the music volume once the sfx volume is applied
 }
 
 void PvzpFoley::RehookupSoundWithMusicVolume()
@@ -412,7 +413,7 @@ void PvzpFoley::RehookupSoundWithMusicVolume()
 			{
 				FoleyInstance* aFoleyInstance = &aFoleyData->mFoleyInstances[i];
 				if (aFoleyInstance->mRefCount != 0)
-					ApplyMusicVolume(aFoleyInstance);
+					ApplyMusicVolume(aFoleyInstance, static_cast<FoleyType>(aFoleyType));
 			}
 		}
 	}

@@ -66,6 +66,7 @@ constexpr const int MAX_SQUIRRELS = 7;
 constexpr const int MAX_SCARY_POTS = 54;
 constexpr const int STORM_FLASH_TIME = 150;
 constexpr const int DEMO_THUNDER_FLASH_TICKS = 60;
+constexpr const float DEMO_RAIN_VOLUME = 0.35f;  // of the music's volume
 
 Challenge::Challenge()
 {
@@ -124,6 +125,8 @@ void Challenge::LoadBeghouledBoardState(BeghouledBoardState* theBoardState)
 
 void Challenge::InitLevel()
 {
+	// The rain at full strength, except under the Legendary Demoman's music.
+	mApp->mSoundSystem->mRainVolumeScale = mApp->IsLegendaryDemomanLevel() ? DEMO_RAIN_VOLUME : 1.0f;
 	if (mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS)
 	{
 		mChallengeStateCounter = 100;
@@ -1518,6 +1521,17 @@ void Challenge::ConveyorBeltDeliverSeed(SeedType& theLastSeedType)
 		aSeedPickArray[3].mWeight = 15;
 		aSeedPickArray[4].mItem = SEED_ICESHROOM;
 		aSeedPickArray[4].mWeight = 15;
+		// Below half health he throws a doom grenade every 15-20 s, so the
+		// belt brings twice the Ice-shrooms: about one and a half for each
+		// grenade, one belt or two.
+		Zombie* aBoss = mBoard->GetBossZombie();
+		if (aBoss && aBoss->mBodyHealth * 2 <= aBoss->mBodyMaxHealth)
+		{
+			aSeedPickArray[0].mWeight = 25;
+			aSeedPickArray[1].mWeight = 15;
+			aSeedPickArray[2].mWeight = 15;
+			aSeedPickArray[4].mWeight = 30;
+		}
 	}
 	else if (mBoard->mLevel == 10)
 	{

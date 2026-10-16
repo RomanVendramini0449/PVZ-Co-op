@@ -216,7 +216,10 @@ public:
 	void                GamePause(bool theEnteringPause);
 	void                PlayFoleyPitch(FoleyType theFoleyType, float thePitch);
 	void                CancelPausedFoley();
-	void     ApplyMusicVolume(FoleyInstance* theFoleyInstance);
+	void     ApplyMusicVolume(FoleyInstance* theFoleyInstance, FoleyType theFoleyType);
+	// The rain loop plays at the music's volume times this (1 as the game
+	// has it). The Legendary Demoman's level lowers it under his music.
+	float               mRainVolumeScale = 1.0f;
 	void                RehookupSoundWithMusicVolume();
 };
 

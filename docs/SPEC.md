@@ -375,8 +375,11 @@ An Ice-shroom freezes him in place (an attack he is winding up waits) and
 freezes his bombs, which burst harmlessly. A light Heavy Weapons Guy (900)
 comes every 18-26 s; at half health he calls in two 2,500-health tanks and
 waits for them. He topples over and blows up. Every win pays **$20,000**. He is drawn among
-the zombies at the depth of his feet; his bombs and the marks go over
-everything.
+the zombies at the depth of the top row of his block, so whatever walks through
+his lanes is drawn over him; his bombs and the marks go over everything. Below
+half health the belt brings twice the Ice-shrooms, to answer the doom
+grenades. In his level the rain plays at 35% and his music 3 dB over the final
+boss's tune.
 
 Losing in Adventure Plus has no house to walk into: the left side of the lawn
 blows up, lane by lane and then all at once, and the game is over.
