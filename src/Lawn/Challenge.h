@@ -140,6 +140,8 @@ public:
 	void                    MouseDownWhackAZombie(int theX, int theY);
 	void                    DrawStormNight(Graphics* g);
 	void                    UpdateStormyNight();
+	void                    UpdateDemomanStorm();
+	void                    DrawDemomanStorm(Graphics* g);
 	void                    InitLevel();
 	void                    SpawnZombieWave();
 	void                    GraveDangerSpawnRandomGrave();
@@ -489,6 +491,8 @@ inline constexpr ZombieAllowedLevels gZombieAllowedLevels[NUM_ZOMBIE_TYPES] = {
 	{ ZOMBIE_SQUASH_HEAD, {0} },
 	{ ZOMBIE_TALLNUT_HEAD, {0} },
 	{ ZOMBIE_REDEYE_GARGANTUAR, {0} },
+	{ ZOMBIE_COOP_TANK, {0} },
+	{ ZOMBIE_COOP_HEAVY, {0} },
 };
 
 inline constexpr SeedType gArtChallengeWallnut[MAX_GRID_SIZE_Y][MAX_GRID_SIZE_X] = {

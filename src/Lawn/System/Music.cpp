@@ -27,6 +27,7 @@
 #include "../../PvzpLib/PvzpDebug.h"
 #include "../../PvzpLib/PvzpCommon.h"
 #include "sound/SDLMusicInterface.h"
+#include "../CoopArt.h"
 
 #include <mutex>
 
@@ -113,6 +114,34 @@ bool Music::PvzpLoadMusic(MusicFile theMusicFile, std::string_view theFileName)
 	std::scoped_lock anAutoCrit(anSDL->mMusicMapMutex);
 	anSDL->mMusicMap.insert(SDLMusicMap::value_type(theMusicFile, aMusicInfo));
 	return true;
+}
+
+// A recording built into the game (CoopPacked.h), loaded the first time it
+// is wanted. The bytes are the executable's own, so they stay valid.
+bool Music::LoadPackedMusic(MusicFile theMusicFile, const char* thePackedName)
+{
+	SDLMusicInterface* anSDL = (SDLMusicInterface*)mApp->mMusicInterface.get();
+	std::scoped_lock anAutoCrit(anSDL->mMusicMapMutex);
+	if (anSDL->mMusicMap.find(static_cast<int>(theMusicFile)) != anSDL->mMusicMap.end())
+		return true;
+
+	std::size_t aSize = 0;
+	const unsigned char* aData = CoopArt::PackedData(thePackedName, aSize);
+	if (aData == nullptr)
+		return false;
+	Mix_Music* aHMusic = Mix_LoadMUS_RW(SDL_RWFromConstMem(aData, static_cast<int>(aSize)), 1);
+	if (aHMusic == nullptr)
+		return false;
+
+	SDLMusicInfo aMusicInfo;
+	aMusicInfo.mHMusic = aHMusic;
+	anSDL->mMusicMap.insert(SDLMusicMap::value_type(theMusicFile, aMusicInfo));
+	return true;
+}
+
+bool Music::IsStreamedTune(MusicTune theMusicTune)
+{
+	return theMusicTune == MusicTune::MUSIC_TUNE_CREDITS_ZOMBIES_ON_YOUR_LAWN || theMusicTune == MusicTune::MUSIC_TUNE_COOP_LEGEND;
 }
 
 void Music::SetupVolumeForTune(MusicTune theMusicTune, float theDrumsVolume, float theHihatsVolume)
@@ -244,7 +273,7 @@ void Music::PlayFromOffset(MusicFile theMusicFile, int theOffset, double theVolu
 	PVZP_ASSERT(anItr != anSDL->mMusicMap.end());
 	SDLMusicInfo* aMusicInfo = &anItr->second;
 
-	if (mCurMusicTune == MusicTune::MUSIC_TUNE_CREDITS_ZOMBIES_ON_YOUR_LAWN)
+	if (IsStreamedTune(mCurMusicTune))
 	{
 		bool aNoLoop = theMusicFile == MusicFile::MUSIC_FILE_CREDITS_ZOMBIES_ON_YOUR_LAWN;
 		mMusicInterface->PlayMusic(theMusicFile, theOffset, aNoLoop);
@@ -365,6 +394,18 @@ void Music::PlayMusic(MusicTune theMusicTune, int theOffset, int theDrumsOffset)
 
 	case MusicTune::MUSIC_TUNE_CREDITS_ZOMBIES_ON_YOUR_LAWN:
 		mCurMusicFileMain = MusicFile::MUSIC_FILE_CREDITS_ZOMBIES_ON_YOUR_LAWN;
+		if (theOffset == -1)
+			theOffset = 0;
+		PlayFromOffset(mCurMusicFileMain, theOffset, 1.0);
+		break;
+
+	case MusicTune::MUSIC_TUNE_COOP_LEGEND:
+		if (!LoadPackedMusic(MusicFile::MUSIC_FILE_COOP_LEGEND, "legend_boss_music"))
+		{
+			mCurMusicTune = MusicTune::MUSIC_TUNE_NONE;
+			break;
+		}
+		mCurMusicFileMain = MusicFile::MUSIC_FILE_COOP_LEGEND;
 		if (theOffset == -1)
 			theOffset = 0;
 		PlayFromOffset(mCurMusicFileMain, theOffset, 1.0);
@@ -594,6 +635,8 @@ void Music::StartGameMusic()
 
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN || mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM)
 		MakeSureMusicIsPlaying(MusicTune::MUSIC_TUNE_ZEN_GARDEN);
+	else if (mApp->IsLegendaryDemomanLevel())
+		MakeSureMusicIsPlaying(MusicTune::MUSIC_TUNE_COOP_LEGEND);
 	else if (mApp->IsBossFightLevel())  // Dr. Zomboss, or Roman
 		MakeSureMusicIsPlaying(MusicTune::MUSIC_TUNE_FINAL_BOSS_BRAINIAC_MANIAC);
 	else if (mApp->IsWallnutBowlingLevel() || mApp->IsWhackAZombieLevel() || mApp->IsLittleTroubleLevel() || mApp->IsBungeeBlitzLevel() ||
@@ -628,7 +671,7 @@ void Music::GameMusicPause(bool thePause)
 		if (!mPaused && mCurMusicTune != MusicTune::MUSIC_TUNE_NONE)
 		{
 			if (mCurMusicFileMain != MusicFile::MUSIC_FILE_NONE &&
-				mCurMusicTune != MusicTune::MUSIC_TUNE_CREDITS_ZOMBIES_ON_YOUR_LAWN)
+				!IsStreamedTune(mCurMusicTune))
 			{
 				mPauseOffset = GetMusicOrder(mCurMusicFileMain);
 			}
@@ -652,7 +695,7 @@ void Music::GameMusicPause(bool thePause)
 		{
 			Mix_Music* aHandle = (mCurMusicFileMain != MusicFile::MUSIC_FILE_NONE) ?
 								  GetMusicHandle(mCurMusicFileMain) : nullptr;
-			if (mCurMusicTune == MusicTune::MUSIC_TUNE_CREDITS_ZOMBIES_ON_YOUR_LAWN ||
+			if (IsStreamedTune(mCurMusicTune) ||
 				(aHandle && Mix_PlayingMusicStream(aHandle)))
 			{
 				if (mCurMusicFileMain != MusicFile::MUSIC_FILE_NONE)

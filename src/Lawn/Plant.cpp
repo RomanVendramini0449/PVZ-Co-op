@@ -891,7 +891,7 @@ bool Plant::FindStarFruitTarget()
 		Rect aZombieRect = aZombie->GetZombieRect();
 		if (aZombie->EffectedByDamage(aDamageRangeFlags))
 		{
-			if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && !aZombie->IsCoopRoman() && mPlantCol >= 5)
+			if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && !aZombie->IsCoopBoss() && mPlantCol >= 5)
 				return true;
 
 			if (aZombie->mRow == mRow)
@@ -1099,8 +1099,9 @@ void Plant::UpdateProductionPlant()
 // building as it gets close -- on its own clock (see PlantInitialize).
 void Plant::UpdateLucaSun()
 {
-	// No sun against Roman: the conveyor is what feeds that fight.
-	if (!IsInPlay() || mApp->IsIZombieLevel() || mApp->IsCoopRomanLevel() || mBoard->HasLevelAwardDropped())
+	// No sun against Roman or the Demoman: the conveyor feeds those fights.
+	if (!IsInPlay() || mApp->IsIZombieLevel() || mApp->IsCoopRomanLevel() || mApp->IsLegendaryDemomanLevel() ||
+		mBoard->HasLevelAwardDropped())
 		return;
 
 	// mStateCountdown is counted down for every plant in UpdateAbilities.

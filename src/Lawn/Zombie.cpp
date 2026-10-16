@@ -113,6 +113,8 @@ constinit const ZombieDefinition gZombieDefs[NUM_ZOMBIE_TYPES] = {
 	{ .mZombieType = ZOMBIE_SQUASH_HEAD, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 3, .mStartingLevel = 99, .mFirstAllowedWave = 10, .mPickWeight = 2000, .mZombieName = "ZOMBIE" },
 	{ .mZombieType = ZOMBIE_TALLNUT_HEAD, .mReanimationType = REANIM_ZOMBIE, .mZombieValue = 4, .mStartingLevel = 99, .mFirstAllowedWave = 10, .mPickWeight = 2000, .mZombieName = "ZOMBIE" },
 	{ .mZombieType = ZOMBIE_REDEYE_GARGANTUAR, .mReanimationType = REANIM_GARGANTUAR, .mZombieValue = 10, .mStartingLevel = 48, .mFirstAllowedWave = 15, .mPickWeight = 6000, .mZombieName = "REDEYED_GARGANTUAR" },
+	{ .mZombieType = ZOMBIE_COOP_TANK, .mReanimationType = REANIM_ZOMBIE_ZAMBONI, .mZombieValue = 7, .mStartingLevel = 99, .mFirstAllowedWave = 6, .mPickWeight = 1500, .mZombieName = "TANK" },
+	{ .mZombieType = ZOMBIE_COOP_HEAVY, .mReanimationType = REANIM_ZOMBIE_FOOTBALL, .mZombieValue = 5, .mStartingLevel = 99, .mFirstAllowedWave = 3, .mPickWeight = 2000, .mZombieName = "HEAVY" },
 };
 
 static ZombieType gBossZombieList[] = {
@@ -145,6 +147,19 @@ Zombie::Zombie()
 void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Zombie* theParentZombie, int theFromWave)
 {
 	PVZP_ASSERT(theType >= 0 && theType <= ZombieType::NUM_ZOMBIE_TYPES);
+
+	// The Adventure Plus enemies become the zombie they are built on.
+	mCoopKind = CoopZombieKind::COOP_KIND_NONE;
+	if (theType == ZombieType::ZOMBIE_COOP_TANK)
+	{
+		theType = ZombieType::ZOMBIE_ZAMBONI;
+		mCoopKind = CoopZombieKind::COOP_KIND_TANK;
+	}
+	else if (theType == ZombieType::ZOMBIE_COOP_HEAVY)
+	{
+		theType = ZombieType::ZOMBIE_FOOTBALL;
+		mCoopKind = CoopZombieKind::COOP_KIND_HEAVY;
+	}
 
 	int aZombatarRecordIndex = -1;
 	if (theType == ZombieType::ZOMBIE_FLAG && mBoard)
@@ -692,6 +707,12 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 			aRenderLayer = RenderLayer::RENDER_LAYER_TOP;
 			break;
 		}
+		if (mApp->IsLegendaryDemomanLevel())
+		{
+			InitCoopDemoman();
+			aRenderLayer = RenderLayer::RENDER_LAYER_TOP;
+			break;
+		}
 		mPosX = 0.0f;
 		mPosY = 0.0f;
 		mZombieRect = Rect(700, 80, 90, 430);
@@ -885,6 +906,19 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 		mFlyingHealth /= 4;
 	}
 
+	// The tank outlasts a Zomboni; the Heavy wears no helmet and goes down
+	// a little sooner than a Football Zombie.
+	if (mCoopKind == CoopZombieKind::COOP_KIND_TANK)
+	{
+		mBodyHealth = COOP_TANK_HEALTH;
+	}
+	else if (mCoopKind == CoopZombieKind::COOP_KIND_HEAVY)
+	{
+		mHelmType = HelmType::HELMTYPE_NONE;
+		mHelmHealth = 0;
+		mBodyHealth = COOP_HEAVY_HEALTH;
+	}
+
 	UpdateAnimSpeed();
 	if (mVariant)
 	{
@@ -922,7 +956,7 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
 
 	// Adventure Plus's bowling level: a Football Zombie always takes three
 	// balls, whatever the difficulty made of his helmet.
-	if (mZombieType == ZombieType::ZOMBIE_FOOTBALL && mApp->IsAdventurePlusLevel() &&
+	if (mZombieType == ZombieType::ZOMBIE_FOOTBALL && mCoopKind == CoopZombieKind::COOP_KIND_NONE && mApp->IsAdventurePlusLevel() &&
 		mApp->mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL)
 	{
 		mHelmHealth = ADVENTURE_PLUS_BOWLING_FOOTBALL_HELM;
@@ -3533,6 +3567,7 @@ void Zombie::DropPole()
 bool Zombie::CanLoseBodyParts()
 {
 	return
+		mCoopKind == CoopZombieKind::COOP_KIND_NONE &&  // their art is one piece
 		mZombieType != ZombieType::ZOMBIE_ZAMBONI &&
 		mZombieType != ZombieType::ZOMBIE_BUNGEE &&
 		mZombieType != ZombieType::ZOMBIE_CATAPULT &&
@@ -4067,6 +4102,21 @@ bool Zombie::ZombieNotWalking()
 
 void Zombie::UpdateZamboni()
 {
+	// The tank drives like a Zomboni but leaves no ice, and it never reaches
+	// the house: at the end of its lane it blows itself up.
+	if (mCoopKind == CoopZombieKind::COOP_KIND_TANK)
+	{
+		if (mPosX > 400.0f)
+		{
+			mVelX = PvzpAnimateCurveFloat(700, 300, mPosX, 0.25f, 0.05f, PvzpCurves::CURVE_LINEAR);
+		}
+		if (mPosX < COOP_TANK_DETONATE_X && !mMindControlled && !IsDeadOrDying())
+		{
+			CoopTankDetonate();
+		}
+		return;
+	}
+
 	if (mPosX > 400.0f && !mFlatTires)
 	{
 		mVelX = PvzpAnimateCurveFloat(700, 300, mPosX, 0.25f, 0.05f, PvzpCurves::CURVE_LINEAR);
@@ -4681,6 +4731,11 @@ void Zombie::UpdatePlaying()
 	if (IsCoopRoman())
 	{
 		UpdateCoopRoman();
+		return;
+	}
+	if (IsCoopDemoman())
+	{
+		UpdateCoopDemoman();
 		return;
 	}
 
@@ -6355,7 +6410,11 @@ void Zombie::Draw(Graphics* g)
 	}
 	if (mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_INVISIGHOUL || mFromWave == Zombie::ZOMBIE_WAVE_UI)
 	{
-		if (mBodyReanimID != ReanimationID::REANIMATIONID_NULL)
+		if (mCoopKind != CoopZombieKind::COOP_KIND_NONE)
+		{
+			DrawCoopKind(g);
+		}
+		else if (mBodyReanimID != ReanimationID::REANIMATIONID_NULL)
 		{
 			DrawReanim(g, aDrawPos, RENDER_GROUP_NORMAL);
 		}
@@ -6548,6 +6607,14 @@ void Zombie::SquishAllInSquare(int theX, int theY, ZombieAttackType theAttackTyp
 
 void Zombie::ZamboniDeath(unsigned int theDamageFlags)
 {
+	// The tank always goes up in flames, spikes or not.
+	if (mCoopKind == CoopZombieKind::COOP_KIND_TANK)
+	{
+		CoopTankBlast();
+		DieWithLoot();
+		return;
+	}
+
 	if (TestBit(theDamageFlags, DamageFlags::DAMAGE_SPIKE))
 	{
 		mFlatTires = true;
@@ -7984,6 +8051,15 @@ void Zombie::TakeBodyDamage(int theDamage, unsigned int theDamageFlags)
 			CoopRomanStartDeath();
 		}
 	}
+	else if (IsCoopDemoman())
+	{
+		// So does the Demoman: he topples over and blows up.
+		if (mBodyHealth <= 0)
+		{
+			mBodyHealth = 1;
+			CoopDemoStartDeath();
+		}
+	}
 	else if (mZombieType == ZombieType::ZOMBIE_BOSS)
 	{
 		if (!TestBit(theDamageFlags, static_cast<int>(DamageFlags::DAMAGE_DOESNT_CAUSE_FLASH)))
@@ -8121,7 +8197,7 @@ bool Zombie::CanBeChilled()
 
 	return
 		mZombieType != ZombieType::ZOMBIE_BOSS ||
-		IsCoopRoman() ||
+		IsCoopBoss() ||
 		mZombiePhase == ZombiePhase::PHASE_BOSS_HEAD_IDLE_BEFORE_SPIT ||
 		mZombiePhase == ZombiePhase::PHASE_BOSS_HEAD_IDLE_AFTER_SPIT ||
 		mZombiePhase == ZombiePhase::PHASE_BOSS_HEAD_SPIT;
@@ -8184,6 +8260,11 @@ bool Zombie::EffectedByDamage(unsigned int theDamageRangeFlags)
 		// Roman can be hit whenever he is there to hit -- except while going
 		// out, which is no time to be counting damage.
 		if (mCoopBossState == 6)  // ROMAN_STATE_DYING
+			return false;
+	}
+	else if (IsCoopDemoman())
+	{
+		if (!CoopDemoCanBeHit())
 			return false;
 	}
 	else if (mZombieType == ZombieType::ZOMBIE_BOSS)
@@ -8378,6 +8459,8 @@ Rect Zombie::GetZombieRect()
 {
 	if (IsCoopRoman())
 		return GetCoopRomanRect();
+	if (IsCoopDemoman())
+		return GetCoopDemoRect();
 
 	Rect aZombieRect = mZombieRect;
 	if (IsWalkingBackwards())
@@ -8466,6 +8549,9 @@ void Zombie::RemoveIceTrap()
 
 void Zombie::HitIceTrap()
 {
+	if (IsCoopDemoman())
+		CoopDemoFreezeBombs();
+
 	bool cold = false;
 	if (mChilledCounter > 0 || mIceTrapCounter != 0)
 	{
@@ -8652,13 +8738,21 @@ void Zombie::MowDown()
 
 	if (mZombieType == ZombieType::ZOMBIE_ZAMBONI)
 	{
-		mApp->AddPvzpParticle(mPosX + 80.0f, mPosY + 60.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_ZAMBONI_EXPLOSION);
-		mApp->PlayFoley(FoleyType::FOLEY_EXPLOSION);
+		if (mCoopKind == CoopZombieKind::COOP_KIND_TANK)
+		{
+			CoopTankBlast();
+		}
+		else
+		{
+			mApp->AddPvzpParticle(mPosX + 80.0f, mPosY + 60.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_ZAMBONI_EXPLOSION);
+			mApp->PlayFoley(FoleyType::FOLEY_EXPLOSION);
+		}
 		DieWithLoot();
 		return;
 	}
 
 	if (mZombiePhase == ZombiePhase::PHASE_ZOMBIE_DYING ||
+		mCoopKind != CoopZombieKind::COOP_KIND_NONE ||
 		mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_IN_VAULT ||
 		mZombiePhase == ZombiePhase::PHASE_RISING_FROM_GRAVE ||
 		mZombiePhase == ZombiePhase::PHASE_DANCER_RISING ||
@@ -8766,6 +8860,12 @@ void Zombie::ApplyBurn()
 	AttachmentDetachCrossFadeParticleType(mAttachmentID, ParticleEffect::PARTICLE_ZAMBONI_SMOKE, nullptr);
 	BungeeDropPlant();
 
+	if (mCoopKind == CoopZombieKind::COOP_KIND_TANK)
+	{
+		ZamboniDeath(0U);
+		return;
+	}
+
 	if (mZombiePhase == ZombiePhase::PHASE_ZOMBIE_DYING ||
 		mZombiePhase == ZombiePhase::PHASE_POLEVAULTER_IN_VAULT ||
 		mZombiePhase == ZombiePhase::PHASE_IMP_GETTING_THROWN ||
@@ -8784,7 +8884,8 @@ void Zombie::ApplyBurn()
 	{
 		DieWithLoot();
 	}
-	else if (mZombieType == ZOMBIE_BUNGEE || mZombieType == ZOMBIE_YETI || Zombie::IsZombotany(mZombieType) || IsBobsledTeamWithSled() || IsFlying() || !mHasHead)
+	else if (mZombieType == ZOMBIE_BUNGEE || mZombieType == ZOMBIE_YETI || mCoopKind == CoopZombieKind::COOP_KIND_HEAVY ||
+		Zombie::IsZombotany(mZombieType) || IsBobsledTeamWithSled() || IsFlying() || !mHasHead)
 	{
 		SetAnimRate(0.0f);
 		Reanimation* aHeadReanim = mApp->ReanimationTryToGet(mSpecialHeadReanimID);
@@ -10607,6 +10708,12 @@ void Zombie::BossSetupReanim()
 
 void Zombie::DrawBossPart(Graphics* g, BossPart theBossPart)
 {
+	if (IsCoopDemoman())
+	{
+		if (theBossPart == BossPart::BOSS_PART_MAIN)
+			DrawCoopDemoman(g);
+		return;
+	}
 	if (IsCoopRoman())
 	{
 		if (theBossPart == BossPart::BOSS_PART_MAIN)
@@ -10854,7 +10961,7 @@ int Zombie::RowDeviationFrom(int theRow)
 {
 	if (mZombieType != ZombieType::ZOMBIE_BOSS)
 		return mRow - theRow;
-	if (!IsCoopRoman())
+	if (!IsCoopBoss())
 		return 0;
 
 	if (theRow < mRow - 1)
@@ -11067,6 +11174,111 @@ void Zombie::UpdateCoopRoman()
 	// The lanes he can be hit from follow him as he slides.
 	const float aRowsDown = (mCoopBossTopY - RomanTopForRow(mBoard, 1)) / RomanRowHeight(mBoard);
 	mRow = std::clamp(static_cast<int>(std::floor(aRowsDown + 0.5f)) + 1, 1, 3);
+}
+
+// The tank's explosion: fire and a shake, nothing else.
+void Zombie::CoopTankBlast()
+{
+	mApp->AddPvzpParticle(mPosX + 76.0f, mPosY + 70.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_POWIE);
+	mApp->PlayFoley(FoleyType::FOLEY_CHERRYBOMB);
+	mBoard->ShakeBoard(3, -4);
+}
+
+// The tank reached the end of its lane: it takes the lane's lawn mower and
+// every plant within a square of its middle with it, instead of getting in.
+void Zombie::CoopTankDetonate()
+{
+	CoopTankBlast();
+
+	if (LawnMower* aMower = mBoard->FindLawnMowerInRow(mRow))
+	{
+		if (aMower->mMowerState != LawnMowerState::MOWER_TRIGGERED)
+		{
+			mApp->AddPvzpParticle(aMower->mPosX + 40.0f, aMower->mPosY + 40.0f, mRenderOrder + 1, ParticleEffect::PARTICLE_MOWER_CLOUD);
+			aMower->Die();
+		}
+	}
+
+	const int aCol = mBoard->PixelToGridXKeepOnBoard(mX + 76, mY + 60);
+	for (Plant* aPlant : mBoard->mPlants)
+	{
+		if (aPlant->mDead || aPlant->NotOnGround())
+			continue;
+		if (std::abs(aPlant->mPlantCol - aCol) <= 1 && std::abs(aPlant->mRow - mRow) <= 1)
+		{
+			mBoard->mPlantsEaten++;
+			aPlant->Die();
+		}
+	}
+
+	DieNoLoot();
+}
+
+// The tank and the Heavy are drawn from their own animations; the zombie
+// each is built on runs underneath, unseen, and sets the pace -- frozen or
+// chilled, the drawing slows and stops with it.
+void Zombie::DrawCoopKind(Graphics* g)
+{
+	const bool aTank = mCoopKind == CoopZombieKind::COOP_KIND_TANK;
+	const char* aSheet = aTank ? "tank" : "heavy";
+	const int aFrames = CoopArt::SheetFrames(aSheet);
+	if (aFrames <= 0)
+		return;
+
+	Reanimation* aBodyReanim = mApp->ReanimationTryToGet(mBodyReanimID);
+	const float aAnimTime = aBodyReanim ? aBodyReanim->mAnimTime : 0.0f;
+	int aFrame = static_cast<int>(aAnimTime * aFrames * (aTank ? 2 : 1));
+
+	// Ground point, in this zombie's own drawing space.
+	float aX = aTank ? 76.0f : 70.0f;
+	float aY = aTank ? 126.0f : 118.0f;
+	float aRotation = 0.0f;
+	int aAlpha = 255;
+	if (mZombieFade >= 0)
+		aAlpha = std::clamp(255 * mZombieFade / 10, 0, 255);
+
+	// The Heavy has no death of his own: he topples over backwards, bounces
+	// once on his back and fades out where he lies.
+	const bool aDying = mZombiePhase == ZombiePhase::PHASE_ZOMBIE_DYING;
+	const bool aBurned = mZombiePhase == ZombiePhase::PHASE_ZOMBIE_BURNED;
+	if (!aTank && aDying)
+	{
+		const float aT = (aBodyReanim && aBodyReanim->mLoopCount == 0) ? aBodyReanim->mAnimTime : 1.0f;
+		const float aFall = std::min(aT / 0.52f, 1.0f);
+		aRotation = aFall * aFall * 1.45f;
+		if (aT > 0.52f && aT < 0.7f)
+			aRotation -= static_cast<float>(sin((aT - 0.52f) / 0.18f * 3.14159f)) * 0.12f;
+		aX += aRotation * 8.0f;
+		aFrame = 0;
+	}
+
+	Graphics aG(*g);
+	aG.SetColorizeImages(true);
+	if (aBurned)
+	{
+		aG.SetColor(Color(40, 30, 30, std::min(aAlpha, std::clamp(mPhaseCounter * 2, 0, 255))));
+	}
+	else if (mChilledCounter > 0 || mIceTrapCounter > 0)
+	{
+		aG.SetColor(Color(110, 150, 255, aAlpha));
+	}
+	else
+	{
+		aG.SetColor(Color(255, 255, 255, aAlpha));
+	}
+
+	const bool aFlip = mMindControlled;
+	if (aFlip)
+		aX = (aTank ? 153.0f : 120.0f) - aX;
+	CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX, aY, 1.0f, aFlip, aFlip ? -aRotation : aRotation);
+
+	// A hit flashes white, the way a zombie does.
+	if (mJustGotShotCounter > 0 && !aBurned)
+	{
+		aG.SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
+		aG.SetColor(Color(255, 255, 255, std::min(mJustGotShotCounter * 10, 120) * aAlpha / 255));
+		CoopArt::DrawSheetFrame(&aG, aSheet, aFrame, aX, aY, 1.0f, aFlip, aFlip ? -aRotation : aRotation);
+	}
 }
 
 void Zombie::DrawCoopRoman(Graphics* g)

@@ -20,6 +20,7 @@
  */
 
 #include "Board.h"
+#include "CoopArt.h"
 #include "Plant.h"
 #include "Zombie.h"
 #include "GridItem.h"
@@ -369,6 +370,17 @@ void CutScene::PreloadResources()
 	if (mApp->IsFirstTimeAdventureMode() && mBoard->mLevel <= 50)
 	{
 		Plant::PreloadPlantResources(mApp->GetAwardSeedForLevel(mBoard->mLevel));
+	}
+	if (mApp->IsLegendaryDemomanLevel())
+	{
+		// The same for the Demoman, the zombies he brings and the conveyor's
+		// plants.
+		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_BOSS);
+		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_COOP_TANK);
+		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_COOP_HEAVY);
+		Zombie::PreloadZombieResources(ZombieType::ZOMBIE_BUNGEE);  // the one that takes Dave
+		for (SeedType aSeed : { SEED_LUCA, SEED_NOAH, SEED_GRS, SEED_JALAPENO, SEED_ICESHROOM })
+			Plant::PreloadPlantResources(aSeed);
 	}
 	if (mApp->IsCoopRomanLevel())
 	{
@@ -864,7 +876,7 @@ void CutScene::StartLevelIntro()
 	if (mCrazyDaveDialogStart != -1)
 	{
 		mCrazyDaveTime = TimeEarlyDaveLeaveEnd - TimePanRightStart;
-		if (mApp->IsFinalBossLevel() && mApp->IsAdventureMode())
+		if ((mApp->IsFinalBossLevel() && mApp->IsAdventureMode()) || mApp->IsLegendaryDemomanLevel())
 		{
 			mCrazyDaveTime += 4000;
 		}
@@ -1324,7 +1336,15 @@ void CutScene::AnimateBoard()
 
 	// Ready Set Plant animation
 	int aTimeReadySetPlant = TimeReadySetPlantStart + mLawnMowerTime + mSodTime + mGraveStoneTime + mCrazyDaveTime + mFogTime + mBossTime;
-	if (mReadySetPlantTime > 0 && mCutsceneTime == aTimeReadySetPlant)
+	if (mReadySetPlantTime > 0 && mCutsceneTime == aTimeReadySetPlant && mApp->IsLegendaryDemomanLevel())
+	{
+		// No Ready-Set-Plant for him: his name, a clap of thunder, and his music.
+		mBoard->DisplayAdvice("LEGENDARY DEMOMAN", MessageStyle::MESSAGE_STYLE_HUGE_WAVE, AdviceType::ADVICE_NONE);
+		mBoard->mChallenge->mChallengeStateCounter = 61;
+		mApp->PlaySample(SOUND_HUGE_WAVE);
+		mApp->mMusic->FadeOut(150);
+	}
+	else if (mReadySetPlantTime > 0 && mCutsceneTime == aTimeReadySetPlant)
 	{
 		mApp->AddReanimation(400, 324, Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_SCREEN_FADE, 0, 0), ReanimationType::REANIM_READYSETPLANT);
 		mApp->PlaySample(SOUND_READYSETPLANT);
@@ -1483,8 +1503,77 @@ void CutScene::StartZombiesWon()
 	mApp->PlaySample(SOUND_LOSEMUSIC);
 }
 
+// Adventure Plus's base has no door to walk through: when a zombie reaches
+// the grate, the left side of the lawn blows up, lane by lane and then all at
+// once, the screen goes dark, and that is the game. Fixed timings and places,
+// no generator, so both co-op players see the same.
+static const int	PlusLostTimeFirstBlast			= 300;
+static const int	PlusLostTimeBlastStep			= 220;
+static const int	PlusLostTimeBigBlast			= 1600;
+static const int	PlusLostTimeDark				= 2600;
+static const int	PlusLostTimeEnd					= 4600;
+
+void CutScene::UpdateAdventurePlusLost()
+{
+	static const int kRows[] = { 2, 0, 4, 1, 3 };
+	const int aRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 0);
+	for (int i = 0; i < 5; i++)
+	{
+		if (mCutsceneTime != PlusLostTimeFirstBlast + PlusLostTimeBlastStep * i)
+			continue;
+		const int aRow = kRows[i];
+		const float aX = 40.0f + 30.0f * ((i * 3) % 4);
+		const float aY = static_cast<float>(mBoard->GridToPixelY(0, aRow)) + 50.0f;
+		mApp->AddPvzpParticle(aX, aY, aRenderOrder, ParticleEffect::PARTICLE_POWIE);
+		mApp->PlayFoley(FoleyType::FOLEY_CHERRYBOMB);
+		mBoard->ShakeBoard(4, -6);
+	}
+
+	if (mCutsceneTime == PlusLostTimeBigBlast)
+	{
+		mApp->AddPvzpParticle(110.0f, 330.0f, aRenderOrder, ParticleEffect::PARTICLE_DOOM);
+		mApp->PlaySample(SOUND_DOOMSHROOM);
+		CoopArt::PlayPackedSound("legend_explode");
+		mBoard->ShakeBoard(8, -10);
+		// Everything on the left side goes with it.
+		for (Zombie* aZombie : mBoard->mZombies)
+		{
+			if (!aZombie->mDead && aZombie->GetZombieRect().mX < 260)
+				aZombie->DieNoLoot();
+		}
+		for (Plant* aPlant : mBoard->mPlants)
+		{
+			if (!aPlant->mDead && aPlant->mPlantCol <= 1)
+				aPlant->Die();
+		}
+	}
+
+	if (mCutsceneTime == PlusLostTimeDark)
+	{
+		ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_ZOMBIES_WON, true);
+		Reanimation* aReanim = mApp->AddReanimation(-BOARD_OFFSET, 0, Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_SCREEN_FADE, 0, 0), ReanimationType::REANIM_ZOMBIES_WON);
+		aReanim->mLoopType = ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD;
+		aReanim->GetTrackInstanceByName("fullscreen")->mTrackColor = Color::Black;
+		aReanim->SetFramesForLayer("anim_screen");
+		mZombiesWonReanimID = mApp->ReanimationGetID(aReanim);
+	}
+
+	if (mCutsceneTime == PlusLostTimeEnd)
+	{
+		GameOverDialog* aDialog = new GameOverDialog("The base went up in smoke.\nYOU LOSE!", false);
+		mApp->AddDialog(Dialogs::DIALOG_GAME_OVER, aDialog);
+		mApp->mWidgetManager->SetFocus(aDialog);
+	}
+}
+
 void CutScene::UpdateZombiesWon()
 {
+	if (mApp->IsAdventurePlusLevel())
+	{
+		UpdateAdventurePlusLost();
+		return;
+	}
+
 	if (mCutsceneTime > LostTimePanRightStart && mCutsceneTime <= LostTimePanRightEnd)
 	{
 		mBoard->Move(CalcPosition(LostTimePanRightStart, LostTimePanRightEnd, 0, BOARD_OFFSET), 0);
@@ -1545,7 +1634,7 @@ void CutScene::UpdateZombiesWon()
 bool CutScene::IsCutSceneOver()
 {
 	PVZP_ASSERT(mApp->mGameScene == GameScenes::SCENE_ZOMBIES_WON);
-	return mCutsceneTime >= LostTimeEnd;
+	return mCutsceneTime >= (mApp->IsAdventurePlusLevel() ? PlusLostTimeEnd : LostTimeEnd);
 }
 
 void CutScene::ZombieWonClick()
@@ -1596,7 +1685,7 @@ void CutScene::AdvanceCrazyDaveDialog(bool theJustSkipping)
 	if (!mApp->AdvanceCrazyDaveText())
 	{
 		mApp->CrazyDaveLeave();
-		if (mApp->IsFinalBossLevel() && mApp->IsAdventureMode())
+		if ((mApp->IsFinalBossLevel() && mApp->IsAdventureMode()) || mApp->IsLegendaryDemomanLevel())
 		{
 			Reanimation* aCrazyDaveReanim = mApp->ReanimationTryToGet(mApp->mCrazyDaveReanimID);
 			aCrazyDaveReanim->PlayReanim("anim_grab", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);

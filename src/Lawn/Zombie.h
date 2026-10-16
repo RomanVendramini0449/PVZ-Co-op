@@ -56,6 +56,40 @@ enum ZombieParts : int32_t
 	PART_DIGGER
 };
 
+// Adventure Plus enemies (docs/SPEC.md 10.3).
+constexpr int COOP_TANK_HEALTH = 1800;
+constexpr int COOP_HEAVY_HEALTH = 1300;
+constexpr float COOP_TANK_DETONATE_X = 35.0f;  // just before the lawn mower
+constexpr int COOP_DEMO_HEALTH = 120000;        // twice Roman
+constexpr int COOP_DEMO_TANK_HEALTH = 4000;     // the tanks he calls in at half health
+constexpr int COOP_DEMO_MAX_BOMBS = 10;
+
+// One of the Legendary Demoman's bombs (CoopDemoman.cpp), in flight from
+// (mFromX, mFromY) to the middle of square (mCol, mRow).
+struct CoopDemoBomb
+{
+	bool    mActive = false;
+	bool    mDoom = false;       // the big one: lands, fizzes, then clears 6x6
+	float   mFromX = 0.0f;
+	float   mFromY = 0.0f;
+	float   mToX = 0.0f;
+	float   mToY = 0.0f;
+	int32_t mCol = 0;
+	int32_t mRow = 0;
+	int32_t mTicks = 0;
+	int32_t mFlightTicks = 0;
+	int32_t mFuse = 0;
+	int32_t mFrozen = 0;         // counting down to a harmless burst
+};
+
+// What an Adventure Plus enemy really is (Zombie::mCoopKind).
+enum CoopZombieKind : int32_t
+{
+	COOP_KIND_NONE,
+	COOP_KIND_TANK,   // built on the Zomboni: no ice, blows up at the end of its lane
+	COOP_KIND_HEAVY,  // built on the Football Zombie: dances, no helmet
+};
+
 class ZombieDrawPosition
 {
 public:
@@ -166,6 +200,21 @@ public:
 	int32_t                         mCoopBossSummonTimer;
 	bool                            mCoopBossNextFire;
 	float                           mCoopBossTopY;        // top of his 3x3 block, in pixels
+	// Adventure Plus: what this zombie really is when it was spawned as one
+	// of the Adventure Plus enemies (ZOMBIE_COOP_TANK...). Not saved either.
+	CoopZombieKind                  mCoopKind;
+	// The Legendary Demoman (Adventure Plus 11), beside the mCoopBoss* above.
+	float                           mCoopBossX;           // his feet, in board pixels
+	float                           mCoopBossY;
+	float                           mCoopBossFromX;       // a hop: from here...
+	float                           mCoopBossFromY;
+	float                           mCoopBossToX;         // ...to here
+	float                           mCoopBossToY;
+	int32_t                         mCoopBossAnimTicks;   // into his current animation
+	int32_t                         mCoopBossNextAction;  // what he moves into a row to do
+	int32_t                         mCoopBossDoomCooldown;
+	bool                            mCoopBossTanksSent;
+	CoopDemoBomb                    mCoopBombs[COOP_DEMO_MAX_BOMBS];
 	ReanimationID                   mMoweredReanimID;
 	ReanimationID                   mZombatarHeadReanimID;
 	int32_t                         mLastPortalX;
@@ -377,6 +426,29 @@ public:
 	void                            CoopRomanStartDeath();
 	Rect                            GetCoopRomanRect();
 	void                            DrawCoopRoman(Graphics* g);
+	// The Legendary Demoman (CoopDemoman.cpp).
+	bool                            IsCoopDemoman();
+	bool                            IsCoopBoss();          // Roman or the Demoman
+	void                            InitCoopDemoman();
+	void                            UpdateCoopDemoman();
+	Rect                            GetCoopDemoRect();
+	bool                            CoopDemoCanBeHit();
+	void                            CoopDemoSetState(int theState, int theTimer);
+	void                            CoopDemoGoIdle();
+	void                            CoopDemoPickAttack();
+	void                            CoopDemoThrowBomb(bool theDoom);
+	void                            CoopDemoDestroyPlants(int theCol0, int theCol1, int theRow0, int theRow1, bool theSquish);
+	void                            CoopDemoBombLands(CoopDemoBomb& theBomb);
+	void                            CoopDemoFreezeBombs();
+	void                            CoopDemoUpdateBombs();
+	void                            CoopDemoSendTanks();
+	bool                            CoopDemoTanksAlive();
+	void                            CoopDemoStartDeath();
+	void                            DrawCoopDemoman(Graphics* g);
+	// Adventure Plus enemies (mCoopKind).
+	void                            CoopTankBlast();
+	void                            CoopTankDetonate();
+	void                            DrawCoopKind(Graphics* g);
 	void                            BossSetupReanim();
 	void                            MowDown();
 	void                            UpdateMowered();

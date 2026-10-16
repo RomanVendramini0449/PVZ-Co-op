@@ -3151,6 +3151,17 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 		};
 	}
 
+	else if (theLevel == ADVENTURE_PLUS_BOSS_LEVEL)
+	{
+		// Then a Bungee Zombie takes him (CutScene::AdvanceCrazyDaveDialog).
+		aLines = {
+			"Something's different this time, neighbor.",
+			"I can feel it in my bones.",
+			"{SHAKE}...",
+			"Did you hear something?",
+		};
+	}
+
 	else if (theLevel == 8)
 	{
 		aLines = {
@@ -3189,10 +3200,16 @@ bool LawnApp::IsCoopRomanLevel()
 	return mGameMode == GameMode::GAMEMODE_COOP_ROMAN;
 }
 
-// Dr. Zomboss's level or Roman's: a boss with a health bar instead of waves.
+bool LawnApp::IsLegendaryDemomanLevel()
+{
+	return IsAdventurePlusLevel() && mCoopPlusLevel == ADVENTURE_PLUS_BOSS_LEVEL;
+}
+
+// Dr. Zomboss's level, Roman's or the Demoman's: a boss with a health bar
+// instead of waves.
 bool LawnApp::IsBossFightLevel()
 {
-	return IsFinalBossLevel() || IsCoopRomanLevel();
+	return IsFinalBossLevel() || IsCoopRomanLevel() || IsLegendaryDemomanLevel();
 }
 
 bool LawnApp::IsChallengeMode()

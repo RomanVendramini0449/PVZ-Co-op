@@ -327,10 +327,43 @@ Bowl (buckets), 2 Yummy, Yummy Brains (footballs, buckets), 3 Up and Under
 Fortress Bowling (Wall-nut Bowling; footballs always take three balls),
 6 Heavy Weapons Guy (Gargantuars, ladders, diggers), 7 Red Spy in the Base,
 8 The Robots Are Coming (Zambonis), 9 Tunnel Vision (diggers, pogos),
-10 Everything, Everywhere, and 11 Boss Battle -- at night (the game's night
-lawn until `adventure_plus_night_background.png` exists), for now a hard
-night level until the boss's art arrives. Budgets are bigger than the
-campaign's.
+10 Everything, Everywhere, and 11 Legendary Demoman (below). Budgets are
+bigger than the campaign's, and zombies have a quarter more health.
+
+Two enemies of its own, spawned as `ZOMBIE_COOP_TANK` / `ZOMBIE_COOP_HEAVY`
+and turned into the zombie each is built on, with `Zombie::mCoopKind` saying
+what it really is (so they keep that zombie's rules), drawn from packed
+animations instead of its reanimation:
+- **Tank** (on the Zomboni): drives and flattens plants like one but leaves no
+  ice, has 1,800 health, and blows up when beaten. If it reaches the end of its
+  lane it blows itself up instead of getting in: the lane's lawn mower goes, and
+  every plant within one square of it.
+- **Dancing Heavy** (on the Football Zombie): as fast, no helmet, 1,300 health,
+  eats the same. He has no death animation of his own: he topples over
+  backwards, bounces once and fades.
+The Heavy turns up from level 2 (a few) and in 6, 7, 9 and 10; the tank in 8
+and 10.
+
+Two plants are earned here, kept as add-ons beside the seed chooser's grid
+like Luca: **GRS** (beating level 5; a fume attack through the lane, green
+bubbles) and **Noah** (Crazy Dave hands him over at the start of level 8;
+the Starfruit's five directions, firing goblin heads).
+
+**Level 11, Legendary Demoman** (`CoopDemoman.cpp`): a boss fight at night in
+the rain, with thunder. Dave's talk ends with a Bungee Zombie taking him, his
+name replaces Ready-Set-Plant, and his own music plays. The conveyor brings
+Luca (no sun here), Noah, GRS, Jalapenos and Ice-shrooms. He holds a 3x3 block
+on the right, where nothing can be planted, has 120,000 health (twice
+Roman's), and between rests he lobs bombs at plants (3-5, later 6-8; each
+destroys the plant it lands on), hops into the lawn and flattens a 3x3
+square, charges down a lane and comes back in from the right, and late in the
+fight throws a doom grenade that wipes a 6x6 square after a fuse. An
+Ice-shroom freezes him in place and freezes his bombs in the air so they burst
+harmlessly. Dancing Heavies come in every so often; at half health he calls
+in two 4,000-health tanks and waits for them. He topples over and blows up.
+
+Losing in Adventure Plus has no house to walk into: the left side of the lawn
+blows up, lane by lane and then all at once, and the game is over.
 
 Each level can open with a talk in Crazy Dave's style
 (`LawnApp::SetupAdventurePlusDialogue`, lines written into the string table

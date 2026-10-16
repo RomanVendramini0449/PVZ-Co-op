@@ -76,6 +76,7 @@ public:
 	bool             IsAfterSeedChooser();
 	void                        AddFlowerPots();
 	void                        UpdateZombiesWon();
+	void                        UpdateAdventurePlusLost();
 	void                        StartZombiesWon();
 	bool             ShowZombieWalking();
 	bool             IsCutSceneOver();

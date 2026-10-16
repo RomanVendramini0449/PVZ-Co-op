@@ -49,6 +49,7 @@ enum MusicTune : int32_t
 	MUSIC_TUNE_CONVEYER,
 	MUSIC_TUNE_FINAL_BOSS_BRAINIAC_MANIAC,
 	MUSIC_TUNE_CREDITS_ZOMBIES_ON_YOUR_LAWN,
+	MUSIC_TUNE_COOP_LEGEND,                     // the Legendary Demoman's (packed into the game)
 	NUM_MUSIC_TUNES
 };
 
@@ -59,6 +60,7 @@ enum MusicFile : int32_t
 	MUSIC_FILE_DRUMS,
 	MUSIC_FILE_HIHATS,
 	MUSIC_FILE_CREDITS_ZOMBIES_ON_YOUR_LAWN,
+	MUSIC_FILE_COOP_LEGEND,
 	NUM_MUSIC_FILES
 };
 
@@ -128,6 +130,10 @@ public:
 	void						GameMusicPause(bool thePause);
 	void						PlayFromOffset(MusicFile theMusicFile, int theOffset, double theVolume);
 	bool						PvzpLoadMusic(MusicFile theMusicFile, std::string_view theFileName);
+	bool						LoadPackedMusic(MusicFile theMusicFile, const char* thePackedName);
+	// Tunes that are one plain recording (not a tracker module): they are
+	// played, paused and resumed whole.
+	static bool					IsStreamedTune(MusicTune theMusicTune);
 	void						MusicTitleScreenInit();
 	void				MakeSureMusicIsPlaying(MusicTune theMusicTune);
 	void				FadeOut(int theFadeOutDuration);

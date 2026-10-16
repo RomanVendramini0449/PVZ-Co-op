@@ -65,6 +65,7 @@ constexpr const int MAX_PORTALS = 4;
 constexpr const int MAX_SQUIRRELS = 7;
 constexpr const int MAX_SCARY_POTS = 54;
 constexpr const int STORM_FLASH_TIME = 150;
+constexpr const int DEMO_THUNDER_FLASH_TICKS = 60;
 
 Challenge::Challenge()
 {
@@ -134,6 +135,12 @@ void Challenge::InitLevel()
 		mChallengeStateCounter = 100;
 		mApp->PlayFoley(FOLEY_RAIN);
 	}
+	if (mApp->IsLegendaryDemomanLevel())
+	{
+		// Rain all through, and thunder now and then (UpdateDemomanStorm).
+		mChallengeStateCounter = DEMO_THUNDER_FLASH_TICKS + 300;
+		mApp->PlayFoley(FOLEY_RAIN);
+	}
 	if (mApp->IsFinalBossLevel())
 	{
 		mBoard->mSeedBank->AddSeed(SEED_CABBAGEPULT);
@@ -194,6 +201,10 @@ void Challenge::StartLevel()
 	{
 		// Roman takes his place on the right as play begins.
 		mBoard->AddZombieInRow(ZOMBIE_BOSS, ROMAN_CENTER_ROW, 0);
+	}
+	if (mApp->IsLegendaryDemomanLevel())
+	{
+		mBoard->AddZombieInRow(ZOMBIE_BOSS, 2, 0);
 	}
 	if (mApp->IsWhackAZombieLevel())
 	{
@@ -1492,6 +1503,22 @@ void Challenge::ConveyorBeltDeliverSeed(SeedType& theLastSeedType)
 		aSeedPickArray[2].mItem = SEED_ICESHROOM;
 		aSeedPickArray[2].mWeight = 25;
 	}
+	else if (mApp->IsLegendaryDemomanLevel())
+	{
+		// The best of the bunch to fight with; Jalapenos for his lane, and
+		// Ice-shrooms to stop him and freeze his bombs.
+		aSeedPickCount = 5;
+		aSeedPickArray[0].mItem = SEED_LUCA;
+		aSeedPickArray[0].mWeight = 30;
+		aSeedPickArray[1].mItem = SEED_NOAH;
+		aSeedPickArray[1].mWeight = 20;
+		aSeedPickArray[2].mItem = SEED_GRS;
+		aSeedPickArray[2].mWeight = 20;
+		aSeedPickArray[3].mItem = SEED_JALAPENO;
+		aSeedPickArray[3].mWeight = 15;
+		aSeedPickArray[4].mItem = SEED_ICESHROOM;
+		aSeedPickArray[4].mWeight = 15;
+	}
 	else if (mBoard->mLevel == 10)
 	{
 		aSeedPickCount = 7;
@@ -1974,6 +2001,8 @@ void Challenge::Update()
 {
 	if (mApp->IsStormyNightLevel())
 		UpdateStormyNight();
+	if (mApp->IsLegendaryDemomanLevel() && !mBoard->mPaused)
+		UpdateDemomanStorm();
 
 	if (mBoard->mPaused)
 	{
@@ -1985,7 +2014,7 @@ void Challenge::Update()
 		return;
 	}
 
-	if (mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsStormyNightLevel())
+	if (mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsStormyNightLevel() || mApp->IsLegendaryDemomanLevel())
 	{
 		UpdateRain();
 	}
@@ -2281,9 +2310,9 @@ void Challenge::PlantAdded(Plant* thePlant)
 
 PlantingReason Challenge::CanPlantAt(int theGridX, int theGridY, SeedType theSeedType)
 {
-	if (mApp->IsCoopRomanLevel() && theGridX >= ROMAN_FIRST_COL)
+	if ((mApp->IsCoopRomanLevel() || mApp->IsLegendaryDemomanLevel()) && theGridX >= ROMAN_FIRST_COL)
 	{
-		return PLANTING_NOT_HERE;  // Roman's ground
+		return PLANTING_NOT_HERE;  // the boss's ground
 	}
 	if (mApp->IsWallnutBowlingLevel())
 	{
@@ -2906,10 +2935,42 @@ void Challenge::DrawStormFlash(Graphics* g, int theTime, int theMaxAmount)
 	g->FillRect(-1000, -1000, 2800, 2600);
 }
 
+// The Demoman's storm: no darkness, as on Stormy Night, just thunder every
+// so often and the lawn lit up white for a moment. mChallengeStateCounter
+// counts down to the next clap.
+void Challenge::UpdateDemomanStorm()
+{
+	if (--mChallengeStateCounter == DEMO_THUNDER_FLASH_TICKS)
+		mApp->PlayFoley(FoleyType::FOLEY_THUNDER);
+	if (mChallengeStateCounter <= 0)
+		mChallengeStateCounter = DEMO_THUNDER_FLASH_TICKS + RandRangeInt(600, 1400);
+}
+
+void Challenge::DrawDemomanStorm(Graphics* g)
+{
+	if (mChallengeStateCounter > DEMO_THUNDER_FLASH_TICKS)
+		return;
+	// Two flickers, then a fade.
+	const int aTime = DEMO_THUNDER_FLASH_TICKS - mChallengeStateCounter;
+	int anAlpha;
+	if (aTime < 6)
+		anAlpha = 170;
+	else if (aTime < 12)
+		anAlpha = 40;
+	else if (aTime < 18)
+		anAlpha = 200;
+	else
+		anAlpha = std::max(0, 200 - (aTime - 18) * 200 / (DEMO_THUNDER_FLASH_TICKS - 18));
+	g->SetColor(Color(255, 255, 255, anAlpha));
+	g->FillRect(-1000, -1000, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);
+}
+
 void Challenge::DrawWeather(Graphics* g)
 {
-	if (mApp->IsStormyNightLevel() || mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS)
+	if (mApp->IsStormyNightLevel() || mApp->mGameMode == GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsLegendaryDemomanLevel())
 		DrawRain(g);
+	if (mApp->IsLegendaryDemomanLevel())
+		DrawDemomanStorm(g);
 
 	if (mApp->IsStormyNightLevel())
 		DrawStormNight(g);

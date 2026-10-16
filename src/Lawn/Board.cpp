@@ -376,6 +376,11 @@ bool Board::NeedSaveGame()
 	if (Coop::Game::Get().IsConnected())
 		return false;
 
+	// Nor in Adventure Plus, even alone: its enemies and boss keep state the
+	// save format has no place for.
+	if (mApp->IsAdventurePlusLevel())
+		return false;
+
 	return
 		mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ICE &&
 		mApp->mGameMode != GameMode::GAMEMODE_UPSELL &&
@@ -641,7 +646,7 @@ void Board::PickZombieWaves()
 		else if (aGameMode == GameMode::GAMEMODE_COOP_ROMAN)
 			mNumWaves = 1;  // no waves: Roman and his summons are the level
 		else if (aGameMode == GameMode::GAMEMODE_COOP_ADVENTURE_PLUS)
-			mNumWaves = 20;  // two flags, like a campaign level
+			mNumWaves = mApp->IsLegendaryDemomanLevel() ? 1 : 20;  // two flags, like a campaign level
 		else if (aGameMode == GameMode::GAMEMODE_CHALLENGE_WALLNUT_BOWLING || aGameMode == GameMode::GAMEMODE_CHALLENGE_AIR_RAID ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_GRAVE_DANGER || aGameMode == GameMode::GAMEMODE_CHALLENGE_HIGH_GRAVITY ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_PORTAL_COMBAT || aGameMode == GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS ||
@@ -708,6 +713,13 @@ void Board::PickZombieWaves()
 
 		if (mApp->mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
 			continue;
+		if (mApp->IsLegendaryDemomanLevel())
+		{
+			PutZombieInWave(ZombieType::ZOMBIE_COOP_HEAVY, aWave, &aZombiePicker);
+			PutZombieInWave(ZombieType::ZOMBIE_COOP_HEAVY, aWave, &aZombiePicker);
+			PutZombieInWave(ZombieType::ZOMBIE_COOP_TANK, aWave, &aZombiePicker);
+			continue;
+		}
 
 		// Gargantuar Onslaught: two Gargantuars for every lane, then three
 		// in the last wave (SpawnZombieWave lines them up).
@@ -931,7 +943,7 @@ static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
 		{ { ZOMBIE_PAIL, 2, 1, 1, 4 } }, 1 },
 	{ "Yummy, Yummy Brains",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL }, 4, 1,
-		{ { ZOMBIE_FOOTBALL, 4, 2, 1, 3 }, { ZOMBIE_PAIL, 3, 2, 1, 2 } }, 2 },
+		{ { ZOMBIE_FOOTBALL, 4, 2, 1, 3 }, { ZOMBIE_PAIL, 3, 2, 1, 2 }, { ZOMBIE_COOP_HEAVY, 9, 9, 1, 1 } }, 3 },
 	{ "Up and Under",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_LADDER, ZOMBIE_DIGGER }, 5, 2,
 		{ { ZOMBIE_LADDER, 3, 1, 1, 3 }, { ZOMBIE_DIGGER, 5, 3, 1, 3 } }, 2 },
@@ -942,26 +954,26 @@ static const AdventurePlusLevel gAdventurePlusLevels[ADVENTURE_PLUS_LEVELS] = {
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL }, 5, 1,
 		{ { ZOMBIE_FOOTBALL, 3, 1, 1, 4 } }, 1 },
 	{ "Heavy Weapons Guy",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR }, 5, 2,
-		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 1 }, { ZOMBIE_LADDER, 3, 2, 1, 2 }, { ZOMBIE_DIGGER, 4, 3, 1, 2 } }, 3 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_LADDER, ZOMBIE_DIGGER, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY }, 6, 2,
+		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 1 }, { ZOMBIE_LADDER, 3, 2, 1, 2 }, { ZOMBIE_COOP_HEAVY, 3, 2, 1, 3 } }, 3 },
 	{ "Red Spy in the Base",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_LADDER }, 7, 3,
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_POLEVAULTER, ZOMBIE_NEWSPAPER, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_COOP_HEAVY }, 8, 3,
 		{ { ZOMBIE_FOOTBALL, 3, 2, 1, 3 }, { ZOMBIE_POLEVAULTER, 2, 2, 1, 2 } }, 2 },
 	{ "The Robots Are Coming",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI }, 5, 3,
-		{ { ZOMBIE_ZAMBONI, 5, 3, 1, 2 }, { ZOMBIE_FOOTBALL, 4, 3, 1, 2 } }, 2 },
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_ZAMBONI, ZOMBIE_COOP_TANK }, 6, 3,
+		{ { ZOMBIE_ZAMBONI, 5, 3, 1, 2 }, { ZOMBIE_FOOTBALL, 4, 3, 1, 2 }, { ZOMBIE_COOP_TANK, 6, 4, 1, 2 } }, 3 },
 	{ "Tunnel Vision",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_DIGGER, ZOMBIE_POGO, ZOMBIE_JACK_IN_THE_BOX }, 6, 3,
+		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_DIGGER, ZOMBIE_POGO, ZOMBIE_JACK_IN_THE_BOX, ZOMBIE_COOP_HEAVY }, 7, 3,
 		{ { ZOMBIE_DIGGER, 3, 1, 2, 4 }, { ZOMBIE_POGO, 5, 3, 1, 2 } }, 2 },
 	{ "Everything, Everywhere",
 		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_DIGGER,
-		  ZOMBIE_ZAMBONI, ZOMBIE_YETI, ZOMBIE_GARGANTUAR }, 9, 4,
-		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 2 }, { ZOMBIE_FOOTBALL, 3, 2, 1, 3 }, { ZOMBIE_YETI, 5, 4, 1, 2 } }, 3 },
-	// At night. A stand-in until the boss's art arrives: a hard night level
-	// that ends in Gargantuars.
-	{ "Boss Battle",
-		{ ZOMBIE_NORMAL, ZOMBIE_TRAFFIC_CONE, ZOMBIE_PAIL, ZOMBIE_FOOTBALL, ZOMBIE_LADDER, ZOMBIE_GARGANTUAR }, 6, 4,
-		{ { ZOMBIE_GARGANTUAR, 9, 5, 1, 3 }, { ZOMBIE_FOOTBALL, 3, 2, 1, 3 } }, 2 },
+		  ZOMBIE_ZAMBONI, ZOMBIE_YETI, ZOMBIE_GARGANTUAR, ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_TANK }, 11, 4,
+		{ { ZOMBIE_GARGANTUAR, 9, 4, 1, 2 }, { ZOMBIE_COOP_HEAVY, 3, 2, 1, 3 }, { ZOMBIE_COOP_TANK, 6, 4, 1, 2 } }, 3 },
+	// At night, in the rain: the Legendary Demoman (CoopDemoman.cpp). No
+	// waves -- he sends his own -- so the roster is only for the street.
+	{ "Legendary Demoman",
+		{ ZOMBIE_COOP_HEAVY, ZOMBIE_COOP_TANK }, 2, 0,
+		{ }, 0 },
 };
 
 const AdventurePlusLevel& GetAdventurePlusLevel(int theLevel)
@@ -5806,7 +5818,9 @@ void Board::ZombiesWon(Zombie* theZombie)
 	else
 	{
 		mApp->mGameScene = GameScenes::SCENE_ZOMBIES_WON;
-		if (theZombie)  // theZombie can be null when game over is triggered without a zombie
+		// Adventure Plus has no house: the zombie stays at the grate, and
+		// the whole left side goes up (CutScene::UpdateAdventurePlusLost).
+		if (theZombie && !mApp->IsAdventurePlusLevel())  // theZombie can be null when game over is triggered without a zombie
 		{
 			theZombie->WalkIntoHouse();
 		}
@@ -6773,6 +6787,16 @@ bool RenderItemSortFunc(const RenderItem& theItem1, const RenderItem& theItem2)
 void Board::AddBossRenderItem(RenderItem* theRenderList, int& theCurRenderItem, Zombie* theBossZombie)
 {
 	PVZP_ASSERT(theCurRenderItem < MAX_RENDER_ITEMS);
+	if (theBossZombie->IsCoopDemoman())
+	{
+		// The Demoman is one picture; his bombs are drawn with him.
+		RenderItem* aItem = &theRenderList[theCurRenderItem];
+		aItem->mRenderObjectType = RenderObjectType::RENDER_ITEM_BOSS_PART;
+		aItem->mZPos = MakeRenderOrder(RenderLayer::RENDER_LAYER_BOSS, 4, 2);
+		aItem->mBossPart = BossPart::BOSS_PART_MAIN;
+		theCurRenderItem++;
+		return;
+	}
 	if (theBossZombie->IsCoopRoman())
 	{
 		// Roman is one picture, plus whatever ball he has rolling.
@@ -7133,7 +7157,7 @@ void Board::DrawGameObjects(Graphics* g)
 	{
 		AddUIRenderItem(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_FOG, MakeRenderOrder(RenderLayer::RENDER_LAYER_FOG, 0, 0));
 	}
-	if (mApp->IsStormyNightLevel() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_RAINING_SEEDS)
+	if (mApp->IsStormyNightLevel() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_RAINING_SEEDS || mApp->IsLegendaryDemomanLevel())
 	{
 		AddUIRenderItem(aRenderList, aRenderItemCount, RenderObjectType::RENDER_ITEM_STORM, MakeRenderOrder(RenderLayer::RENDER_LAYER_FOG, 0, 3));
 	}
@@ -9566,7 +9590,8 @@ bool Board::HasConveyorBeltSeedBank()
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_PORTAL_COMBAT ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_COLUMN ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_INVISIGHOUL ||
-		mApp->IsCoopRomanLevel();
+		mApp->IsCoopRomanLevel() ||
+		mApp->IsLegendaryDemomanLevel();
 }
 
 int Board::GetNumSeedsInBank()
@@ -9654,7 +9679,8 @@ bool Board::StageHasGraveStones()
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_PORTAL_COMBAT ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_LAST_STAND ||
 		mApp->IsIZombieLevel() ||
-		mApp->IsScaryPotterLevel())
+		mApp->IsScaryPotterLevel() ||
+		mApp->IsLegendaryDemomanLevel())
 		return false;
 
 	return mBackground == BackgroundType::BACKGROUND_2_NIGHT;

@@ -1418,6 +1418,11 @@ enum ZombieType : int32_t
 	ZOMBIE_SQUASH_HEAD,
 	ZOMBIE_TALLNUT_HEAD,
 	ZOMBIE_REDEYE_GARGANTUAR,
+	// Adventure Plus. Spawned under these names; each becomes the zombie it
+	// is built on (Zomboni, Football) with Zombie::mCoopKind saying what it
+	// really is, so it keeps all of that zombie's rules.
+	ZOMBIE_COOP_TANK,
+	ZOMBIE_COOP_HEAVY,
 	NUM_ZOMBIE_TYPES,
 	ZOMBIE_CACHED_POLEVAULTER_WITH_POLE,
 	NUM_CACHED_ZOMBIE_TYPES
