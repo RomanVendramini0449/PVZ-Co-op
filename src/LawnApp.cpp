@@ -3124,8 +3124,8 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 			"So, get Luca first.",
 			aHasLuca
 				? "Oh, you already have Luca? Okay, you should be fine then. Should be A-okay!"
-				: "No Luca? Gargantuar Onslaught, on Level Select. Go get him! Or try without him. I'm not your mom.",
-			"Alright, good luck, buddy!",
+				: "No Luca? Go to Gargantuar Onslaught, damn you! Or don't. I'm not your mom.",
+			"Alright, good luck, buddy. Now go save Team Fortress!",
 		};
 	}
 

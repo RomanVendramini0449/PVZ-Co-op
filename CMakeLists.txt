@@ -90,7 +90,11 @@ endforeach()
 # Adventure Plus zombie parts: repainted copies of the game's own zombie
 # parts, each named exactly like the part it replaces (see
 # art-templates/zombies/README.txt). Any number, including none.
-file(GLOB COOP_ZOMBIE_PARTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/coop/zombie-parts/*.png")
+# Crazy Dave's parts (assets/coop/dave-parts) go in the same table: the swap
+# is by the image a part replaces, whoever's it is.
+file(GLOB COOP_ZOMBIE_PARTS CONFIGURE_DEPENDS
+	"${CMAKE_CURRENT_SOURCE_DIR}/assets/coop/zombie-parts/*.png"
+	"${CMAKE_CURRENT_SOURCE_DIR}/assets/coop/dave-parts/*.png")
 list(SORT COOP_ZOMBIE_PARTS)
 set(aPartTable "")
 set(aPartIndex 0)

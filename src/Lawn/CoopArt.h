@@ -83,7 +83,8 @@ namespace CoopArt
 	// night one (the boss battle) is adventure_plus_night_background.png.
 	Sexy::Image* AdventurePlusBackground(bool theNight);
 
-	// Adventure Plus: the repainted zombie part (assets/coop/zombie-parts) to
+	// Adventure Plus: the repainted zombie or Crazy Dave part
+	// (assets/coop/zombie-parts, assets/coop/dave-parts) to
 	// draw in place of theOriginal, or nullptr to draw it as it is. Always
 	// nullptr outside an Adventure Plus level, and cheap when there are none.
 	Sexy::Image* SubstituteZombiePart(Sexy::Image* theOriginal);
