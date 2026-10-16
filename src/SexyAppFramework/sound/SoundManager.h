@@ -45,6 +45,9 @@ public:
 
 	virtual bool			LoadSound(intptr_t theSfxID, const std::string& theFilename) = 0;
 	virtual intptr_t		LoadSound(const std::string& theFilename) = 0;
+	// A sound held in memory (theData stays valid), under theName so a
+	// second load finds the first. -1 if it cannot be decoded.
+	virtual intptr_t		LoadSoundFromMemory(const std::string& theName, const void* theData, size_t theSize) { return -1; }
 	virtual void			ReleaseSound(intptr_t theSfxID) = 0;
 
 	virtual void			SetVolume(double theVolume) = 0;

@@ -324,6 +324,10 @@ void AwardScreen::Draw(Graphics* g)
 		DrawAwardSeed(g, SEED_LUCA);
 		DrawCoopPrizeLine(g, ONSLAUGHT_PRIZE_COINS);
 	}
+	else if (mAwardType == AWARD_COOP_GRS)
+	{
+		DrawAwardSeed(g, SEED_GRS);
+	}
 	else if (mAwardType == AWARD_COOP_ROMAN_BEATEN)
 	{
 		DrawBottom(g, "Roman Defeated!", "Luca vs. Roman", "Luca has kept Roman at bay... for now.");
@@ -530,7 +534,7 @@ void AwardScreen::StartButtonPressed()
 		mApp->ShowCreditScreen();
 	}
 	else if (mAwardType == AWARD_HELP_ZOMBIENOTE || mAwardType == AWARD_COOP_LUCA || mAwardType == AWARD_COOP_ONSLAUGHT_PRIZE ||
-		mAwardType == AWARD_COOP_ROMAN_BEATEN)
+		mAwardType == AWARD_COOP_ROMAN_BEATEN || mAwardType == AWARD_COOP_GRS)
 	{
 		mApp->KillAwardScreen();
 		mApp->ShowGameSelector();

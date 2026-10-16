@@ -295,12 +295,21 @@ bool SeedChooserScreen::Has7Rows()
 	return false;
 }
 
-// Luca has no place in the grid -- every row is spoken for -- so it gets an
-// add-on of its own beside the grid, like the Imitater's, sitting on top of
-// the Imitater's when both are owned.
-int SeedChooserScreen::LucaAddonY()
+// Luca, GRS and Noah have no place in the grid -- every row is spoken for --
+// so each gets an add-on of its own beside it, like the Imitater's, stacked
+// upward over the Imitater's in that order, owned ones only.
+int SeedChooserScreen::AddonY(SeedType theSeedType)
 {
-	return mApp->HasSeedType(SEED_IMITATER) ? 503 - 80 : 503;
+	static const SeedType kStack[] = { SEED_IMITATER, SEED_LUCA, SEED_GRS, SEED_NOAH };
+	int aY = 503;
+	for (SeedType aSeed : kStack)
+	{
+		if (aSeed == theSeedType)
+			return aY;
+		if (mApp->HasSeedType(aSeed))
+			aY -= 80;
+	}
+	return aY;
 }
 
 void SeedChooserScreen::GetSeedPositionInChooser(int theIndex, int& x, int& y)
@@ -310,10 +319,10 @@ void SeedChooserScreen::GetSeedPositionInChooser(int theIndex, int& x, int& y)
 		x = mImitaterButton->mX;
 		y = mImitaterButton->mY;
 	}
-	else if (theIndex == SEED_LUCA)
+	else if (theIndex == SEED_LUCA || theIndex == SEED_GRS || theIndex == SEED_NOAH)
 	{
 		x = 464;
-		y = LucaAddonY() + 12;
+		y = AddonY(static_cast<SeedType>(theIndex)) + 12;
 	}
 	else
 	{
@@ -373,14 +382,16 @@ void SeedChooserScreen::Draw(Graphics* g)
 	{
 		g->DrawImage(Sexy::IMAGE_SEEDCHOOSER_IMITATERADDON, 459, 503);
 	}
-	if (mApp->HasSeedType(SEED_LUCA))
+	for (SeedType anAddon : { SEED_LUCA, SEED_GRS, SEED_NOAH })
 	{
-		g->DrawImage(Sexy::IMAGE_SEEDCHOOSER_IMITATERADDON, 459, LucaAddonY());
-		if (mChosenSeeds[SEED_LUCA].mSeedState != SEED_IN_CHOOSER)
+		if (!mApp->HasSeedType(anAddon))
+			continue;
+		g->DrawImage(Sexy::IMAGE_SEEDCHOOSER_IMITATERADDON, 459, AddonY(anAddon));
+		if (mChosenSeeds[anAddon].mSeedState != SEED_IN_CHOOSER)
 		{
 			int x, y;
-			GetSeedPositionInChooser(SEED_LUCA, x, y);
-			DrawSeedPacket(g, x, y, SEED_LUCA, SEED_NONE, 0, 55, true, false);
+			GetSeedPositionInChooser(anAddon, x, y);
+			DrawSeedPacket(g, x, y, anAddon, SEED_NONE, 0, 55, true, false);
 		}
 	}
 	// the localization key name is wrong

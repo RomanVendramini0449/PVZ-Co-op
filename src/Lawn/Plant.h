@@ -228,6 +228,7 @@ public:
 	void                    UpdateLucaSun();
 	void                    DrawLuca(Sexy::Graphics* g, float theOffsetX, float theOffsetY);
 	bool                    DrawShopSkin(Sexy::Graphics* g, float theOffsetX, float theOffsetY);
+	void                    DrawCoopPhotoPlant(Sexy::Graphics* g, float theOffsetX, float theOffsetY);
 	void                    UpdateShooter();
 	bool                    FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon = PlantWeapon::WEAPON_PRIMARY);
 	void                    LaunchThreepeater();

@@ -51,7 +51,8 @@ constinit const ProjectileDefinition gProjectileDefinition[] = {
 	{ .mProjectileType = ProjectileType::PROJECTILE_BUTTER, .mImageRow = 0, .mDamage = 40 },
 	{ .mProjectileType = ProjectileType::PROJECTILE_ZOMBIE_PEA, .mImageRow = 0, .mDamage = 20 },
 	// PvZ Co-op: Luca's cheese hits half again as hard as a pea.
-	{ .mProjectileType = ProjectileType::PROJECTILE_CHEESE, .mImageRow = 0, .mDamage = 30 }
+	{ .mProjectileType = ProjectileType::PROJECTILE_CHEESE, .mImageRow = 0, .mDamage = 30 },
+	{ .mProjectileType = ProjectileType::PROJECTILE_GOBLIN, .mImageRow = 0, .mDamage = 30 }
 };
 
 Projectile::Projectile()
@@ -145,6 +146,7 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 		mRotation = RandRangeFloat(0.0f, 2 * PI);
 		mRotationSpeed = RandRangeFloat(0.05f, 0.1f);
 		break;
+	case ProjectileType::PROJECTILE_GOBLIN:
 	case ProjectileType::PROJECTILE_STAR:
 		mShadowY += 15.0f;
 		mRotationSpeed = RandRangeFloat(0.05f, 0.1f);
@@ -249,7 +251,7 @@ Zombie* Projectile::FindCollisionTarget()
 				continue;
 			}
 
-			if (mProjectileType == ProjectileType::PROJECTILE_STAR && mProjectileAge < 25 && mVelX >= 0.0f && aZombie->mZombieType == ZombieType::ZOMBIE_DIGGER)
+			if ((mProjectileType == ProjectileType::PROJECTILE_STAR || mProjectileType == ProjectileType::PROJECTILE_GOBLIN) && mProjectileAge < 25 && mVelX >= 0.0f && aZombie->mZombieType == ZombieType::ZOMBIE_DIGGER)
 			{
 				continue;
 			}
@@ -298,13 +300,14 @@ void Projectile::CheckForCollision()
 		return;
 	}
 
-	if (mProjectileType == ProjectileType::PROJECTILE_STAR && (mPosY > 600.0f || mPosY < 40.0f))
+	if ((mProjectileType == ProjectileType::PROJECTILE_STAR || mProjectileType == ProjectileType::PROJECTILE_GOBLIN) && (mPosY > 600.0f || mPosY < 40.0f))
 	{
 		Die();
 		return;
 	}
 
-	if ((mProjectileType == ProjectileType::PROJECTILE_PEA || mProjectileType == ProjectileType::PROJECTILE_STAR || mProjectileType == ProjectileType::PROJECTILE_CHEESE) && mShadowY - mPosY > 90.0f)
+	if ((mProjectileType == ProjectileType::PROJECTILE_PEA || mProjectileType == ProjectileType::PROJECTILE_STAR || mProjectileType == ProjectileType::PROJECTILE_CHEESE ||
+		mProjectileType == ProjectileType::PROJECTILE_GOBLIN) && mShadowY - mPosY > 90.0f)
 	{
 		return;
 	}
@@ -352,6 +355,7 @@ bool Projectile::CantHitHighGround()
 		mProjectileType == ProjectileType::PROJECTILE_CHEESE ||
 		mProjectileType == ProjectileType::PROJECTILE_SNOWPEA ||
 		mProjectileType == ProjectileType::PROJECTILE_STAR ||
+		mProjectileType == ProjectileType::PROJECTILE_GOBLIN ||
 		mProjectileType == ProjectileType::PROJECTILE_PUFF ||
 		mProjectileType == ProjectileType::PROJECTILE_FIREBALL
 		) && !mOnHighGround;
@@ -381,7 +385,7 @@ void Projectile::CheckForHighGround()
 		return;
 	}
 
-	if (mProjectileType == ProjectileType::PROJECTILE_STAR && aShadowDelta < 23.0f)
+	if ((mProjectileType == ProjectileType::PROJECTILE_STAR || mProjectileType == ProjectileType::PROJECTILE_GOBLIN) && aShadowDelta < 23.0f)
 	{
 		DoImpact(nullptr);
 		return;
@@ -894,6 +898,11 @@ void Projectile::DoImpact(Zombie* theZombie)
 	case ProjectileType::PROJECTILE_STAR:
 		aEffect = ParticleEffect::PARTICLE_STAR_SPLAT;
 		break;
+	case ProjectileType::PROJECTILE_GOBLIN:
+		// A green splat: the pea's.
+		aSplatPosX -= 15.0f;
+		aEffect = ParticleEffect::PARTICLE_PEA_SPLAT;
+		break;
 	case ProjectileType::PROJECTILE_PUFF:
 		aSplatPosX -= 20.0f;
 		aEffect = ParticleEffect::PARTICLE_PUFF_SPLAT;
@@ -992,6 +1001,12 @@ void Projectile::Draw(Graphics* g)
 	{
 		// Centred where a pea's centre would be, so it flies the same line.
 		CoopArt::DrawCheese(g, mPosX - mX + 16.0f, mPosY + mPosZ - mY + 14.0f, mRotation);
+		return;
+	}
+	if (mProjectileType == ProjectileType::PROJECTILE_GOBLIN)
+	{
+		// Centred where the star's centre would be.
+		CoopArt::DrawGoblinProjectile(g, mPosX - mX + 20.0f, mPosY + mPosZ - mY + 18.0f, mRotation);
 		return;
 	}
 

@@ -20,6 +20,9 @@
  */
 
 #include "CoopArt.h"
+#include "CoopPacked.h"
+#include "sound/SoundManager.h"
+#include <cstring>
 
 #include "../LawnApp.h"
 #include "../PvzpLib/PvzpCommon.h"
@@ -312,6 +315,129 @@ Image* CoopArt::AdventurePlusBackground(bool theNight)
 	LoadArt();
 	// No night picture yet: the game's own night lawn, not the day board.
 	return theNight ? gAdventurePlusNightBackground : gAdventurePlusBackground;
+}
+
+static const CoopPackedFile* FindPacked(const char* theName)
+{
+	for (const CoopPackedFile* aFile = gCoopPackedFiles; aFile->mName; aFile++)
+		if (strcmp(aFile->mName, theName) == 0)
+			return aFile;
+	return nullptr;
+}
+
+static const CoopSheetMeta* FindSheet(const char* theName)
+{
+	for (const CoopSheetMeta* aMeta = gCoopSheetMetas; aMeta->mName; aMeta++)
+		if (strcmp(aMeta->mName, theName) == 0)
+			return aMeta;
+	return nullptr;
+}
+
+// Decoded on first use (the renderer must exist by then) and kept.
+static Image* PackedImageByName(const char* theName)
+{
+	static std::unordered_map<std::string, Image*> sImages;
+	const auto anIt = sImages.find(theName);
+	if (anIt != sImages.end())
+		return anIt->second;
+	Image* anImage = nullptr;
+	if (const CoopPackedFile* aFile = FindPacked(theName))
+		anImage = gLawnApp->GetImageFromMemory(aFile->mData, aFile->mSize, std::string("coop/packed/") + theName);
+	sImages[theName] = anImage;
+	return anImage;
+}
+
+Image* CoopArt::PackedImage(const char* theName)
+{
+	return PackedImageByName(theName);
+}
+
+void CoopArt::DrawPhotoPlant(Graphics* g, const char* theName, float theX, float theY, float theScaleX, float theScaleY,
+	float theSquashX, float theSquashY, int theGlow)
+{
+	// A head about Luca's height, standing where the plant stands.
+	DrawStandIn(g, PackedImageByName(theName), 80.0f, theX, theY, theScaleX, theScaleY, theSquashX, theSquashY, theGlow);
+}
+
+void CoopArt::DrawGoblinProjectile(Graphics* g, float theCenterX, float theCenterY, float theRotation)
+{
+	Image* anImage = PackedImageByName("goblin_projectile");
+	if (anImage == nullptr)
+		return;
+	// About the cheese's size: half its packed height.
+	constexpr float GOBLIN_SCALE = 0.5f;
+	Graphics aG(*g);
+	aG.SetLinearBlend(true);
+	SexyMatrix3 aTransform;
+	PvzpScaleRotateTransformMatrix(aTransform, theCenterX + g->mTransX, theCenterY + g->mTransY, theRotation, GOBLIN_SCALE, GOBLIN_SCALE);
+	const Rect aSrcRect(0, 0, anImage->mWidth, anImage->mHeight);
+	const Color& aColor = aG.mColorizeImages ? aG.mColor : Color::White;
+	PvzpBltMatrix(&aG, anImage, aTransform, aG.mClipRect, aColor, aG.mDrawMode, aSrcRect);
+}
+
+int CoopArt::SheetFrames(const char* theSheet)
+{
+	const CoopSheetMeta* aMeta = FindSheet(theSheet);
+	return aMeta ? aMeta->mCount : 0;
+}
+
+void CoopArt::DrawSheetFrame(Graphics* g, const char* theSheet, int theFrame, float theX, float theY,
+	float theScale, bool theFlip, float theRotation)
+{
+	const CoopSheetMeta* aMeta = FindSheet(theSheet);
+	Image* anImage = aMeta ? PackedImageByName(theSheet) : nullptr;
+	if (anImage == nullptr || aMeta->mCount <= 0)
+		return;
+
+	const int aFrame = ((theFrame % aMeta->mCount) + aMeta->mCount) % aMeta->mCount;
+	const Rect aSrc((aFrame % aMeta->mCols) * aMeta->mFrameW, (aFrame / aMeta->mCols) * aMeta->mFrameH, aMeta->mFrameW, aMeta->mFrameH);
+	// Where the ground point falls inside the frame, in packed pixels.
+	const float aAnchorX = (aMeta->mAnchorX - aMeta->mCropX) * aMeta->mScale;
+	const float aAnchorY = (aMeta->mAnchorY - aMeta->mCropY) * aMeta->mScale;
+
+	// Frame pixel (u, v) -> screen: scale (mirrored if asked) about the
+	// ground point, turn, and put the ground point on (theX, theY).
+	const float aSign = theFlip ? -1.0f : 1.0f;
+	const float aCos = cosf(theRotation) * theScale, aSin = sinf(theRotation) * theScale;
+	SexyMatrix3 aMatrix;
+	aMatrix.LoadIdentity();
+	// The blit draws the source rect centred on the origin, so the frame's
+	// centre is the point being transformed.
+	const float aCenterU = aMeta->mFrameW * 0.5f - aAnchorX;
+	const float aCenterV = aMeta->mFrameH * 0.5f - aAnchorY;
+	aMatrix.m00 = aCos * aSign;
+	aMatrix.m01 = -aSin;
+	aMatrix.m10 = aSin * aSign;
+	aMatrix.m11 = aCos;
+	aMatrix.m02 = theX + g->mTransX + aMatrix.m00 * aCenterU + aMatrix.m01 * aCenterV;
+	aMatrix.m12 = theY + g->mTransY + aMatrix.m10 * aCenterU + aMatrix.m11 * aCenterV;
+
+	Graphics aG(*g);
+	aG.SetLinearBlend(true);
+	const Color& aColor = aG.mColorizeImages ? aG.mColor : Color::White;
+	PvzpBltMatrix(&aG, anImage, aMatrix, aG.mClipRect, aColor, aG.mDrawMode, aSrc);
+}
+
+void CoopArt::PlayPackedSound(const char* theName)
+{
+	static std::unordered_map<std::string, intptr_t> sSounds;
+	auto anIt = sSounds.find(theName);
+	if (anIt == sSounds.end())
+	{
+		intptr_t anId = -1;
+		if (const CoopPackedFile* aFile = FindPacked(theName))
+			anId = gLawnApp->mSoundManager->LoadSoundFromMemory(std::string("coop/") + theName, aFile->mData, aFile->mSize);
+		anIt = sSounds.emplace(theName, anId).first;
+	}
+	if (anIt->second >= 0)
+		gLawnApp->PlaySample(anIt->second);
+}
+
+const unsigned char* CoopArt::PackedData(const char* theName, std::size_t& theSizeOut)
+{
+	const CoopPackedFile* aFile = FindPacked(theName);
+	theSizeOut = aFile ? aFile->mSize : 0;
+	return aFile ? aFile->mData : nullptr;
 }
 
 const CoopArt::PartSubstitute* CoopArt::SubstituteZombiePart(Image* theOriginal)

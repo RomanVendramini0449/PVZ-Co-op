@@ -142,6 +142,8 @@ public:
 	bool							mCoopInfoSent = false;
 	// Adventure Plus: the level being played, 1-10; 0 outside it.
 	int								mCoopPlusLevel = 0;
+	// Crazy Dave is holding Noah out ({SHOW_NOAH}), drawn in his hand.
+	bool							mCoopDaveHoldingNoah = false;
 	std::unique_ptr<LevelStats>		mLastLevelStats;
 	std::atomic<bool>					mCloseRequest;
 	uint32_t						mAppCounter;

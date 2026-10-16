@@ -22,6 +22,7 @@
 #ifndef __COOPART_H__
 #define __COOPART_H__
 
+#include <cstddef>
 #include <string>
 
 namespace Sexy
@@ -106,6 +107,27 @@ namespace CoopArt
 	// theOriginal, or nullptr to draw it as it is. Always nullptr outside an
 	// Adventure Plus level, and cheap when there are none.
 	const PartSubstitute* SubstituteZombiePart(Sexy::Image* theOriginal);
+
+	// ---- packed assets (CoopPacked.h) ----
+	// A plant drawn as a packed picture ("grs", "noah") in the 80x80 plant
+	// frame at (theX, theY), like DrawLuca.
+	void DrawPhotoPlant(Sexy::Graphics* g, const char* theName, float theX, float theY, float theScaleX, float theScaleY,
+		float theSquashX = 1.0f, float theSquashY = 1.0f, int theGlow = 0);
+	// Noah's goblin head, centred on (theCenterX, theCenterY), turned.
+	void DrawGoblinProjectile(Sexy::Graphics* g, float theCenterX, float theCenterY, float theRotation);
+	// A packed single picture by name ("noah", "grs", "goblin_projectile").
+	Sexy::Image* PackedImage(const char* theName);
+	// The frame count of a sprite sheet ("demo_idle", "tank"...), 0 if none.
+	int SheetFrames(const char* theSheet);
+	// Draws one frame of a sprite sheet with its ground point at (theX, theY),
+	// theScale times its packed size, mirrored if theFlip. The caller's
+	// colour and colourise state apply, so it can be tinted or faded.
+	void DrawSheetFrame(Sexy::Graphics* g, const char* theSheet, int theFrame, float theX, float theY,
+		float theScale = 1.0f, bool theFlip = false, float theRotation = 0.0f);
+	// Plays a packed sound ("grs_shoot", "legend_explode"...).
+	void PlayPackedSound(const char* theName);
+	// The packed music track's bytes, for Music to load; nullptr if absent.
+	const unsigned char* PackedData(const char* theName, std::size_t& theSizeOut);
 
 	// Adventure Plus's stand-in for Crazy Dave (assets/coop/
 	// adventure_plus_narrator.png); nullptr while there is none.

@@ -2034,6 +2034,12 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		// reaches the joining player like the rest of the host's progress.
 		if (mCoopPlusLevel >= 1 && mCoopPlusLevel <= ADVENTURE_PLUS_LEVELS)
 			mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_ADVENTURE_PLUS_BEATEN] |= 1u << (mCoopPlusLevel - 1);
+		// GRS joins you for beating the bowling level.
+		if (mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_GRS] == 0)
+		{
+			mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_GRS] = 1;
+			aUnlockedNewChallenge = true;
+		}
 	}
 	else
 	{
@@ -2206,6 +2212,10 @@ void LawnApp::CheckForGameEnd()
 		else if (mGameMode == GameMode::GAMEMODE_COOP_ROMAN)
 		{
 			ShowAwardScreen(AwardType::AWARD_COOP_ROMAN_BEATEN, true);
+		}
+		else if (IsAdventurePlusLevel() && aUnlockedNewChallenge && mCoopPlusLevel == ADVENTURE_PLUS_BOWLING_LEVEL)
+		{
+			ShowAwardScreen(AwardType::AWARD_COOP_GRS, true);
 		}
 		else
 		{
@@ -2713,6 +2723,18 @@ void LawnApp::LoadingThreadProc()
 		"That's KERNEL! He used to be a regular old squash. Don't ask him about it. He squashes zombies exactly the same, he's just angrier about it.");
 	mStringProperties.insert_or_assign("CRAZY_DAVE_3952",
 		"This pepper is CRAZY! His name is Philippe. He burns a whole lane just like a regular Jalapeno, but he enjoys it WAY too much.");
+	mStringProperties.insert_or_assign("GRS", "GRS");
+	mStringProperties.insert_or_assign("GRS_TOOLTIP", "Breathes green fumes through every zombie in reach");
+	mStringProperties.insert_or_assign("GRS_DESCRIPTION",
+		"GRS breathes green fumes that go straight through every zombie in front of him.{SHORTLINE}"
+		"{KEYWORD}Damage:{STAT} normal, to everything in reach{BR}{KEYWORD}Range:{STAT} four tiles{SHORTLINE}"
+		"Unlike a Fume-shroom, he never sleeps. Nobody has asked why.");
+	mStringProperties.insert_or_assign("NOAH", "Noah");
+	mStringProperties.insert_or_assign("NOAH_TOOLTIP", "Throws goblin heads in five directions");
+	mStringProperties.insert_or_assign("NOAH_DESCRIPTION",
+		"Noah throws goblin heads five ways at once, like a Starfruit, only harder.{SHORTLINE}"
+		"{KEYWORD}Damage:{STAT} heavy-ish, five directions{SHORTLINE}"
+		"Crazy Dave was saving him for something special.");
 	mStringProperties.insert_or_assign("LUCA", "Luca");
 	mStringProperties.insert_or_assign("LUCA_TOOLTIP", "Shoots cheese and makes sun");
 	mStringProperties.insert_or_assign("LUCA_DESCRIPTION",
@@ -3129,6 +3151,27 @@ int LawnApp::SetupAdventurePlusDialogue(int theLevel)
 		};
 	}
 
+	else if (theLevel == 8)
+	{
+		aLines = {
+			"Hey! Hold on a second, neighbor.",
+			"Here. I've been saving something special.",
+			"{SHOW_NOAH}I want you to have this.",
+			"{HANDING}This is NOAH. He throws goblin heads in five directions at once!",
+			"{HANDING}Don't ask where he gets them. I didn't.",
+			"Okay. NOW go get 'em!",
+		};
+		// Yours from here on, in this level's seed chooser and every one
+		// after. Granted here, on both machines alike: co-op shares the
+		// host's profile, and the chooser must offer the same plants to both.
+		if (mPlayerInfo && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_NOAH] == 0)
+		{
+			mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_NOAH] = 1;
+			if (!Coop::Game::Get().IsFollower())
+				WriteCurrentUserConfig();
+		}
+	}
+
 	if (aLines.empty())
 		return -1;
 
@@ -3426,11 +3469,22 @@ int LawnApp::GetSeedsAvailable()
 	}
 
 	SeedType aSeedTypeMax = GetAwardSeedForLevel(aLevel);
-	return std::min(NUM_SEEDS_IN_CHOOSER, aSeedTypeMax);
+	// Luca, GRS and Noah have their own unlocks (HasSeedType); the campaign
+	// count stops at the 49 it has always had.
+	return std::min(static_cast<int>(SeedType::SEED_LUCA), static_cast<int>(aSeedTypeMax));
 }
 
 bool LawnApp::HasSeedType(SeedType theSeedType)
 {
+	// Never chooser plants, though they sit inside its range now that GRS and
+	// Noah come after them (see NUM_SEEDS_IN_CHOOSER).
+	if (theSeedType >= SeedType::SEED_EXPLODE_O_NUT && theSeedType <= SeedType::SEED_LEFTPEATER)
+		return false;
+	if (theSeedType == SeedType::SEED_GRS && !(mBoard && mGameMode == GameMode::GAMEMODE_COOP_SANDBOX))
+		return mPlayerInfo != nullptr && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_GRS] > 0;
+	if (theSeedType == SeedType::SEED_NOAH && !(mBoard && mGameMode == GameMode::GAMEMODE_COOP_SANDBOX))
+		return mPlayerInfo != nullptr && mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_UNLOCK_NOAH] > 0;
+
 	// The Dev Sandbox is for trying things out: every plant, upgrades and
 	// Luca included, whatever the profile has earned.
 	if (mBoard && mGameMode == GameMode::GAMEMODE_COOP_SANDBOX &&
@@ -3703,6 +3757,7 @@ void LawnApp::CrazyDaveDoneHanding()
 	Reanimation* aCrazyDaveReanim = ReanimationGet(mCrazyDaveReanimID);
 	ReanimatorTrackInstance* aHandTrackInstance = aCrazyDaveReanim->GetTrackInstanceByName("Dave_handinghand");
 	AttachmentDie(aHandTrackInstance->mAttachmentID);
+	mCoopDaveHoldingNoah = false;
 
 	PvzpLogLn("DoneHanding");
 }
@@ -3815,6 +3870,18 @@ void LawnApp::CrazyDaveTalkMessage(const std::string& theMessage)
 			}
 
 			mCrazyDaveState = CrazyDaveState::CRAZY_DAVE_TALKING;
+		}
+		else if (theMessage.find("{SHOW_NOAH}") != std::string::npos)
+		{
+			// Adventure Plus 8: Dave holds Noah out, the way he holds out the
+			// Wall-nut before bowling. Noah is drawn in his hand (DrawCrazyDave).
+			aCrazyDaveReanim->PlayReanim("anim_talk_handing", ReanimLoopType::REANIM_LOOP, 50, 12.0f);
+			mCoopDaveHoldingNoah = true;
+			if (doSound)
+			{
+				PlayFoley(FoleyType::FOLEY_CRAZY_DAVE_SCREAM_2);
+			}
+			mCrazyDaveState = CrazyDaveState::CRAZY_DAVE_HANDING_TALKING;
 		}
 		else if (theMessage.find("{SHOW_WALLNUT}") != std::string::npos)
 		{
@@ -4119,12 +4186,25 @@ void LawnApp::DrawCrazyDave(Graphics* g)
 	// Adventure Plus can put someone else in Dave's place: his animation still
 	// runs, unseen, and the stand-in follows it in, talks and leaves with it.
 	if (Image* aStandIn = IsAdventurePlusLevel() ? CoopArt::AdventurePlusNarrator() : nullptr)
-	{
 		CoopArt::DrawNarrator(g, aCrazyDaveReanim, aStandIn, !mCrazyDaveMessageText.empty(), mAppCounter);
-		return;
-	}
+	else
+		aCrazyDaveReanim->Draw(g);
 
-	aCrazyDaveReanim->Draw(g);
+	// Noah, held out in Dave's handing hand.
+	if (mCoopDaveHoldingNoah && (mCrazyDaveState == CrazyDaveState::CRAZY_DAVE_HANDING_TALKING ||
+		mCrazyDaveState == CrazyDaveState::CRAZY_DAVE_HANDING_IDLING))
+	{
+		const int aHand = aCrazyDaveReanim->FindTrackIndex("Dave_handinghand");
+		ReanimatorTransform aHandTransform;
+		aCrazyDaveReanim->GetCurrentTransform(aHand, &aHandTransform);
+		SexyMatrix3 aMatrix;
+		Reanimation::MatrixFromTransform(aHandTransform, aMatrix);
+		SexyMatrix3Multiply(aMatrix, aCrazyDaveReanim->mOverlayMatrix, aMatrix);
+		// The middle of the hand picture (114 x 75), a little above the palm.
+		const float aX = aMatrix.m00 * 57.0f + aMatrix.m01 * 20.0f + aMatrix.m02;
+		const float aY = aMatrix.m10 * 57.0f + aMatrix.m11 * 20.0f + aMatrix.m12;
+		CoopArt::DrawPhotoPlant(g, "noah", aX - 55.0f, aY - 105.0f, 1.4f, 1.4f);
+	}
 }
 
 int LawnApp::GetNumPreloadingTasks()

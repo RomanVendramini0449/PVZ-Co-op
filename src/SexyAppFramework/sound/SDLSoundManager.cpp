@@ -306,6 +306,27 @@ bool SDLSoundManager::DecodeSound(intptr_t theSfxID, const std::string& theFilen
 	return !!mSourceSounds[theSfxID];
 }
 
+intptr_t SDLSoundManager::LoadSoundFromMemory(const std::string& theName, const void* theData, size_t theSize)
+{
+	for (intptr_t i = 0; i < MAX_SOURCE_SOUNDS; i++)
+		if (mSourceFileNames[i] == theName)
+			return i;
+	if (!Initialized())
+		return -1;
+	for (intptr_t i = MAX_SOURCE_SOUNDS - 1; i >= 0; i--)
+	{
+		if (mSourceSounds[i] == nullptr && mSourceFileNames[i].empty())
+		{
+			mSourceSounds[i] = Mix_LoadWAV_RW(SDL_RWFromConstMem(theData, static_cast<int>(theSize)), 1);
+			if (mSourceSounds[i] == nullptr)
+				return -1;
+			mSourceFileNames[i] = theName;
+			return i;
+		}
+	}
+	return -1;
+}
+
 intptr_t SDLSoundManager::LoadSound(const std::string& theFilename)
 {
 	intptr_t i;

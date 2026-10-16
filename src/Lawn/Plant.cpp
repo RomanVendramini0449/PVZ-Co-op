@@ -105,7 +105,11 @@ constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_EXPLODE_O_NUT,     .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_WALLNUT,       .mPacketIndex = 2,  .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "EXPLODE_O_NUT" },
 	{ .mSeedType = SeedType::SEED_GIANT_WALLNUT,     .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_WALLNUT,       .mPacketIndex = 2,  .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "GIANT_WALLNUT" },
 	{ .mSeedType = SeedType::SEED_SPROUT,            .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_ZENGARDEN_SPROUT, .mPacketIndex = 33, .mSeedCost = 0,   .mRefreshTime = 3000,   .mSubClass = PlantSubClass::SUBCLASS_NORMAL,  .mLaunchRate = 0,    .mPlantName = "SPROUT" },
-	{ .mSeedType = SeedType::SEED_LEFTPEATER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_REPEATER,      .mPacketIndex = 5,  .mSeedCost = 200, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "REPEATER" }
+	{ .mSeedType = SeedType::SEED_LEFTPEATER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_REPEATER,      .mPacketIndex = 5,  .mSeedCost = 200, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "REPEATER" },
+	// PvZ Co-op: a Fume-shroom and a Starfruit underneath, their animations
+	// running unseen so they aim and fire as those do; drawn with their art.
+	{ .mSeedType = SeedType::SEED_GRS,               .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_FUMESHROOM,    .mPacketIndex = 9,  .mSeedCost = 150, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "GRS" },
+	{ .mSeedType = SeedType::SEED_NOAH,              .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_STARFRUIT,     .mPacketIndex = 30, .mSeedCost = 175, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "NOAH" }
 };
 
 Plant::Plant()
@@ -803,7 +807,8 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon)
 
 		switch (mSeedType)
 		{
-		case SeedType::SEED_FUMESHROOM:     mShootingCounter = 50;  break;
+		case SeedType::SEED_FUMESHROOM:
+		case SeedType::SEED_GRS:            mShootingCounter = 50;  break;
 		case SeedType::SEED_PUFFSHROOM:     mShootingCounter = 29;  break;
 		case SeedType::SEED_SCAREDYSHROOM:  mShootingCounter = 25;  break;
 		case SeedType::SEED_CABBAGEPULT:    mShootingCounter = 32;  break;
@@ -937,11 +942,13 @@ void Plant::StarFruitFire()
 {
 	mApp->PlayFoley(FoleyType::FOLEY_THROW);
 
+	// Noah throws goblin heads instead of stars.
+	const ProjectileType aType = mSeedType == SeedType::SEED_NOAH ? ProjectileType::PROJECTILE_GOBLIN : ProjectileType::PROJECTILE_STAR;
 	float aShootAngleX = cos(DEG_TO_RAD(30.0f)) * 3.33f;
 	float aShootAngleY = sin(DEG_TO_RAD(30.0f)) * 3.33f;
 	for (int i = 0; i < 5; i++)
 	{
-		Projectile* aProjectile = mBoard->AddProjectile(mX + 25, mY + 25, mRenderOrder - 1, mRow, ProjectileType::PROJECTILE_STAR);
+		Projectile* aProjectile = mBoard->AddProjectile(mX + 25, mY + 25, mRenderOrder - 1, mRow, aType);
 		aProjectile->mDamageRangeFlags = GetDamageRangeFlags(PlantWeapon::WEAPON_PRIMARY);
 		aProjectile->mMotionType = ProjectileMotion::MOTION_STAR;
 
@@ -968,7 +975,7 @@ void Plant::UpdateShooter()
 		{
 			LaunchThreepeater();
 		}
-		else if (mSeedType == SeedType::SEED_STARFRUIT)
+		else if (mSeedType == SeedType::SEED_STARFRUIT || mSeedType == SeedType::SEED_NOAH)
 		{
 			LaunchStarFruit();
 		}
@@ -3252,6 +3259,13 @@ void Plant::UpdateShooting()
 		int aRenderPosition = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0);
 		AddAttachedParticle(mX + 85, mY + 31, aRenderPosition, ParticleEffect::PARTICLE_FUMECLOUD);
 	}
+	if (mSeedType == SeedType::SEED_GRS && mShootingCounter == 15)
+	{
+		int aRenderPosition = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0);
+		PvzpParticleSystem* aFumes = mApp->AddPvzpParticle(mX + 85, mY + 31, aRenderPosition, ParticleEffect::PARTICLE_FUMECLOUD);
+		if (aFumes)
+			aFumes->OverrideColor(nullptr, Color(90, 255, 70));
+	}
 
 	if (mSeedType == SeedType::SEED_GLOOMSHROOM)
 	{
@@ -3627,7 +3641,7 @@ float PlantDrawHeightOffset(Board* theBoard, Plant* thePlant, SeedType theSeedTy
 	{
 		aHeightOffset += 25.0f;
 	}
-	else if (theSeedType == SeedType::SEED_STARFRUIT)
+	else if (theSeedType == SeedType::SEED_STARFRUIT || theSeedType == SeedType::SEED_NOAH)
 	{
 		aHeightOffset += 10.0f;
 	}
@@ -4071,6 +4085,10 @@ void Plant::Draw(Graphics* g)
 		{
 			DrawLuca(g, aOffsetX, aOffsetY);
 		}
+		else if (mSeedType == SeedType::SEED_GRS || mSeedType == SeedType::SEED_NOAH)
+		{
+			DrawCoopPhotoPlant(g, aOffsetX, aOffsetY);
+		}
 		else if (DrawShopSkin(g, aOffsetX, aOffsetY))
 		{
 			// Kernel or Philippe, bought from Crazy Dave, in place of the plant.
@@ -4193,6 +4211,28 @@ static bool GetShopSkin(SeedType theSeedType, CoopArt::Skin& theSkinOut)
 // still runs, unseen, so nothing about how it plays changes. Kernel crouches,
 // stretches as he leaps and lands flat; Philippe swells and glows as his fuse
 // burns down. Everything here is drawing only.
+// GRS and Noah: their pictures, breathing a little, with a kick when they
+// fire and the usual glows (highlighted, just bitten).
+void Plant::DrawCoopPhotoPlant(Graphics* g, float theOffsetX, float theOffsetY)
+{
+	const uint32_t aCounter = IsOnBoard() ? mBoard->mMainCounter : mApp->mAppCounter;
+	const float aTime = static_cast<float>(fmod((mRow * 97.0 + mPlantCol * 61.0 + static_cast<double>(aCounter)) * 0.05, 2.0 * PI));
+	float aSquashX = 1.0f + 0.03f * sin(aTime);
+	float aSquashY = 1.0f - 0.03f * sin(aTime);
+	if (mShootingCounter > 0)
+	{
+		const float aKick = sin(PI * std::clamp(40 - mShootingCounter, 0, 40) / 40.0f);
+		aSquashX *= 1.0f + 0.12f * aKick;
+		aSquashY *= 1.0f - 0.10f * aKick;
+	}
+	int aGlow = 0;
+	if (mHighlighted)
+		aGlow = 196;
+	else if (mEatenFlashCountdown > 0)
+		aGlow = std::clamp(mEatenFlashCountdown * 3, 0, 255);
+	CoopArt::DrawPhotoPlant(g, mSeedType == SeedType::SEED_GRS ? "grs" : "noah", theOffsetX, theOffsetY, 1.0f, 1.0f, aSquashX, aSquashY, aGlow);
+}
+
 bool Plant::DrawShopSkin(Graphics* g, float theOffsetX, float theOffsetY)
 {
 	CoopArt::Skin aSkin;
@@ -4306,6 +4346,11 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
 			// Its reanimation is a Peashooter's, kept only for the aiming;
 			// what it looks like is its own art.
 			CoopArt::DrawLuca(&aSeedG, thePosX + aOffsetX, thePosY + aOffsetY, aSeedG.mScaleX, aSeedG.mScaleY);
+		}
+		else if (aSeedType == SeedType::SEED_GRS || aSeedType == SeedType::SEED_NOAH)
+		{
+			CoopArt::DrawPhotoPlant(&aSeedG, aSeedType == SeedType::SEED_GRS ? "grs" : "noah",
+				thePosX + aOffsetX, thePosY + aOffsetY, aSeedG.mScaleX, aSeedG.mScaleY);
 		}
 		else if (CoopArt::Skin aSkin; GetShopSkin(aSeedType, aSkin))
 		{
@@ -4643,9 +4688,16 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 		DoRowAreaDamage(20, 2U);
 		return;
 	}
-	if (mSeedType == SeedType::SEED_STARFRUIT)
+	if (mSeedType == SeedType::SEED_STARFRUIT || mSeedType == SeedType::SEED_NOAH)
 	{
 		StarFruitFire();
+		return;
+	}
+	if (mSeedType == SeedType::SEED_GRS)
+	{
+		// Through every zombie in reach, like a Fume-shroom; his own sound.
+		DoRowAreaDamage(20, 2U);
+		CoopArt::PlayPackedSound("grs_shoot");
 		return;
 	}
 
@@ -5343,7 +5395,8 @@ Rect Plant::GetPlantAttackRect(PlantWeapon thePlantWeapon)
 	case SeedType::SEED_TORCHWOOD:      aRect = Rect(mX + 50,       mY,             30,                 mHeight);               break;
 	case SeedType::SEED_PUFFSHROOM:
 	case SeedType::SEED_SEASHROOM:      aRect = Rect(mX + 60,       mY,             230,                mHeight);               break;
-	case SeedType::SEED_FUMESHROOM:     aRect = Rect(mX + 60,       mY,             340,                mHeight);               break;
+	case SeedType::SEED_FUMESHROOM:
+	case SeedType::SEED_GRS:            aRect = Rect(mX + 60,       mY,             340,                mHeight);               break;
 	case SeedType::SEED_GLOOMSHROOM:    aRect = Rect(mX - 80,       mY - 80,        240,                240);                   break;
 	case SeedType::SEED_TANGLEKELP:     aRect = Rect(mX,            mY,             mWidth,             mHeight);               break;
 	case SeedType::SEED_CATTAIL:        aRect = Rect(-BOARD_WIDTH,  -BOARD_HEIGHT,  BOARD_WIDTH * 2,    BOARD_HEIGHT * 2);      break;

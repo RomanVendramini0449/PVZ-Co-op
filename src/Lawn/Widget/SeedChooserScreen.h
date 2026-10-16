@@ -101,7 +101,7 @@ public:
 	void                    CrazyDavePickSeeds();
 	bool                    Has7Rows();
 	void                    GetSeedPositionInChooser(int theIndex, int& x, int& y);
-	int                     LucaAddonY();
+	int                     AddonY(SeedType theSeedType);
 	void         GetSeedPositionInBank(int theIndex, int& x, int& y);
 	unsigned int SeedNotRecommendedToPick(SeedType theSeedType);
 	bool         SeedNotAllowedToPick(SeedType theSeedType);

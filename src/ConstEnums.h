@@ -110,6 +110,7 @@ enum AwardType : int32_t
 	AWARD_COOP_LUCA,  // PvZ Co-op: Luca, for beating Gargantuar Onslaught
 	AWARD_COOP_ONSLAUGHT_PRIZE,  // PvZ Co-op: its prize money, every win after
 	AWARD_COOP_ROMAN_BEATEN,     // PvZ Co-op: Luca vs. Roman won
+	AWARD_COOP_GRS,              // PvZ Co-op: GRS, for beating Adventure Plus 5
 };
 enum BackgroundType : int32_t
 {
@@ -822,7 +823,8 @@ enum ProjectileType : int32_t
 	PROJECTILE_BUTTER = 12,
 	PROJECTILE_ZOMBIE_PEA = 13,
 	PROJECTILE_CHEESE = 14,  // PvZ Co-op: Luca's
-	NUM_PROJECTILES = 15
+	PROJECTILE_GOBLIN = 15,  // PvZ Co-op: Noah's; flies like a Starfruit's star
+	NUM_PROJECTILES = 16
 };
 enum ReanimationType : uint32_t {
 	REANIM_NONE = static_cast<uint32_t>(-1),
@@ -1100,6 +1102,11 @@ enum SeedType : int32_t
 	SEED_GIANT_WALLNUT,
 	SEED_SPROUT,
 	SEED_LEFTPEATER,
+	// PvZ Co-op, Adventure Plus plants. At the end, not beside Luca: seed
+	// numbers are saved (the Zen Garden keeps its plants by them), and putting
+	// these in the middle would shift every number after them.
+	SEED_GRS,   // green fumes through every zombie in reach, day or night
+	SEED_NOAH,  // five goblin heads at once, a Starfruit's spread
 	NUM_SEED_TYPES,
 	SEED_BEGHOULED_BUTTON_SHUFFLE,
 	SEED_BEGHOULED_BUTTON_CRATER,
@@ -1122,7 +1129,10 @@ enum SeedType : int32_t
 	SEED_ZOMBIE_DANCER,
 	SEED_ZOMBIE_GARGANTUAR,
 	SEED_ZOMBIE_IMP,
-	NUM_SEEDS_IN_CHOOSER = 50,
+	// Every chooser plant is below this: up to Luca, then GRS and Noah. The
+	// four between (Explode-o-nut to the Left Repeater) are never chosen;
+	// LawnApp::HasSeedType keeps them out.
+	NUM_SEEDS_IN_CHOOSER = 56,
 	SEED_NONE = -1
 };
 enum ShieldType : int32_t
@@ -1182,6 +1192,10 @@ enum StoreItem : int32_t
 	// PvZ Co-op: not sold. Which Adventure Plus levels have been beaten, one
 	// bit each (bit 0 is level 1).
 	STORE_ITEM_ADVENTURE_PLUS_BEATEN = 45,
+	// PvZ Co-op: not sold. GRS, for beating Adventure Plus 5; Noah, handed
+	// over by Crazy Dave at the start of Adventure Plus 8.
+	STORE_ITEM_UNLOCK_GRS = 46,
+	STORE_ITEM_UNLOCK_NOAH = 47,
 	STORE_ITEM_INVALID = -1
 };
 enum StorePages : int32_t
