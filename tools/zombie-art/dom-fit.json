@@ -1,0 +1,250 @@
+{
+ "_note": "Fits the artist's layers in assets/coop/dom_split (head, body, legs) into Crazy Dave's parts. The raised arm and jar stay on the body.",
+ "layers": [
+  {
+   "file": "head.png",
+   "leftover": "crazydave_head"
+  },
+  {
+   "file": "body.png",
+   "regions": [
+    {
+     "part": "crazydave_outerhand",
+     "polygon": [
+      [
+       100,
+       322
+      ],
+      [
+       242,
+       322
+      ],
+      [
+       242,
+       432
+      ],
+      [
+       100,
+       440
+      ]
+     ]
+    },
+    {
+     "part": "crazydave_outerarm",
+     "polygon": [
+      [
+       0,
+       342
+      ],
+      [
+       106,
+       336
+      ],
+      [
+       106,
+       452
+      ],
+      [
+       0,
+       456
+      ]
+     ]
+    }
+   ],
+   "leftover": "crazydave_body1",
+   "skin_only": [
+    "crazydave_outerhand"
+   ],
+   "fill_behind": [
+    {
+     "into": "crazydave_body1",
+     "from": [
+      "crazydave_outerarm"
+     ],
+     "within": [
+      [
+       0,
+       325
+      ],
+      [
+       110,
+       325
+      ],
+      [
+       110,
+       392
+      ],
+      [
+       0,
+       398
+      ]
+     ]
+    },
+    {
+     "into": "crazydave_body1",
+     "from": [
+      "crazydave_outerhand"
+     ],
+     "within": [
+      [
+       60,
+       258
+      ],
+      [
+       372,
+       258
+      ],
+      [
+       372,
+       575
+      ],
+      [
+       60,
+       575
+      ]
+     ]
+    }
+   ],
+   "grow": {
+    "crazydave_outerarm": 6,
+    "crazydave_outerhand": 2
+   }
+  },
+  {
+   "file": "legs.png",
+   "regions": [
+    {
+     "part": "crazydave_foot1",
+     "polygon": [
+      [
+       70,
+       830
+      ],
+      [
+       222,
+       830
+      ],
+      [
+       222,
+       942
+      ],
+      [
+       70,
+       942
+      ]
+     ]
+    },
+    {
+     "part": "crazydave_foot2",
+     "polygon": [
+      [
+       222,
+       828
+      ],
+      [
+       370,
+       828
+      ],
+      [
+       370,
+       942
+      ],
+      [
+       222,
+       942
+      ]
+     ]
+    }
+   ],
+   "leftover": "crazydave_body2",
+   "grow": {
+    "crazydave_foot1": 3,
+    "crazydave_foot2": 3
+   }
+  }
+ ],
+ "empty": [
+  "crazydave_beard",
+  "crazydave_eye",
+  "crazydave_eyebrow",
+  "crazydave_pot",
+  "crazydave_pot_inside",
+  "crazydave_innerpants",
+  "crazydave_innerfinger1",
+  "crazydave_innerfinger2",
+  "crazydave_innerfinger3",
+  "crazydave_innerfinger4",
+  "crazydave_outerfinger1",
+  "crazydave_outerfinger2",
+  "crazydave_outerfinger3",
+  "crazydave_outerfinger4",
+  "crazydave_handinghand",
+  "crazydave_handinghand2",
+  "crazydave_handinghand3",
+  "crazydave_innerarm",
+  "crazydave_innerhand"
+ ],
+ "mouth": {
+  "center": [
+   231,
+   252
+  ],
+  "tilt": -6,
+  "lip": [
+   150,
+   100,
+   95
+  ],
+  "shapes": {
+   "crazydave_mouth1": [
+    14,
+    8,
+    "teeth"
+   ],
+   "crazydave_mouth2": [
+    0,
+    0,
+    "closed"
+   ],
+   "crazydave_mouth3": [
+    10,
+    5,
+    "teeth"
+   ],
+   "crazydave_mouth4": [
+    6,
+    8,
+    "plain"
+   ],
+   "crazydave_mouth5": [
+    16,
+    7,
+    "teeth"
+   ],
+   "crazydave_mouth6": [
+    4,
+    4,
+    "plain"
+   ]
+  }
+ },
+ "eyes": [
+  [
+   180,
+   188,
+   15,
+   8
+  ],
+  [
+   272,
+   166,
+   14,
+   8
+  ]
+ ],
+ "skin": [
+  178,
+  135,
+  120
+ ]
+}

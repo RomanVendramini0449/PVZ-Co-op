@@ -64,26 +64,17 @@ def poly_mask(shape, pts):
     return m
 
 
-def main(cfg_path, char_path, dave_dir, pak, parts_out, preview_out):
-    cfg = json.load(open(cfg_path))
-    layout = json.load(open(os.path.join(dave_dir, 'layout.json')))
-    origin = layout['origin']
-    W, H = layout['canvas']
-    char = Image.open(char_path).convert('RGBA')
-    assert char.size == (W, H), 'character must be painted on the %dx%d Dave canvas' % (W, H)
-    rgba = np.array(char)
+def assign(cfg, rgba, H, W):
+    """One layer: which of its pixels go to which part, with holes behind
+    moving parts filled in. Returns ({part: mask}, {part: pixels to cut from})."""
+    rgba = rgba.copy()
     alpha = rgba[..., 3]
     present = alpha > 8
-
-    data, files = rz.read_pak(pak)
-    off, size = files['reanim/crazydave.reanim']
-    tracks = rz.parse_reanim(data[off:off + size].decode('latin1'))
-    idle = track_matrices(tracks, layout['frame'], origin)
 
     # ---- who owns each pixel ----
     owner = np.full((H, W), '', object)
     masks = {}
-    for region in cfg['regions']:
+    for region in cfg.get('regions', []):
         m = poly_mask((H, W), region['polygon']) > 0
         m &= present & (owner == '')
         owner[m] = region['part']
@@ -112,7 +103,8 @@ def main(cfg_path, char_path, dave_dir, pak, parts_out, preview_out):
             owner[give] = ''
             masks[part] = masks[part] & ~give
     rest = present & (owner == '')
-    masks[cfg['leftover']] = masks.get(cfg['leftover'], np.zeros((H, W), bool)) | rest
+    if cfg.get('leftover'):
+        masks[cfg['leftover']] = masks.get(cfg['leftover'], np.zeros((H, W), bool)) | rest
 
     # ---- fill the torso where moving parts were cut out ----
     # Moving parts are cut from the untouched picture; only the parts they
@@ -145,6 +137,44 @@ def main(cfg_path, char_path, dave_dir, pak, parts_out, preview_out):
         k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * grow + 1, 2 * grow + 1))
         masks[part] = masks[part] | ((cv2.dilate(masks[part].astype(np.uint8), k) > 0) & (original[..., 3] > 200))
 
+    return masks, {part: (rgba if part in filled_parts else original) for part in masks}
+
+
+def main(cfg_path, char_path, dave_dir, pak, parts_out, preview_out):
+    cfg = json.load(open(cfg_path))
+    layout = json.load(open(os.path.join(dave_dir, 'layout.json')))
+    origin = layout['origin']
+    W, H = layout['canvas']
+    # One picture, or the artist's own layers (cfg "layers": a file each,
+    # with its own regions and leftover part). Each part comes from one layer.
+    if 'layers' in cfg:
+        base = char_path if os.path.isdir(char_path) else os.path.dirname(char_path)
+        layer_cfgs = cfg['layers']
+        layer_arrays = [np.array(Image.open(os.path.join(base, l['file'])).convert('RGBA')) for l in layer_cfgs]
+    else:
+        layer_cfgs = [cfg]
+        layer_arrays = [np.array(Image.open(char_path).convert('RGBA'))]
+    for arr in layer_arrays:
+        assert arr.shape[:2] == (H, W), 'the character must be painted on the %dx%d Dave canvas' % (W, H)
+    # The whole character, for sampling skin colours.
+    composite = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    for arr in layer_arrays:
+        composite.alpha_composite(Image.fromarray(arr))
+    original = np.array(composite)
+
+    data, files = rz.read_pak(pak)
+    off, size = files['reanim/crazydave.reanim']
+    tracks = rz.parse_reanim(data[off:off + size].decode('latin1'))
+    idle = track_matrices(tracks, layout['frame'], origin)
+
+    masks = {}
+    sources = {}
+    for lcfg, rgba in zip(layer_cfgs, layer_arrays):
+        lmasks, lsource = assign(lcfg, rgba, H, W)
+        for part, m in lmasks.items():
+            masks[part] = m
+            sources[part] = lsource[part]
+
     os.makedirs(parts_out, exist_ok=True)
     for f in os.listdir(parts_out):
         if f.endswith('.png'):
@@ -164,7 +194,7 @@ def main(cfg_path, char_path, dave_dir, pak, parts_out, preview_out):
 
     for part, mask in masks.items():
         tname = track_of[part]
-        res = cut(rgba if part in filled_parts else original, mask.astype(np.uint8) * 255, idle[tname][1])
+        res = cut(sources[part], mask.astype(np.uint8) * 255, idle[tname][1])
         if res:
             write(part, *res)
 
