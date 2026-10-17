@@ -2428,11 +2428,18 @@ void Plant::UpdateBowling()
 			Die();
 	}
 
-	// Adventure Plus: the rockets leave a smoke trail.
-	if (mApp->IsAdventurePlusLevel() && mBoard->mMainCounter % 5 == 0)
+	// Adventure Plus: the rockets trail smoke -- one smoke emitter per rocket,
+	// kept at its tail as it flies; the puffs it leaves drift behind, and it
+	// goes when the rocket does (RemoveEffects).
+	if (mApp->IsAdventurePlusLevel())
 	{
-		mApp->AddPvzpParticle(mX + 8.0f, mY + 46.0f, Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0),
-			ParticleEffect::PARTICLE_PUFFSHROOM_TRAIL);
+		const float aTailX = mX + 4.0f, aTailY = mY + 30.0f;
+		PvzpParticleSystem* aSmoke = mApp->ParticleTryToGet(mParticleID);
+		if (aSmoke == nullptr)
+			aSmoke = AddAttachedParticle(static_cast<int>(aTailX), static_cast<int>(aTailY),
+				Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0), ParticleEffect::PARTICLE_ZAMBONI_SMOKE);
+		if (aSmoke)
+			aSmoke->SystemMove(aTailX, aTailY);
 	}
 
 	if (mState == PlantState::STATE_BOWLING_UP)
