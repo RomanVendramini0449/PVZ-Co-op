@@ -1005,13 +1005,6 @@ void Projectile::Draw(Graphics* g)
 		CoopArt::DrawCheese(g, mPosX - mX + 16.0f, mPosY + mPosZ - mY + 14.0f, mRotation);
 		return;
 	}
-	if (mCoopSentry && CoopArt::PackedImage("sentry_projectile"))
-	{
-		// The Sentry Turret's own shot, centred on the spike's middle, turned
-		// the way it flies.
-		CoopArt::DrawPackedRotated(g, "sentry_projectile", mPosX - mX + 20.0f, mPosY + mPosZ - mY + 12.0f, mRotation, 1.0f);
-		return;
-	}
 	if (mProjectileType == ProjectileType::PROJECTILE_GOBLIN)
 	{
 		// Centred where the star's centre would be.
@@ -1074,6 +1067,14 @@ void Projectile::Draw(Graphics* g)
 	default:
 		PVZP_ASSERT(false);
 		break;
+	}
+
+	// A Sentry Turret's shot is a Cattail spike with its bullet picture:
+	// drawn by the spike's own code below, so it turns and moves the same.
+	if (mCoopSentry)
+	{
+		if (Image* aBullet = CoopArt::PackedImage("sentry_projectile"))
+			aImage = aBullet;
 	}
 
 	bool aMirror = false;
