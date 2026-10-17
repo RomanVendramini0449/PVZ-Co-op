@@ -418,9 +418,9 @@ packet). Crazy Dave talks before levels 1, 3, 4, 6, 8, 9, 10 and 11
 (`LawnApp::SetupAdventurePlusDialogue`). Yeti Season is dark, foggy and stormy:
 rain, thunder, and lightning that lights the lawn up.
 
-Losing in Adventure Plus has no house to walk into: the camera swings left onto
-the base, which blows up, lane by lane and then all at once, and the game is
-over.
+Losing in Adventure Plus has no house to walk into: the camera stays put and
+the left of the lawn blows up, lane by lane and then all at once, and the game
+is over.
 
 Each level can open with a talk in Crazy Dave's style
 (`LawnApp::SetupAdventurePlusDialogue`, lines written into the string table

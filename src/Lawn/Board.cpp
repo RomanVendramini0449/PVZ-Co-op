@@ -5866,7 +5866,7 @@ void Board::ZombiesWon(Zombie* theZombie)
 	{
 		mApp->mGameScene = GameScenes::SCENE_ZOMBIES_WON;
 		// Adventure Plus has no house: the zombie stays at the grate, and
-		// the whole left side goes up (CutScene::UpdateAdventurePlusLost).
+		// the left side goes up (CutScene::UpdateAdventurePlusLost).
 		if (theZombie && !mApp->IsAdventurePlusLevel())  // theZombie can be null when game over is triggered without a zombie
 		{
 			theZombie->WalkIntoHouse();

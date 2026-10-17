@@ -1508,53 +1508,44 @@ void CutScene::StartZombiesWon()
 // the grate, the left side of the lawn blows up, lane by lane and then all at
 // once, the screen goes dark, and that is the game. Fixed timings and places,
 // no generator, so both co-op players see the same.
-static const int	PlusLostTimePanStart			= 100;   // the camera swings left onto the base...
-static const int	PlusLostTimePanEnd				= 1300;
-static const int	PlusLostTimeFirstBlast			= 1100;  // ...and it starts going up as it arrives
-static const int	PlusLostTimeBlastStep			= 140;   // ten blasts over the house, 1.4 s
-static const int	PlusLostTimeBigBlast			= 2700;
-static const int	PlusLostTimeDark				= 3700;
-static const int	PlusLostTimeEnd					= 5700;
+static const int	PlusLostTimeFirstBlast			= 300;
+static const int	PlusLostTimeBlastStep			= 220;
+static const int	PlusLostTimeBigBlast			= 1600;
+static const int	PlusLostTimeDark				= 2600;
+static const int	PlusLostTimeEnd					= 4600;
 
 void CutScene::UpdateAdventurePlusLost()
 {
-	if (mCutsceneTime > PlusLostTimePanStart && mCutsceneTime <= PlusLostTimePanEnd)
-		mBoard->Move(CalcPosition(PlusLostTimePanStart, PlusLostTimePanEnd, 0, BOARD_OFFSET), 0);
-
-	// Everything happens in the house -- the part of the background left of
-	// the lawn that the pan brings into view (board x -220 to 0) -- and no
-	// further: blasts all over it, top to bottom, then the whole house at
-	// once. Fixed places, so both co-op players see the same.
-	static const float kHouseBlasts[][2] = {
-		{ -150.0f, 300.0f }, { -190.0f, 140.0f }, { -90.0f, 470.0f }, { -170.0f, 560.0f },
-		{ -70.0f, 200.0f }, { -200.0f, 380.0f }, { -110.0f, 90.0f }, { -60.0f, 360.0f },
-		{ -180.0f, 250.0f }, { -100.0f, 540.0f },
-	};
-	constexpr int kHouseBlastCount = sizeof(kHouseBlasts) / sizeof(kHouseBlasts[0]);
+	static const int kRows[] = { 2, 0, 4, 1, 3 };
 	const int aRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_TOP, 0, 0);
-	for (int i = 0; i < kHouseBlastCount; i++)
+	for (int i = 0; i < 5; i++)
 	{
 		if (mCutsceneTime != PlusLostTimeFirstBlast + PlusLostTimeBlastStep * i)
 			continue;
-		mApp->AddPvzpParticle(kHouseBlasts[i][0], kHouseBlasts[i][1], aRenderOrder, ParticleEffect::PARTICLE_POWIE);
+		const int aRow = kRows[i];
+		const float aX = 40.0f + 30.0f * ((i * 3) % 4);
+		const float aY = static_cast<float>(mBoard->GridToPixelY(0, aRow)) + 50.0f;
+		mApp->AddPvzpParticle(aX, aY, aRenderOrder, ParticleEffect::PARTICLE_POWIE);
 		mApp->PlayFoley(FoleyType::FOLEY_CHERRYBOMB);
 		mBoard->ShakeBoard(4, -6);
 	}
 
 	if (mCutsceneTime == PlusLostTimeBigBlast)
 	{
-		// The whole house goes up together.
-		mApp->AddPvzpParticle(-110.0f, 330.0f, aRenderOrder, ParticleEffect::PARTICLE_DOOM);
-		for (int i = 0; i < kHouseBlastCount; i += 2)
-			mApp->AddPvzpParticle(kHouseBlasts[i][0], kHouseBlasts[i][1], aRenderOrder, ParticleEffect::PARTICLE_POWIE);
+		mApp->AddPvzpParticle(110.0f, 330.0f, aRenderOrder, ParticleEffect::PARTICLE_DOOM);
 		mApp->PlaySample(SOUND_DOOMSHROOM);
 		CoopArt::PlayPackedSound("legend_explode");
 		mBoard->ShakeBoard(8, -10);
-		// The zombies at the door go with it.
+		// Everything on the left side goes with it.
 		for (Zombie* aZombie : mBoard->mZombies)
 		{
-			if (!aZombie->mDead && aZombie->GetZombieRect().mX < 60)
+			if (!aZombie->mDead && aZombie->GetZombieRect().mX < 260)
 				aZombie->DieNoLoot();
+		}
+		for (Plant* aPlant : mBoard->mPlants)
+		{
+			if (!aPlant->mDead && aPlant->mPlantCol <= 1)
+				aPlant->Die();
 		}
 	}
 
