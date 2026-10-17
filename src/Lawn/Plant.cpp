@@ -112,7 +112,7 @@ constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_NOAH,              .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_STARFRUIT,     .mPacketIndex = 30, .mSeedCost = 175, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "NOAH" },
 	// The Sentry Turret: a Cattail underneath -- it aims and fires as one,
 	// homing spikes at whatever is nearest, anywhere -- but on dry land.
-	{ .mSeedType = SeedType::SEED_SENTRY,            .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_CATTAIL,       .mPacketIndex = 27, .mSeedCost = 300, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 200,  .mPlantName = "SENTRY" }
+	{ .mSeedType = SeedType::SEED_SENTRY,            .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_CATTAIL,       .mPacketIndex = 27, .mSeedCost = 250, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 200,  .mPlantName = "SENTRY" }
 };
 
 Plant::Plant()
