@@ -7858,12 +7858,14 @@ void Zombie::DropHelm(unsigned int theDamageFlags)
 	float aPosX = mPosX + aDrawPos.mImageOffsetX + aDrawPos.mHeadX + 14.0f;
 	float aPosY = mPosY + aDrawPos.mImageOffsetY + aDrawPos.mHeadY + aDrawPos.mBodyY + 18.0f;
 	ParticleEffect aEffect = ParticleEffect::PARTICLE_NONE;
+	Image* aDebrisImage = nullptr;  // the picture the falling piece is drawn with
 	if (mHelmType == HelmType::HELMTYPE_TRAFFIC_CONE)
 	{
 		GetTrackPosition("anim_cone", aPosX, aPosY);
 		ReanimShowPrefix("anim_cone", RENDER_GROUP_HIDDEN);
 		ReanimShowPrefix("anim_hair", RENDER_GROUP_NORMAL);
 		aEffect = ParticleEffect::PARTICLE_ZOMBIE_TRAFFIC_CONE;
+		aDebrisImage = IMAGE_REANIM_ZOMBIE_CONE3;
 	}
 	else if (mHelmType == HelmType::HELMTYPE_PAIL)
 	{
@@ -7871,6 +7873,7 @@ void Zombie::DropHelm(unsigned int theDamageFlags)
 		ReanimShowPrefix("anim_bucket", RENDER_GROUP_HIDDEN);
 		ReanimShowPrefix("anim_hair", RENDER_GROUP_NORMAL);
 		aEffect = ParticleEffect::PARTICLE_ZOMBIE_PAIL;
+		aDebrisImage = IMAGE_REANIM_ZOMBIE_BUCKET3;
 	}
 	else if (mHelmType == HelmType::HELMTYPE_FOOTBALL)
 	{
@@ -7878,12 +7881,14 @@ void Zombie::DropHelm(unsigned int theDamageFlags)
 		ReanimShowPrefix("zombie_football_helmet", RENDER_GROUP_HIDDEN);
 		ReanimShowPrefix("anim_hair", RENDER_GROUP_NORMAL);
 		aEffect = ParticleEffect::PARTICLE_ZOMBIE_HELMET;
+		aDebrisImage = IMAGE_REANIM_ZOMBIE_FOOTBALL_HELMET3;
 	}
 	else if (mHelmType == HelmType::HELMTYPE_DIGGER)
 	{
 		GetTrackPosition("Zombie_digger_hardhat", aPosX, aPosY);
 		ReanimShowTrack("Zombie_digger_hardhat", RENDER_GROUP_HIDDEN);
 		aEffect = ParticleEffect::PARTICLE_ZOMBIE_HEADLIGHT;
+		aDebrisImage = IMAGE_REANIM_ZOMBIE_DIGGER_HARDHAT3;
 	}
 	else if (mHelmType == HelmType::HELMTYPE_BOBSLED && !TestBit(theDamageFlags, static_cast<int>(DamageFlags::DAMAGE_DOESNT_LEAVE_BODY)))
 	{
@@ -7894,6 +7899,11 @@ void Zombie::DropHelm(unsigned int theDamageFlags)
 	{
 		PvzpParticleSystem* aParticle = mApp->AddPvzpParticle(aPosX, aPosY, mRenderOrder + 1, aEffect);
 		OverrideParticleScale(aParticle);
+		// Adventure Plus: the piece that falls off is your repaint too
+		// (assets/coop/headwear-originals), not the game's own.
+		if (aParticle && aDebrisImage)
+			if (const CoopArt::PartSubstitute* aSubstitute = CoopArt::SubstituteZombiePart(aDebrisImage))
+				aParticle->OverrideImage(nullptr, aSubstitute->mImage);
 	}
 
 	mHelmType = HelmType::HELMTYPE_NONE;
