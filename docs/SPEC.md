@@ -361,11 +361,11 @@ about the Heavy's size, with their own hit sounds):
   between a Conehead and a Buckethead. In most levels, more from level 4.
 
 **Protect the Engineer's sentry** (levels 3 and 7): the Engineer's Sentry
-Turret stands built at column 3, row 4 (level 7: column 3, row 2). It cannot
+Turret stands built at column 3, row 3 (level 7: column 3, row 1). It cannot
 be dug up; if it is destroyed it blows up (harmlessly) and the level is lost.
 Beating level 3 wins the Sentry Turret: 300 sun, a quarter slower than a
-Cattail, about a Peashooter's size, firing bullets that home only within 60
-degrees of straight ahead and fly on straight past that. Every Sentry Turret
+Cattail, about a Peashooter's size, firing bullets that home on the nearest
+zombie in any direction, like a Cattail's spikes. Every Sentry Turret
 blows up harmlessly when destroyed.
 
 **TF2 bowling**: the Wall-nuts are rockets (the Explode-o-nut a crit rocket),

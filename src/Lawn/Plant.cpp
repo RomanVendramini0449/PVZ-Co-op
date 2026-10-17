@@ -5074,7 +5074,6 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 		aProjectile->mCoopSentry = mSeedType == SeedType::SEED_SENTRY;  // drawn as its own shot
 		if (aProjectile->mCoopSentry)
 		{
-			aProjectile->mVelX = 3.0f;  // a bullet: quicker, and it turns less (Projectile::UpdateNormalMotion)
 			CoopArt::PlayPackedSound("turret_fire");
 		}
 		aProjectile->mVelX = 2.0f;
@@ -5124,16 +5123,6 @@ Zombie* Plant::FindTargetZombie(int theRow, PlantWeapon thePlantWeapon)
 			}
 		}
 
-		if (mSeedType == SeedType::SEED_SENTRY)
-		{
-			// The Sentry Turret only sees forward: within 60 degrees of
-			// straight ahead (tan 60 = 1.73), never behind it.
-			const Rect aTargetRect = aZombie->GetZombieRect();
-			const float aDX = aTargetRect.mX + aTargetRect.mWidth * 0.5f - (mX + 40.0f);
-			const float aDY = aTargetRect.mY + aTargetRect.mHeight * 0.5f - (mY + 40.0f);
-			if (aDX <= 0.0f || std::abs(aDY) > aDX * 1.732f)
-				continue;
-		}
 		if (mSeedType != SeedType::SEED_CATTAIL && mSeedType != SeedType::SEED_SENTRY)
 		{
 			if (mSeedType == SeedType::SEED_GLOOMSHROOM)

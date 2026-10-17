@@ -665,28 +665,14 @@ void Projectile::UpdateNormalMotion()
 			SexyVector2 aToTarget = (aTargetCenter - aProjectileCenter).Normalize();
 			SexyVector2 aMotion(mVelX, mVelY);
 
-			if (mCoopSentry && aToTarget.x < 0.5f)
-			{
-				// A Sentry Turret's bullet bends no further than 60 degrees
-				// off straight ahead (cos 60 = 0.5): past that it stops
-				// tracking and flies on straight, hitting whatever is in its
-				// lane like any shot.
-				mMotionType = ProjectileMotion::MOTION_STRAIGHT;
-				mTargetZombieID = ZombieID::ZOMBIEID_NULL;
-				mVelY = 0.0f;
-				mRotation = 0.0f;
-			}
-			else
-			{
-				// Bullets turn at three fifths of a spike's rate, and fly faster.
-				aMotion += aToTarget * ((mCoopSentry ? 0.0006f : 0.001f) * mProjectileAge);
-				aMotion = aMotion.Normalize();
-				aMotion *= mCoopSentry ? 3.0f : 2.0f;
+			// A Sentry Turret's bullet homes just like a Cattail's spike.
+			aMotion += aToTarget * (0.001f * mProjectileAge);
+			aMotion = aMotion.Normalize();
+			aMotion *= 2.0f;
 
-				mVelX = aMotion.x;
-				mVelY = aMotion.y;
-				mRotation = -atan2(mVelY, mVelX);
-			}
+			mVelX = aMotion.x;
+			mVelY = aMotion.y;
+			mRotation = -atan2(mVelY, mVelX);
 		}
 
 		mPosY += mVelY;
