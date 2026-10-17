@@ -2768,7 +2768,7 @@ void LawnApp::LoadingThreadProc()
 	mStringProperties.insert_or_assign("SENTRY_TOOLTIP", "Shoots homing spikes at the nearest zombie, anywhere");
 	mStringProperties.insert_or_assign("SENTRY_DESCRIPTION",
 		"The Sentry Turret finds the nearest zombie, wherever it is, and keeps shooting at it.{SHORTLINE}"
-		"{KEYWORD}Damage:{STAT} normal, two at a time{BR}{KEYWORD}Range:{STAT} the whole lawn, any direction, even the air{SHORTLINE}"
+		"{KEYWORD}Damage:{STAT} heavy, two at a time{BR}{KEYWORD}Range:{STAT} the whole lawn, any direction, even the air{SHORTLINE}"
 		"A Cattail that left the pond and got a job. Sentry going up!");
 	mStringProperties.insert_or_assign("NOAH", "Noah");
 	mStringProperties.insert_or_assign("NOAH_TOOLTIP", "Throws goblin heads in five directions");

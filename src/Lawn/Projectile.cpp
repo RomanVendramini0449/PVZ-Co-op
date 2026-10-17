@@ -35,6 +35,9 @@
 #include "Widget/AchievementsScreen.h"
 #include <algorithm>
 
+// The Sentry Turret's bullets (a Cattail spike underneath, 20): times this.
+constexpr int SENTRY_DAMAGE_MULTIPLIER = 2;
+
 constinit const ProjectileDefinition gProjectileDefinition[] = {
 	{ .mProjectileType = ProjectileType::PROJECTILE_PEA, .mImageRow = 0, .mDamage = 20 },
 	{ .mProjectileType = ProjectileType::PROJECTILE_SNOWPEA, .mImageRow = 0, .mDamage = 20 },
@@ -848,7 +851,10 @@ void Projectile::DoImpact(Zombie* theZombie)
 	else if (theZombie)
 	{
 		unsigned int aDamageFlags = GetDamageFlags(theZombie);
-		theZombie->TakeDamage(GetProjectileDef().mDamage, aDamageFlags);
+		// A Sentry Turret's bullet hits twice as hard as the Cattail spike it
+		// flies as: a cabbage's worth.
+		const int aDamage = mCoopSentry ? GetProjectileDef().mDamage * SENTRY_DAMAGE_MULTIPLIER : GetProjectileDef().mDamage;
+		theZombie->TakeDamage(aDamage, aDamageFlags);
 	}
 
 	float aLastPosX = mPosX - mVelX;
