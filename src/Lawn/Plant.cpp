@@ -108,7 +108,7 @@ constinit const PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
 	{ .mSeedType = SeedType::SEED_LEFTPEATER,        .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_REPEATER,      .mPacketIndex = 5,  .mSeedCost = 200, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "REPEATER" },
 	// PvZ Co-op: a Fume-shroom and a Starfruit underneath, their animations
 	// running unseen so they aim and fire as those do; drawn with their art.
-	{ .mSeedType = SeedType::SEED_GRS,               .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_FUMESHROOM,    .mPacketIndex = 9,  .mSeedCost = 150, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "GRS" },
+	{ .mSeedType = SeedType::SEED_GRS,               .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_FUMESHROOM,    .mPacketIndex = 9,  .mSeedCost = 150, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 120,  .mPlantName = "GRS" },
 	{ .mSeedType = SeedType::SEED_NOAH,              .mPlantImage = nullptr, .mReanimationType = ReanimationType::REANIM_STARFRUIT,     .mPacketIndex = 30, .mSeedCost = 175, .mRefreshTime = 750,    .mSubClass = PlantSubClass::SUBCLASS_SHOOTER, .mLaunchRate = 150,  .mPlantName = "NOAH" },
 	// The Sentry Turret: a Cattail underneath -- it aims and fires as one,
 	// homing spikes at whatever is nearest, anywhere -- but on dry land.
@@ -478,6 +478,9 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 	case SeedType::SEED_MAGNETSHROOM:
 		PVZP_ASSERT(aBodyReanim);
 		aBodyReanim->SetTruncateDisappearingFrames();
+		break;
+	case SeedType::SEED_GRS:
+		mPlantHealth = 600;  // twice a Fume-shroom's: he is worth his 150 sun
 		break;
 	case SeedType::SEED_SPIKEROCK:
 		mPlantHealth = 450;
@@ -4840,8 +4843,9 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 	}
 	if (mSeedType == SeedType::SEED_GRS)
 	{
-		// Through every zombie in reach, like a Fume-shroom; his own sound.
-		DoRowAreaDamage(20, 2U);
+		// Through every zombie in reach, like a Fume-shroom but twice as hard;
+		// his own sound.
+		DoRowAreaDamage(40, 2U);
 		CoopArt::PlayPackedSound("grs_shoot");
 		return;
 	}

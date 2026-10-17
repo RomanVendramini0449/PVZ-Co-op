@@ -382,8 +382,8 @@ Gargantuar in its final wave.
 Three plants are earned here, kept as add-ons beside the seed chooser's grid
 like Luca: the **Sentry Turret** (beating level 7, seed packet and award
 screen; a Cattail on dry land: homing spikes at the nearest zombie anywhere,
-drawn as a Cattail until its own art arrives), **GRS** (beating level 5; a fume attack through the lane, green
-bubbles) and **Noah** (Crazy Dave hands him over at the start of level 8;
+drawn as a Cattail until its own art arrives), **GRS** (Graz; beating level 5; 150 sun, a fume attack through the lane, green
+bubbles, at twice a Fume-shroom's damage and health and a bit faster) and **Noah** (Crazy Dave hands him over at the start of level 8;
 the Starfruit's five directions, firing goblin heads).
 
 **Level 11, Legendary Demoman** (`CoopDemoman.cpp`): a boss fight at night in
