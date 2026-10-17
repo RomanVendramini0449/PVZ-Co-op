@@ -1166,7 +1166,11 @@ void SeedBank::UpdateConveyorBelt()
 			}
 		}
 
-		mBoard->UpdateToolTip();
+		// Co-op: every player's belt moves, but the tooltip is this screen's,
+		// worked out against the acting player's bank -- refreshed off the
+		// other player's belt, it flipped between theirs and yours.
+		if (mBoard->IsLocalPlayerActing())
+			mBoard->UpdateToolTip();
 	}
 }
 

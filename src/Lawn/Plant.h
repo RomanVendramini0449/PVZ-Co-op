@@ -230,6 +230,7 @@ public:
 	bool                    DrawShopSkin(Sexy::Graphics* g, float theOffsetX, float theOffsetY);
 	void                    DrawCoopPhotoPlant(Sexy::Graphics* g, float theOffsetX, float theOffsetY);
 	void                    DrawSentry(Sexy::Graphics* g, float theOffsetX, float theOffsetY);
+	void                    DrawPlusRocketSmoke(Sexy::Graphics* g, float theOffsetX, float theOffsetY);
 	static bool             DrawPlusRocket(Sexy::Graphics* g, SeedType theSeedType, float theX, float theY, PlantState theState, uint32_t theCounter, float theScale);
 	void                    UpdateShooter();
 	bool                    FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon = PlantWeapon::WEAPON_PRIMARY);

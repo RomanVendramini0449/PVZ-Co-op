@@ -2428,20 +2428,6 @@ void Plant::UpdateBowling()
 			Die();
 	}
 
-	// Adventure Plus: the rockets trail smoke -- one smoke emitter per rocket,
-	// kept at its tail as it flies; the puffs it leaves drift behind, and it
-	// goes when the rocket does (RemoveEffects).
-	if (mApp->IsAdventurePlusLevel())
-	{
-		const float aTailX = mX + 4.0f, aTailY = mY + 30.0f;
-		PvzpParticleSystem* aSmoke = mApp->ParticleTryToGet(mParticleID);
-		if (aSmoke == nullptr)
-			aSmoke = AddAttachedParticle(static_cast<int>(aTailX), static_cast<int>(aTailY),
-				Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_PARTICLE, mRow, 0), ParticleEffect::PARTICLE_ZAMBONI_SMOKE);
-		if (aSmoke)
-			aSmoke->SystemMove(aTailX, aTailY);
-	}
-
 	if (mState == PlantState::STATE_BOWLING_UP)
 	{
 		mY -= 2;
@@ -4106,6 +4092,8 @@ void Plant::Draw(Graphics* g)
 
 		aOffsetX += mShakeOffsetX;
 		aOffsetY += mShakeOffsetY;
+		if (IsOnBoard())
+			DrawPlusRocketSmoke(g, aOffsetX, aOffsetY);  // under the rocket
 		if (IsInPlay() && mApp->IsIZombieLevel())
 		{
 			mBoard->mChallenge->IZombieDrawPlant(g, this);
@@ -4253,6 +4241,56 @@ static bool GetShopSkin(SeedType theSeedType, CoopArt::Skin& theSkinOut)
 // Explode-o-nut a crit rocket, the giant one twice the size -- pointing the
 // way they roll. They bounce and blow up just as the nuts do. False when it
 // is not that, or the art is missing: draw the plant as usual.
+// Adventure Plus bowling: the smoke a rocket leaves, drawn straight from where
+// it is -- puffs hanging in the air along its path, thinning and spreading
+// out to the left of its tail. Nothing is spawned, so nothing piles up, and
+// it all goes with the rocket. The puffs sit at fixed points on the lawn
+// (multiples of SPACING), so they stay put as the rocket flies on.
+void Plant::DrawPlusRocketSmoke(Graphics* g, float theOffsetX, float theOffsetY)
+{
+	if (!mApp->IsAdventurePlusLevel() || !mApp->IsWallnutBowlingLevel())
+		return;
+	if (mSeedType != SeedType::SEED_WALLNUT && mSeedType != SeedType::SEED_EXPLODE_O_NUT && mSeedType != SeedType::SEED_GIANT_WALLNUT)
+		return;
+	Image* aPuff = IMAGE_ZAMBONISMOKE;
+	if (aPuff == nullptr || aPuff->mNumCols <= 0)
+		return;
+
+	constexpr float SPACING = 8.0f;
+	const float aScale = mSeedType == SeedType::SEED_GIANT_WALLNUT ? 2.0f : 1.0f;
+	const float aLength = 120.0f * aScale;
+	// The tail: the rocket's left end, half-way up it (see DrawPlusRocket).
+	const float aTailX = 40.0f - 40.0f * aScale;
+	const float aTailY = 40.0f + 12.0f * aScale - (mSeedType == SeedType::SEED_EXPLODE_O_NUT ? 12.0f : 7.0f) * aScale;
+	const float aWorldTail = mX + aTailX;
+	const float aFirst = std::floor(aWorldTail / SPACING) * SPACING;
+	const int aCelWidth = aPuff->GetCelWidth(), aCelHeight = aPuff->GetCelHeight();
+
+	Graphics aG(*g);
+	aG.SetColorizeImages(true);
+	// Furthest (faintest) first, so the fresh smoke at the tail is on top.
+	const int aCount = static_cast<int>(aLength / SPACING);
+	for (int k = aCount; k >= 0; k--)
+	{
+		const float aWorldX = aFirst - SPACING * k;
+		const float aAge = (aWorldTail - aWorldX) / aLength;  // 0 at the tail, 1 at the end
+		if (aAge < 0.0f || aAge > 1.0f)
+			continue;
+		// The same look for a given spot every frame.
+		const uint32_t aHash = static_cast<uint32_t>(static_cast<int>(aWorldX / SPACING)) * 2654435761u;
+		const int aCel = static_cast<int>((aHash >> 16) % static_cast<uint32_t>(aPuff->mNumCols));
+		const float aJitter = static_cast<float>(static_cast<int>((aHash >> 8) % 7) - 3);
+		const float aPuffScale = (0.35f + 0.85f * aAge) * aScale;
+		const int aAlpha = static_cast<int>(200.0f * (1.0f - aAge) * (1.0f - aAge));
+		if (aAlpha <= 0)
+			continue;
+		aG.SetColor(Color(255, 255, 255, aAlpha));
+		const float aX = theOffsetX + aWorldX - mX;
+		const float aY = theOffsetY + aTailY + aJitter * aAge;
+		PvzpDrawImageCelCenterScaledF(&aG, aPuff, aX - aCelWidth * 0.5f, aY - aCelHeight * 0.5f, aCel, aPuffScale, aPuffScale);
+	}
+}
+
 bool Plant::DrawPlusRocket(Graphics* g, SeedType theSeedType, float theX, float theY, PlantState theState, uint32_t theCounter, float theScale)
 {
 	if (!gLawnApp->IsAdventurePlusLevel() || !gLawnApp->IsWallnutBowlingLevel())
