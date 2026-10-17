@@ -119,8 +119,8 @@ bool Music::PvzpLoadMusic(MusicFile theMusicFile, std::string_view theFileName)
 // The packed boss music is limited to 0.6 of full scale (pack_coop_assets.py)
 // and raised here by this much as it plays: louder than the music slider's
 // cap would otherwise let any music be, and still without clipping.
-static constexpr int COOP_MUSIC_BOOST_NUM = 8;
-static constexpr int COOP_MUSIC_BOOST_DEN = 5;
+static constexpr int COOP_MUSIC_BOOST_NUM = 27;  // x1.35 (was x1.6: a touch too loud)
+static constexpr int COOP_MUSIC_BOOST_DEN = 20;
 
 static void SDLCALL CoopMusicBoost(Mix_Music*, void* theStream, int theLength, void*)
 {
