@@ -30,7 +30,7 @@ namespace Coop
 
 // Bumped on any wire-format change. Peers with different versions are rejected
 // at handshake rather than allowed to desync later.
-constexpr uint32_t PROTOCOL_VERSION = 9;
+constexpr uint32_t PROTOCOL_VERSION = 10;
 
 constexpr uint16_t DEFAULT_PORT = 1337;
 
@@ -239,6 +239,13 @@ struct LevelSetup
 	int32_t  mProfileLevel = 1;
 	int32_t  mCoins = 0;
 	uint32_t mFinishedAdventure = 0;
+	// Read by the simulation, so they have to match. Board::DropLootPiece
+	// spawns the minigame present on level 22 and the puzzle present on
+	// level 36 only for a player who has not unlocked that mode yet. With
+	// one player unlocked and the other not, one lawn gained a coin the
+	// other never had and the games diverged on an ordinary level.
+	uint32_t mHasUnlockedMinigames = 0;
+	uint32_t mHasUnlockedPuzzleMode = 0;
 	uint32_t mPurchases[PURCHASE_COUNT] = {};
 };
 

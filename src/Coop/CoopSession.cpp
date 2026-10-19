@@ -183,6 +183,8 @@ namespace
 		thePacker.U32(static_cast<uint32_t>(theSetup.mProfileLevel));
 		thePacker.U32(static_cast<uint32_t>(theSetup.mCoins));
 		thePacker.U32(theSetup.mFinishedAdventure);
+		thePacker.U32(theSetup.mHasUnlockedMinigames);
+		thePacker.U32(theSetup.mHasUnlockedPuzzleMode);
 		for (int i = 0; i < PURCHASE_COUNT; i++)
 			thePacker.U32(theSetup.mPurchases[i]);
 	}
@@ -199,6 +201,8 @@ namespace
 		theSetup.mProfileLevel = static_cast<int32_t>(theCursor.U32());
 		theSetup.mCoins = static_cast<int32_t>(theCursor.U32());
 		theSetup.mFinishedAdventure = theCursor.U32();
+		theSetup.mHasUnlockedMinigames = theCursor.U32();
+		theSetup.mHasUnlockedPuzzleMode = theCursor.U32();
 		for (int i = 0; i < PURCHASE_COUNT; i++)
 			theSetup.mPurchases[i] = theCursor.U32();
 	}

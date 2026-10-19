@@ -648,6 +648,8 @@ Coop::LevelSetup LawnApp::CoopMakeProfileSetup() const
 	aSetup.mProfileLevel = mPlayerInfo->mLevel;
 	aSetup.mCoins = mPlayerInfo->mCoins;
 	aSetup.mFinishedAdventure = mPlayerInfo->mFinishedAdventure;
+	aSetup.mHasUnlockedMinigames = static_cast<uint32_t>(mPlayerInfo->mHasUnlockedMinigames);
+	aSetup.mHasUnlockedPuzzleMode = static_cast<uint32_t>(mPlayerInfo->mHasUnlockedPuzzleMode);
 	for (int i = 0; i < Coop::PURCHASE_COUNT; i++)
 		aSetup.mPurchases[i] = mPlayerInfo->mPurchases[i];
 	aSetup.mDifficulty = Coop::Game::Get().GetNextDifficulty();
@@ -700,6 +702,8 @@ void LawnApp::CoopBorrowHostProfile(const Coop::LevelSetup& theSetup)
 	mPlayerInfo->mLevel = theSetup.mProfileLevel;
 	mPlayerInfo->mCoins = theSetup.mCoins;
 	mPlayerInfo->mFinishedAdventure = theSetup.mFinishedAdventure;
+	mPlayerInfo->mHasUnlockedMinigames = static_cast<int32_t>(theSetup.mHasUnlockedMinigames);
+	mPlayerInfo->mHasUnlockedPuzzleMode = static_cast<int32_t>(theSetup.mHasUnlockedPuzzleMode);
 	for (int i = 0; i < Coop::PURCHASE_COUNT; i++)
 		mPlayerInfo->mPurchases[i] = theSetup.mPurchases[i];
 
