@@ -74,6 +74,7 @@ void Lockstep::Reset()
 	mStallEvents = 0;
 	mTotalStallMs = 0;
 	mSmoothTicks = 0;
+	mPacingCounter = 0;
 	mRaisedThisStall = false;
 	mRecentStalls.clear();
 	mOwnHeadroom = 0;
@@ -276,6 +277,43 @@ bool Lockstep::BeginTick()
 		return false;
 	}
 
+	// How far ahead of need the peer's input is arriving: the ticks after
+	// this one that are already here. Measured before anything commits to
+	// this tick, because it decides whether we take the tick at all.
+	uint32_t aDepth = 0;
+	while (aDepth < HEADROOM_REPORT_CAP && mRemoteByTick.count(mCurrentTick + aDepth + 1) != 0)
+		++aDepth;
+
+	// Pace, rather than sprint into a wall.
+	//
+	// Running flat out until the queue empties and then stopping dead for
+	// several ticks is the freeze; the engine's accumulator then replays the
+	// missed ticks back to back, which is the jump after it. Both are
+	// plainly visible, and raising the delay only moves the wall further
+	// away rather than removing it.
+	//
+	// So while the buffer is thin, give up one tick in twenty instead. The
+	// game runs five per cent slow for a moment, which nobody can see, and
+	// the late input gets time to land, so the queue usually refills before
+	// it can empty. Both machines do this off the same signal, so they slow
+	// together and stay in step.
+	//
+	// This is not a stall: nothing is missing and we are choosing to wait.
+	// It is kept out of the stall statistics so it cannot drive the delay up
+	// or raise the "waiting for the other player" banner.
+	if (aDepth < PACING_MIN_DEPTH)
+	{
+		if (++mPacingCounter >= PACING_SKIP_INTERVAL)
+		{
+			mPacingCounter = 0;
+			return false;
+		}
+	}
+	else
+	{
+		mPacingCounter = 0;
+	}
+
 	if (mStalling)
 	{
 		mStalling = false;
@@ -284,13 +322,9 @@ bool Lockstep::BeginTick()
 				std::chrono::steady_clock::now() - mStallBegan).count());
 	}
 
-	// How far ahead of need the peer's input is arriving: the ticks after
-	// this one that are already here. That is the slack the PEER's delay
-	// buys us, so it goes back to the peer with our next batch.
-	uint32_t aHeadroom = 0;
-	while (aHeadroom < HEADROOM_REPORT_CAP && mRemoteByTick.count(mCurrentTick + aHeadroom + 1) != 0)
-		++aHeadroom;
-	mOwnHeadroom = aHeadroom;
+	// That same depth is the slack the PEER's delay buys us, so it goes back
+	// to the peer with our next batch.
+	mOwnHeadroom = aDepth;
 
 	// Give the delay back once the link has behaved for a while, so one bad
 	// moment does not cost input lag for the rest of the session -- but only

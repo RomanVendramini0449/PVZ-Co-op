@@ -87,6 +87,13 @@ public:
 	static constexpr uint32_t HEADROOM_REPORT_CAP = 8;
 	// Several short stalls close together mean the link is slower than the
 	// delay assumes, even though no single one lasted long.
+	// Buffer depth we try to keep in hand between us and an empty queue.
+	static constexpr uint32_t PACING_MIN_DEPTH = 2;
+	// While the buffer is thin, one tick in this many is given up: a five
+	// per cent change of tempo, which nobody can see, in place of running
+	// flat out into a stop everybody can.
+	static constexpr uint32_t PACING_SKIP_INTERVAL = 20;
+
 	static constexpr uint32_t FREQUENT_STALLS = 3;
 	static constexpr uint32_t FREQUENT_STALLS_WINDOW_MS = 2000;
 
@@ -126,7 +133,8 @@ private:
 	std::chrono::steady_clock::time_point mLastDelayRaise{};
 	uint32_t    mStallEvents = 0;      // distinct times we had to wait
 	uint64_t    mTotalStallMs = 0;     // how long we waited in total
-	uint32_t    mSmoothTicks = 0;      // consecutive ticks with no waiting
+	uint32_t    mSmoothTicks = 0;
+	uint32_t    mPacingCounter = 0;      // consecutive ticks with no waiting
 	// One raise per stall, however long it lasts: a single long wait is the
 	// other machine loading something, not a slow link, and used to ratchet
 	// the delay up a step every 120 ms of it.
