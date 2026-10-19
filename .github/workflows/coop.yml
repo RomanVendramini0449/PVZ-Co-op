@@ -23,75 +23,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-linux:
-    name: Test netcode (Linux)
+  check-launcher:
+    name: Check the launcher
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build libjpeg-dev libopenmpt-dev \
-            libpng-dev libsdl2-dev ccache
-
-      # Most of a run is recompiling ~400 unchanged C++ files. Caching the
-      # object files makes a launcher- or docs-only change rebuild in
-      # seconds instead of minutes.
-      - name: Restore compiler cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ccache
-          key: ccache-linux-${{ github.sha }}
-          restore-keys: ccache-linux-
-
-      # The launcher is PowerShell, so the compiler never sees it. A syntax
-      # check alone is not enough either: an edit once deleted a function
-      # while leaving its call site, which parses fine and only fails when a
-      # user presses the button. This resolves every command it calls.
+      # The C++ build used to live here too, but the game now uses #embed and
+      # Ubuntu's GCC does not support it, so the build failed and every
+      # netcode test after it was skipped -- the safety net was off without
+      # anything saying so. Those tests moved to the Windows job, which has a
+      # compiler that can build the game. This job stays for the launcher,
+      # which is PowerShell and needs no compiler at all.
       - name: Check the launcher script
         shell: pwsh
         run: |
           ./tools/check-launcher.ps1
-          # Runs the same function the Start button calls, for both the host
-          # and join forms, so a broken command line fails here rather than
-          # in someone's hands.
           ./tools/windows/PVZ-Coop-Launcher.ps1 -TestOnly
-
-      - name: Build
-        run: |
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-          cmake --build build
-          ccache --show-stats | head -5
-
-      # Needs no game assets, so the netcode is verified on every push.
-      - name: Run co-op self-tests
-        run: ./build/pvz-portable --coop-selftest
-
-      # Two real processes over a real socket, which is what the players do.
-      # Both must finish on the same simulation state.
-      - name: Two-process lockstep test
-        run: |
-          ./build/pvz-portable --coop-nettest --host --port 35200 > host.log 2>&1 &
-          sleep 2
-          ./build/pvz-portable --coop-nettest --join 127.0.0.1:35200 > client.log 2>&1
-          sleep 3
-          echo "----- host -----";   cat host.log
-          echo "----- client -----"; cat client.log
-
-          grep -q "coop nettest: PASS" host.log   || { echo "host did not pass";   exit 1; }
-          grep -q "coop nettest: PASS" client.log || { echo "client did not pass"; exit 1; }
-
-          HOST_STATE=$(grep -o 'final state 0x[0-9A-F]*' host.log)
-          CLIENT_STATE=$(grep -o 'final state 0x[0-9A-F]*' client.log)
-          echo "host:   $HOST_STATE"
-          echo "client: $CLIENT_STATE"
-          if [ "$HOST_STATE" != "$CLIENT_STATE" ]; then
-            echo "DESYNC: the two processes ended on different states"
-            exit 1
-          fi
-          echo "Both processes agree on the final simulation state."
 
   build-windows:
     name: Build Windows .exe
@@ -147,6 +95,32 @@ jobs:
       - name: Verify the netcode in the Windows build
         shell: msys2 {0}
         run: ./dist/PvZ-Coop.exe --coop-selftest
+
+      # Two real processes over a real socket, which is what the players do.
+      # Both must finish on the same simulation state; a mismatch here is the
+      # same class of bug as a desync in a live game.
+      - name: Two-process lockstep test
+        shell: msys2 {0}
+        run: |
+          ./dist/PvZ-Coop.exe --coop-nettest --host --port 35200 > host.log 2>&1 &
+          sleep 3
+          ./dist/PvZ-Coop.exe --coop-nettest --join 127.0.0.1:35200 > client.log 2>&1
+          sleep 4
+          echo "----- host -----";   cat host.log
+          echo "----- client -----"; cat client.log
+
+          grep -q "coop nettest: PASS" host.log   || { echo "host did not pass";   exit 1; }
+          grep -q "coop nettest: PASS" client.log || { echo "client did not pass"; exit 1; }
+
+          HOST_STATE=$(grep -o 'final state 0x[0-9A-F]*' host.log)
+          CLIENT_STATE=$(grep -o 'final state 0x[0-9A-F]*' client.log)
+          echo "host:   $HOST_STATE"
+          echo "client: $CLIENT_STATE"
+          if [ "$HOST_STATE" != "$CLIENT_STATE" ]; then
+            echo "DESYNC: the two processes ended on different states"
+            exit 1
+          fi
+          echo "Both processes agree on the final simulation state." 
 
       - uses: actions/upload-artifact@v7
         with:

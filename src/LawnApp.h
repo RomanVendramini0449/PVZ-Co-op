@@ -124,6 +124,10 @@ public:
 	bool							mCoopPendingEndLevel = false;
 	// When to stop showing "the games fell out of sync, level restarted".
 	uint32_t						mCoopResyncNoticeUntil = 0;
+	// Restarting recovers a one-off divergence. A reproducible one would
+	// restart forever, so the attempts are counted per level and capped.
+	uint32_t						mCoopResyncAttempts = 0;
+	int32_t							mCoopResyncLevel = -1;
 	bool							mCoopRunningDeferredEndLevel = false;
 	// Host: the last screen announced, so it is only sent when it changes.
 	Coop::HostScreen				mCoopLastScreen = Coop::HostScreen::None;

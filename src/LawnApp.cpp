@@ -77,6 +77,12 @@
 #include "widget/Dialog.h"
 #include "SexyAppFramework/resource.h"
 
+// How many times the host will restart a level to clear a desync before it
+// stops trying. Three is enough for a one-off divergence and short enough
+// that a reproducible one does not trap both players in a restart loop.
+static constexpr uint32_t COOP_MAX_RESYNC_ATTEMPTS = 3;
+
+
 bool gIsPartnerBuild = false;
 bool gSlowMo = false;
 bool gFastMo = false;
@@ -2657,10 +2663,42 @@ void LawnApp::UpdateFrames()
 			if (aCoop.IsInGame() && aCoop.IsHost() && aCoop.GetLockstep().IsDesynced()
 				&& mBoard && (IsAdventureMode() || IsCoopBonusLevel()) && !mCoopPendingEndLevel)
 			{
-				printf("co-op: %s Restarting the level.\n", aCoop.GetLockstep().GetDesyncText().c_str());
-				fflush(stdout);
-				mCoopResyncNoticeUntil = SDL_GetTicks() + 6000;
-				mCoopPendingEndLevel = true;
+				// Count attempts per level: a fresh level starts with a clean
+				// slate, but the same level failing over and over means the
+				// cause is reproducible rather than a one-off.
+				const int32_t aLevel = mPlayerInfo ? mPlayerInfo->mLevel : 0;
+				if (aLevel != mCoopResyncLevel)
+				{
+					mCoopResyncLevel = aLevel;
+					mCoopResyncAttempts = 0;
+				}
+
+				if (mCoopResyncAttempts < COOP_MAX_RESYNC_ATTEMPTS)
+				{
+					mCoopResyncAttempts++;
+					printf("co-op: %s Restarting the level (attempt %u of %u).\n",
+						aCoop.GetLockstep().GetDesyncText().c_str(),
+						mCoopResyncAttempts, COOP_MAX_RESYNC_ATTEMPTS);
+					fflush(stdout);
+					mCoopResyncNoticeUntil = SDL_GetTicks() + 6000;
+					mCoopPendingEndLevel = true;
+				}
+				else
+				{
+					// Restarting is not fixing it. Looping would lock both
+					// players out of the game entirely, which is worse than
+					// stopping, and freezing the board is worse still: end
+					// the session so both games keep running on their own.
+					printf("co-op: %s Gave up after %u restarts; ending the session.\n",
+						aCoop.GetLockstep().GetDesyncText().c_str(), mCoopResyncAttempts);
+					fflush(stdout);
+					mCoopResyncAttempts = 0;
+					mCoopResyncLevel = -1;
+					aCoop.EndLevel();
+					aCoop.GetSession().Disconnect(
+						"The games kept falling out of sync, so co-op has stopped. "
+						"Your game carries on by itself.");
+				}
 			}
 		}
 

@@ -1005,7 +1005,21 @@ const AdventurePlusLevel& GetAdventurePlusLevel(int theLevel)
 
 int Board::GetLevelRandSeed()
 {
-	int aRndSeed = mApp->mPlayerInfo->mId + mBoardRandSeed;
+	// mPlayerInfo->mId is the one term here co-op never syncs. ProfileMgr
+	// hands ids out with mNextProfileId++, so the host's profile and the
+	// client's are numbered by independent local counters. Everything else
+	// already agrees: mBoardRandSeed comes from the shared per-level seed,
+	// and mFinishedAdventure and mLevel are borrowed from the host.
+	//
+	// Including it gave the two machines different level RNG streams, and
+	// this seed places the gravestones. Night levels therefore had graves in
+	// different squares on each lawn, so planting where one player saw bare
+	// ground and the other saw a grave desynced the game on the spot. The
+	// seed chooser and challenge levels draw from the same stream and were
+	// just as exposed.
+	int aRndSeed = mBoardRandSeed;
+	if (!Coop::Game::Get().IsConnected())
+		aRndSeed += mApp->mPlayerInfo->mId;
 	if (mApp->IsAdventureMode())
 	{
 		aRndSeed += mApp->mPlayerInfo->mFinishedAdventure * 101 + mLevel;
