@@ -55,7 +55,7 @@ public:
 	// Never drop below this. Updates run in bursts of one or two ticks per
 	// 60 Hz frame, so a peer's batch can land a whole frame late even over
 	// loopback; 20 ms left no room for that and showed up as hitches.
-	static constexpr uint32_t MIN_INPUT_DELAY = 3;      // 30 ms
+	static constexpr uint32_t MIN_INPUT_DELAY = 5;      // 50 ms
 	// Everything below is measured in milliseconds of real stalling, NOT in
 	// calls to BeginTick(). The caller polls in a tight loop, so counting
 	// calls measured how fast the loop spins rather than how bad the link is:
@@ -80,7 +80,7 @@ public:
 	static constexpr uint32_t HEADROOM_REPORT_CAP = 8;
 	// Several short stalls close together mean the link is slower than the
 	// delay assumes, even though no single one lasted long.
-	static constexpr uint32_t FREQUENT_STALLS = 4;
+	static constexpr uint32_t FREQUENT_STALLS = 3;
 	static constexpr uint32_t FREQUENT_STALLS_WINDOW_MS = 2000;
 
 private:

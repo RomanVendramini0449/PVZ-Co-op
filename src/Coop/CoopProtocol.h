@@ -38,10 +38,15 @@ constexpr uint16_t DEFAULT_PORT = 1337;
 // allocated, so a hostile or corrupt peer cannot exhaust memory.
 constexpr uint32_t MAX_FRAME_BYTES = 64 * 1024;
 
-// Ticks of input delay. Input sampled on tick T executes on tick T + delay on
-// BOTH machines. See docs/ARCHITECTURE.md. 3 ticks = 30 ms, sized for LAN;
-// Phase 2 raises it adaptively when the link stalls.
-constexpr uint32_t DEFAULT_INPUT_DELAY = 3;
+// Ticks of input delay: how far ahead of itself each machine schedules its
+// own input, and therefore how much of the peer's input it has buffered.
+//
+// Six ticks is 60 ms. Three was too thin for a real link: a stall costs far
+// more than the delay saves, because the simulation stops dead and then
+// catches up in a burst, which is what hitching actually is. Sixty
+// milliseconds of extra lag before a plant appears is not perceptible in
+// this game; stuttering very much is.
+constexpr uint32_t DEFAULT_INPUT_DELAY = 6;
 
 // How often the peers compare simulation checksums. At 100 Hz this is 4 times
 // a second: frequent enough to catch a desync before it is visible, cheap
