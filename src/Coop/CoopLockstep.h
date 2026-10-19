@@ -55,7 +55,10 @@ public:
 	// Never drop below this. Updates run in bursts of one or two ticks per
 	// 60 Hz frame, so a peer's batch can land a whole frame late even over
 	// loopback; 20 ms left no room for that and showed up as hitches.
-	static constexpr uint32_t MIN_INPUT_DELAY = 5;      // 50 ms
+	// Never below the starting delay. Six ticks was chosen deliberately as
+	// the buffer a real link needs; a floor underneath it just undid that
+	// choice ten seconds into every session.
+	static constexpr uint32_t MIN_INPUT_DELAY = DEFAULT_INPUT_DELAY;  // 60 ms
 	// Everything below is measured in milliseconds of real stalling, NOT in
 	// calls to BeginTick(). The caller polls in a tight loop, so counting
 	// calls measured how fast the loop spins rather than how bad the link is:
@@ -68,7 +71,11 @@ public:
 	// cost input lag for the rest of the session. Ten seconds: lowering too
 	// eagerly made the delay oscillate -- drop, stall, raise, drop -- which is
 	// a hitch every few seconds.
-	static constexpr uint32_t SMOOTH_TICKS_BEFORE_LOWER = 1000;
+	// Ten seconds of quiet was weak evidence that a link had stopped needing
+	// its buffer, and gave a sawtooth: lower, stall, lower, stall, with each
+	// stall a visible freeze. A minute is real evidence, and a link that
+	// genuinely settles still gets its lag back, just unhurriedly.
+	static constexpr uint32_t SMOOTH_TICKS_BEFORE_LOWER = 6000;
 	// ...and only if OUR input has been reaching the peer at least this many
 	// ticks ahead of need the whole time, so there is slack to give back.
 	// That is the peer's measurement, not ours: our delay is what protects
