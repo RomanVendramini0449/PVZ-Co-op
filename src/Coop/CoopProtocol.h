@@ -30,7 +30,7 @@ namespace Coop
 
 // Bumped on any wire-format change. Peers with different versions are rejected
 // at handshake rather than allowed to desync later.
-constexpr uint32_t PROTOCOL_VERSION = 10;
+constexpr uint32_t PROTOCOL_VERSION = 11;
 
 constexpr uint16_t DEFAULT_PORT = 1337;
 
@@ -67,6 +67,12 @@ enum class MsgType : uint8_t
 	HostScreen = 10,  // host -> client: the screen the host is on, outside a level
 	PeerReady = 11,   // client -> host: past the title screen, ready to follow
 	PlayerInfo = 12,  // both ways: this player's name and colour, whenever they change
+	// Either way: "I have detected that we are out of sync". Detection is
+	// not naturally symmetric, because the machine running behind can
+	// receive the other's checksum before it has computed its own. Whoever
+	// notices says so, rather than leaving the other one starving for input
+	// it will never send.
+	Desync = 13,
 };
 
 // A player's name is at most this long on the wire (the game's own profile

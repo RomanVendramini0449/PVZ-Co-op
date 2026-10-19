@@ -149,6 +149,10 @@ private:
 
 	// Our own checksums, kept until the peer's arrive to compare against.
 	std::map<uint32_t, uint32_t> mLocalChecksums;
+	// The peer's checksums, held until our own for the same tick exists.
+	// Throwing away the ones that arrived early meant the machine running
+	// behind could never detect a desync at all.
+	std::map<uint32_t, uint32_t> mPeerChecksums;
 	bool        mDesynced = false;
 	std::string mDesyncText;
 

@@ -128,6 +128,8 @@ public:
 	// restart forever, so the attempts are counted per level and capped.
 	uint32_t						mCoopResyncAttempts = 0;
 	int32_t							mCoopResyncLevel = -1;
+	// When the game first became unable to advance, for the watchdog below.
+	uint32_t						mCoopStuckSince = 0;
 	bool							mCoopRunningDeferredEndLevel = false;
 	// Host: the last screen announced, so it is only sent when it changes.
 	Coop::HostScreen				mCoopLastScreen = Coop::HostScreen::None;

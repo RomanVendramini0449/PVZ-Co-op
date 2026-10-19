@@ -81,6 +81,7 @@ private:
 	std::deque<CommandBatch> mPendingBatches;
 	struct PendingChecksum { uint32_t mEpoch; uint32_t mTick; uint32_t mValue; };
 	std::deque<PendingChecksum> mPendingChecksums;
+	std::deque<uint32_t>        mPendingDesyncs;
 	// Host-driven campaign flow (SPEC.md section 3). Queued rather than
 	// applied on arrival: the client acts on these from the game loop, where
 	// building a board is safe.
@@ -146,6 +147,10 @@ public:
 	// Simulation checksums, compared to catch a desync early.
 	bool SendChecksum(uint32_t theTick, uint32_t theChecksum, uint32_t theEpoch = 0);
 	bool PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut, uint32_t theEpoch = 0);
+
+	// Tell the peer we have detected a desync, and collect theirs.
+	bool SendDesync(uint32_t theTick);
+	bool PopDesync(uint32_t& theTickOut);
 
 	// Host-driven campaign flow. Only the host sends these; only the client
 	// has anything to pop.

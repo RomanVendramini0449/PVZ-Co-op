@@ -82,6 +82,13 @@
 // that a reproducible one does not trap both players in a restart loop.
 static constexpr uint32_t COOP_MAX_RESYNC_ATTEMPTS = 3;
 
+// Last resort. Whatever goes wrong, a co-op session must never leave the game
+// sitting unresponsive: past these, the session ends and play continues
+// alone. Both are far longer than any legitimate pause, so neither can fire
+// on a slow link or a long level load.
+static constexpr uint32_t COOP_DESYNC_WATCHDOG_MS = 12000;
+static constexpr uint32_t COOP_STALL_WATCHDOG_MS = 45000;
+
 
 bool gIsPartnerBuild = false;
 bool gSlowMo = false;
@@ -2712,6 +2719,56 @@ void LawnApp::UpdateFrames()
 					aCoop.GetSession().Disconnect(
 						"The games kept falling out of sync, so co-op has stopped. "
 						"Your game carries on by itself.");
+				}
+			}
+		}
+
+		// Watchdog, after the host's recovery above has had its chance.
+		//
+		// The host restarts the level when it sees a desync, but that relies
+		// on the host being the one that noticed and on the restart actually
+		// happening. Anything that defeats both leaves the simulation gated
+		// and the game unresponsive, which is the worst outcome available.
+		// So if the game simply cannot advance for far longer than any real
+		// pause, the session ends and both players carry on alone.
+		{
+			Coop::Game& aCoop = Coop::Game::Get();
+			if (!aCoop.IsInGame())
+			{
+				mCoopStuckSince = 0;
+			}
+			else
+			{
+				const Coop::Lockstep& aLockstep = aCoop.GetLockstep();
+				const bool aDesynced = aLockstep.IsDesynced();
+				const bool aStalledTooLong =
+					aLockstep.CurrentStallMsPublic() >= COOP_STALL_WATCHDOG_MS;
+				const uint32_t aNow = SDL_GetTicks();
+
+				if (!aDesynced && !aStalledTooLong)
+				{
+					mCoopStuckSince = 0;
+				}
+				else
+				{
+					if (mCoopStuckSince == 0)
+						mCoopStuckSince = aNow;
+
+					const uint32_t aLimit = aDesynced
+						? COOP_DESYNC_WATCHDOG_MS : COOP_STALL_WATCHDOG_MS;
+					if (aNow - mCoopStuckSince >= aLimit)
+					{
+						printf("co-op: stuck for %u ms (%s); ending the session so the game keeps running.\n",
+							aNow - mCoopStuckSince, aDesynced ? "out of sync" : "no input from the other player");
+						fflush(stdout);
+						mCoopStuckSince = 0;
+						mCoopResyncAttempts = 0;
+						mCoopResyncLevel = -1;
+						aCoop.EndLevel();
+						aCoop.GetSession().Disconnect(
+							"Co-op stopped responding, so it has ended. "
+							"Your game carries on by itself.");
+					}
 				}
 			}
 		}

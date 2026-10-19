@@ -258,6 +258,7 @@ bool Session::StartHost(uint16_t thePort, Difficulty theDifficulty, uint32_t the
 	mOutbound.clear();
 	mPendingBatches.clear();
 	mPendingChecksums.clear();
+	mPendingDesyncs.clear();
 
 	mLocalBuildHash = HashOwnExecutable();
 	mLocalAssetHash = HashGameAssets();
@@ -291,6 +292,7 @@ bool Session::StartJoin(const std::string& theHost, uint16_t thePort)
 	mOutbound.clear();
 	mPendingBatches.clear();
 	mPendingChecksums.clear();
+	mPendingDesyncs.clear();
 
 	mLocalBuildHash = HashOwnExecutable();
 	mLocalAssetHash = HashGameAssets();
@@ -503,6 +505,15 @@ bool Session::HandleFrame(const char* theData, uint32_t theLen)
 		return true;
 	}
 
+	case MsgType::Desync:
+	{
+		const uint32_t aTick = aCursor.U32();
+		if (!aCursor.mOk)
+			return false;
+		mPendingDesyncs.push_back(aTick);
+		return true;
+	}
+
 	case MsgType::EnterLevel:
 	{
 		if (mIsHost)
@@ -667,6 +678,29 @@ bool Session::SendChecksum(uint32_t theTick, uint32_t theChecksum, uint32_t theE
 	aPacker.U32(theTick);
 	aPacker.U32(theChecksum);
 	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
+}
+
+bool Session::SendDesync(uint32_t theTick)
+{
+	if (!IsConnected())
+		return false;
+
+	Packer aPacker;
+	aPacker.U8(static_cast<uint8_t>(MsgType::Desync));
+	aPacker.U32(theTick);
+	return SendFrame(aPacker.mData.data(), static_cast<uint32_t>(aPacker.mData.size()));
+}
+
+bool Session::PopDesync(uint32_t& theTickOut)
+{
+	// No epoch filter on purpose: a desync notice is about the session, not
+	// a particular level, and dropping a late one would put us right back to
+	// one machine knowing and the other waiting.
+	if (mPendingDesyncs.empty())
+		return false;
+	theTickOut = mPendingDesyncs.front();
+	mPendingDesyncs.pop_front();
+	return true;
 }
 
 bool Session::PopChecksum(uint32_t& theTickOut, uint32_t& theChecksumOut, uint32_t theEpoch)

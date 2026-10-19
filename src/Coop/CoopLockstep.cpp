@@ -80,6 +80,7 @@ void Lockstep::Reset()
 	mOwnHeadroom = 0;
 	mPeerMinHeadroom = UINT32_MAX;
 	mLocalChecksums.clear();
+	mPeerChecksums.clear();
 	mDesynced = false;
 	mDesyncText.clear();
 }
@@ -100,6 +101,13 @@ void Lockstep::ReportDesync(const std::string& theReason)
 
 	mDesynced = true;
 	mDesyncText = theReason;
+
+	// Tell the peer. Detection is not symmetric, so without this the other
+	// machine can be left waiting for input we have already stopped
+	// sending. If they spotted it first this is a harmless echo, because
+	// their own report has already latched.
+	if (mSession != nullptr)
+		mSession->SendDesync(mCurrentTick);
 }
 
 void Lockstep::QueueLocalCommand(CommandType theType, int16_t theX, int16_t theY, int16_t theArg)
@@ -136,23 +144,46 @@ void Lockstep::DrainSession()
 	uint32_t aTick = 0;
 	uint32_t aRemoteChecksum = 0;
 	while (mSession->PopChecksum(aTick, aRemoteChecksum, mEpoch))
-	{
-		auto aFound = mLocalChecksums.find(aTick);
-		if (aFound == mLocalChecksums.end())
-			continue;  // ours for that tick is gone or not computed yet
+		mPeerChecksums[aTick] = aRemoteChecksum;
 
-		if (aFound->second != aRemoteChecksum && !mDesynced)
+	// Compare every tick we now hold both halves of.
+	//
+	// A peer checksum that arrived before our own for that tick used to be
+	// discarded, and the machine running behind is exactly the one that
+	// receives them early. So it could never detect a desync at all, while
+	// the machine ahead detected it, stopped simulating, and with that
+	// stopped sending input. The one left behind then starved on a batch
+	// that was never coming, and neither recovered: both simply hung.
+	for (auto aIt = mPeerChecksums.begin(); aIt != mPeerChecksums.end(); )
+	{
+		auto aMine = mLocalChecksums.find(aIt->first);
+		if (aMine == mLocalChecksums.end())
 		{
-			mDesynced = true;
-			mDesyncText = "The two games have fallen out of sync (tick "
-				+ std::to_string(aTick) + "). This is a bug, not your connection.";
+			++aIt;
+			continue;
 		}
-		mLocalChecksums.erase(aFound);
+
+		if (aMine->second != aIt->second)
+			ReportDesync("The two games have fallen out of sync (tick "
+				+ std::to_string(aIt->first) + "). This is a bug, not your connection.");
+
+		mLocalChecksums.erase(aMine);
+		aIt = mPeerChecksums.erase(aIt);
 	}
+
+	// A desync the peer spotted first. Whoever notices tells the other, so
+	// both leave the level together instead of one waiting on a machine
+	// that has already stopped.
+	uint32_t aPeerDesyncTick = 0;
+	while (mSession->PopDesync(aPeerDesyncTick))
+		ReportDesync("The two games have fallen out of sync (tick "
+			+ std::to_string(aPeerDesyncTick) + "). This is a bug, not your connection.");
 
 	// Anything older than the live tick can never be compared again.
 	while (!mLocalChecksums.empty() && mLocalChecksums.begin()->first + 1000 < mCurrentTick)
 		mLocalChecksums.erase(mLocalChecksums.begin());
+	while (!mPeerChecksums.empty() && mPeerChecksums.begin()->first + 1000 < mCurrentTick)
+		mPeerChecksums.erase(mPeerChecksums.begin());
 }
 
 bool Lockstep::BeginTick()
