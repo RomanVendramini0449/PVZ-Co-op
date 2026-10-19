@@ -2665,8 +2665,16 @@ void LawnApp::UpdateFrames()
 		{
 			Coop::Game& aCoop = Coop::Game::Get();
 			if (aCoop.IsInGame() && aCoop.IsHost() && aCoop.GetLockstep().IsDesynced()
-				&& mBoard && (IsAdventureMode() || IsCoopBonusLevel()) && !mCoopPendingEndLevel)
+				&& mBoard && !mCoopPendingEndLevel)
 			{
+				// Only a level that can be replayed from its seed can be
+				// restarted. Anything else used to fall outside this check
+				// entirely, which meant a desync there was never acted on at
+				// all: the simulation stays stopped while out of sync, so
+				// both machines simply froze, with nothing left to unfreeze
+				// them. Such a level now ends the session instead.
+				const bool aCanRestart = IsAdventureMode() || IsCoopBonusLevel();
+
 				// Count attempts per level: a fresh level starts with a clean
 				// slate, but the same level failing over and over means the
 				// cause is reproducible rather than a one-off.
@@ -2677,7 +2685,7 @@ void LawnApp::UpdateFrames()
 					mCoopResyncAttempts = 0;
 				}
 
-				if (mCoopResyncAttempts < COOP_MAX_RESYNC_ATTEMPTS)
+				if (aCanRestart && mCoopResyncAttempts < COOP_MAX_RESYNC_ATTEMPTS)
 				{
 					mCoopResyncAttempts++;
 					printf("co-op: %s Restarting the level (attempt %u of %u).\n",
@@ -2689,12 +2697,14 @@ void LawnApp::UpdateFrames()
 				}
 				else
 				{
-					// Restarting is not fixing it. Looping would lock both
-					// players out of the game entirely, which is worse than
-					// stopping, and freezing the board is worse still: end
-					// the session so both games keep running on their own.
-					printf("co-op: %s Gave up after %u restarts; ending the session.\n",
-						aCoop.GetLockstep().GetDesyncText().c_str(), mCoopResyncAttempts);
+					// Either restarting is not fixing it, or this level
+					// cannot be restarted at all. Looping would lock both
+					// players out, and leaving it frozen is worse still,
+					// because a stopped simulation never recovers on its
+					// own: end the session so both games keep running.
+					printf("co-op: %s %s; ending the session.\n",
+						aCoop.GetLockstep().GetDesyncText().c_str(),
+						aCanRestart ? "Gave up restarting" : "This level cannot be restarted");
 					fflush(stdout);
 					mCoopResyncAttempts = 0;
 					mCoopResyncLevel = -1;
