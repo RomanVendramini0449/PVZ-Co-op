@@ -82,11 +82,16 @@
 // that a reproducible one does not trap both players in a restart loop.
 static constexpr uint32_t COOP_MAX_RESYNC_ATTEMPTS = 3;
 
-// Last resort. Whatever goes wrong, a co-op session must never leave the game
-// sitting unresponsive: past these, the session ends and play continues
-// alone. Both are far longer than any legitimate pause, so neither can fire
-// on a slow link or a long level load.
-static constexpr uint32_t COOP_DESYNC_WATCHDOG_MS = 12000;
+// Last resort, and nothing more. Whatever goes wrong, a co-op session must
+// never leave the game sitting unresponsive: past these, the session ends and
+// play continues alone.
+//
+// Generous on purpose. Recovering from a desync means tearing the level down,
+// rebuilding it and the other player following, which takes real time, and a
+// watchdog that beats its own recovery just ends a session that was about to
+// be fine. The timer is also restarted whenever a recovery begins, so these
+// count idle time only.
+static constexpr uint32_t COOP_DESYNC_WATCHDOG_MS = 45000;
 static constexpr uint32_t COOP_STALL_WATCHDOG_MS = 45000;
 
 
@@ -2741,11 +2746,13 @@ void LawnApp::UpdateFrames()
 			{
 				const Coop::Lockstep& aLockstep = aCoop.GetLockstep();
 				const bool aDesynced = aLockstep.IsDesynced();
-				const bool aStalledTooLong =
-					aLockstep.CurrentStallMsPublic() >= COOP_STALL_WATCHDOG_MS;
 				const uint32_t aNow = SDL_GetTicks();
 
-				if (!aDesynced && !aStalledTooLong)
+				// A restart is already under way, so this is not idle time.
+				// Without this the watchdog raced the very recovery it is
+				// there to back up, and killed sessions that were busy
+				// fixing themselves.
+				if (!aDesynced || mCoopPendingEndLevel)
 				{
 					mCoopStuckSince = 0;
 				}
@@ -2754,12 +2761,10 @@ void LawnApp::UpdateFrames()
 					if (mCoopStuckSince == 0)
 						mCoopStuckSince = aNow;
 
-					const uint32_t aLimit = aDesynced
-						? COOP_DESYNC_WATCHDOG_MS : COOP_STALL_WATCHDOG_MS;
-					if (aNow - mCoopStuckSince >= aLimit)
+					if (aNow - mCoopStuckSince >= COOP_DESYNC_WATCHDOG_MS)
 					{
-						printf("co-op: stuck for %u ms (%s); ending the session so the game keeps running.\n",
-							aNow - mCoopStuckSince, aDesynced ? "out of sync" : "no input from the other player");
+						printf("co-op: out of sync and not recovering after %u ms; ending the session so the game keeps running.\n",
+							aNow - mCoopStuckSince);
 						fflush(stdout);
 						mCoopStuckSince = 0;
 						mCoopResyncAttempts = 0;
@@ -2769,6 +2774,21 @@ void LawnApp::UpdateFrames()
 							"Co-op stopped responding, so it has ended. "
 							"Your game carries on by itself.");
 					}
+				}
+
+				// The scheduler times a stall itself, so this needs no timer
+				// of its own: it is one continuous wait with no input at all,
+				// which no level load or slow link produces.
+				if (aCoop.IsInGame() && aLockstep.CurrentStallMsPublic() >= COOP_STALL_WATCHDOG_MS)
+				{
+					printf("co-op: no input from the other player for %u ms; ending the session.\n",
+						aLockstep.CurrentStallMsPublic());
+					fflush(stdout);
+					mCoopStuckSince = 0;
+					aCoop.EndLevel();
+					aCoop.GetSession().Disconnect(
+						"The other player stopped responding, so co-op has ended. "
+						"Your game carries on by itself.");
 				}
 			}
 		}
